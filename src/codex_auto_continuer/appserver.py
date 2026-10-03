@@ -1,0 +1,214 @@
+from __future__ import annotations
+
+import json
+from collections import deque
+from pathlib import Path
+from typing import Any
+
+from .errors import ProtocolError
+from .ws_unix import UnixWebSocket
+
+
+class RpcError(ProtocolError):
+    def __init__(self, method: str, error: dict[str, Any]):
+        self.method = method
+        self.error = error
+        message = error.get("message") if isinstance(error, dict) else None
+        super().__init__(f"Codex RPC {method} failed: {message or error!r}")
+
+
+class AppServerClient:
+    def __init__(self, websocket: UnixWebSocket):
+        self._ws = websocket
+        self._next_id = 1
+        self.notifications: deque[dict[str, Any]] = deque(maxlen=256)
+        self.server_requests: deque[dict[str, Any]] = deque(maxlen=64)
+        self.thread_subscriptions: set[str] = set()
+        self.user_agent: str | None = None
+
+    @classmethod
+    def connect(cls, socket_path: Path, timeout: float) -> "AppServerClient":
+        client = cls(UnixWebSocket.connect(socket_path, timeout))
+        result = client.request(
+            "initialize",
+            {
+                "clientInfo": {
+                    "name": "codex_auto_continuer",
+                    "title": "Codex Auto Continuer",
+                    "version": "0.1.0",
+                },
+                "capabilities": {
+                    "experimentalApi": True,
+                    "requestAttestation": False,
+                    "optOutNotificationMethods": [
+                        "item/agentMessage/delta",
+                        "item/reasoning/summaryTextDelta",
+                        "item/reasoning/textDelta",
+                        "item/commandExecution/outputDelta",
+                        "item/fileChange/outputDelta",
+                    ],
+                },
+            },
+        )
+        if not isinstance(result, dict) or not isinstance(result.get("userAgent"), str):
+            client.close()
+            raise ProtocolError("Codex initialize response omitted userAgent.")
+        client.user_agent = result["userAgent"]
+        client.notify("initialized", None)
+        return client
+
+    def close(self) -> None:
+        self.thread_subscriptions.clear()
+        self._ws.close()
+
+    def notify(self, method: str, params: Any) -> None:
+        message: dict[str, Any] = {"method": method}
+        if params is not None:
+            message["params"] = params
+        self._ws.send_text(json.dumps(message, separators=(",", ":")))
+
+    def request(self, method: str, params: dict[str, Any] | None = None) -> Any:
+        request_id = self._next_id
+        self._next_id += 1
+        message: dict[str, Any] = {"id": request_id, "method": method}
+        if params is not None:
+            message["params"] = params
+        self._ws.send_text(json.dumps(message, separators=(",", ":")))
+        while True:
+            raw = self._ws.recv_text()
+            try:
+                incoming = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise ProtocolError(f"Codex app-server emitted invalid JSON: {exc}") from exc
+            if not isinstance(incoming, dict):
+                raise ProtocolError("Codex app-server emitted a non-object JSON-RPC message.")
+            if "id" in incoming and "method" in incoming:
+                # Deliberately do not answer app-server -> client approvals/input requests.
+                self.server_requests.append(incoming)
+                continue
+            if "method" in incoming and "id" not in incoming:
+                self.notifications.append(incoming)
+                continue
+            if incoming.get("id") != request_id:
+                raise ProtocolError(
+                    f"Codex app-server returned response id {incoming.get('id')!r}; expected {request_id!r}."
+                )
+            if "error" in incoming:
+                error = incoming["error"]
+                if not isinstance(error, dict):
+                    raise ProtocolError(f"Codex RPC {method} returned a malformed error object.")
+                raise RpcError(method, error)
+            if "result" not in incoming:
+                raise ProtocolError(f"Codex RPC {method} response omitted both result and error.")
+            return incoming["result"]
+
+    def thread_list(self, *, cursor: str | None = None, limit: int = 100) -> dict[str, Any]:
+        return self._expect_object(
+            "thread/list",
+            self.request(
+                "thread/list",
+                {
+                    "cursor": cursor,
+                    "limit": limit,
+                    "sortKey": "updated_at",
+                    "sortDirection": "desc",
+                    "modelProviders": [],
+                    "sourceKinds": [],
+                    "archived": False,
+                },
+            ),
+        )
+
+    def latest_turn(self, thread_id: str) -> dict[str, Any] | None:
+        result = self._expect_object(
+            "thread/turns/list",
+            self.request(
+                "thread/turns/list",
+                {
+                    "threadId": thread_id,
+                    "cursor": None,
+                    "limit": 1,
+                    "sortDirection": "desc",
+                    "itemsView": "summary",
+                },
+            ),
+        )
+        data = result.get("data")
+        if not isinstance(data, list):
+            raise ProtocolError("thread/turns/list response omitted data array.")
+        if not data:
+            return None
+        if not isinstance(data[0], dict):
+            raise ProtocolError("thread/turns/list returned a non-object turn.")
+        return data[0]
+
+    def rate_limits(self) -> dict[str, Any]:
+        return self._expect_object("account/rateLimits/read", self.request("account/rateLimits/read", {}))
+
+    def resume_thread(self, thread_id: str) -> dict[str, Any]:
+        result = self._expect_object(
+            "thread/resume", self.request("thread/resume", {"threadId": thread_id, "excludeTurns": True})
+        )
+        self.thread_subscriptions.add(thread_id)
+        return result
+
+    def queue_add(self, thread_id: str, prompt: str, client_user_message_id: str) -> dict[str, Any]:
+        return self._expect_object(
+            "thread/queue/add",
+            self.request(
+                "thread/queue/add",
+                {
+                    "threadId": thread_id,
+                    "input": [{"type": "text", "text": prompt, "text_elements": []}],
+                    "clientUserMessageId": client_user_message_id,
+                },
+            ),
+        )
+
+    def queue_list_page(self, thread_id: str, cursor: str | None = None) -> dict[str, Any]:
+        return self._expect_object(
+            "thread/queue/list",
+            self.request("thread/queue/list", {"threadId": thread_id, "cursor": cursor, "limit": 100}),
+        )
+
+    def queue_delete(self, thread_id: str, queued_submission_id: str) -> bool:
+        result = self._expect_object(
+            "thread/queue/delete",
+            self.request(
+                "thread/queue/delete",
+                {"threadId": thread_id, "queuedSubmissionId": queued_submission_id},
+            ),
+        )
+        deleted = result.get("deleted")
+        if not isinstance(deleted, bool):
+            raise ProtocolError("thread/queue/delete response omitted boolean deleted field.")
+        return deleted
+
+    def queue_items(self, thread_id: str) -> list[dict[str, Any]]:
+        cursor: str | None = None
+        seen: set[str] = set()
+        out: list[dict[str, Any]] = []
+        while True:
+            page = self.queue_list_page(thread_id, cursor)
+            data = page.get("data")
+            if not isinstance(data, list):
+                raise ProtocolError("thread/queue/list response omitted data array.")
+            for item in data:
+                if not isinstance(item, dict):
+                    raise ProtocolError("thread/queue/list returned a non-object queue item.")
+                out.append(item)
+            next_cursor = page.get("nextCursor")
+            if next_cursor is None:
+                return out
+            if not isinstance(next_cursor, str) or not next_cursor:
+                raise ProtocolError("thread/queue/list returned an invalid nextCursor.")
+            if next_cursor in seen:
+                raise ProtocolError("thread/queue/list repeated a pagination cursor.")
+            seen.add(next_cursor)
+            cursor = next_cursor
+
+    @staticmethod
+    def _expect_object(method: str, value: Any) -> dict[str, Any]:
+        if not isinstance(value, dict):
+            raise ProtocolError(f"Codex RPC {method} returned a non-object result.")
+        return value

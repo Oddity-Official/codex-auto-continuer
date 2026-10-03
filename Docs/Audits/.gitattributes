@@ -1,0 +1,7 @@
+# Keep source-position fixtures and captured evidence byte-for-byte across hosts.
+** -text whitespace=cr-at-eol
+# This fixture intentionally uses CR-only line endings.
+**/unicode_quote_cr.md whitespace=-blank-at-eol
+# Generated failure fixtures intentionally contain malformed indentation/spacing.
+**/failure-* -whitespace
+**/minimal-failure-* -whitespace

@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codex-auto-continuer"
+version = "0.1.0"
+description = "Windows-native supervisor that resumes Codex threads after verified usage-limit recovery"
+requires-python = ">=3.13"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+codex-auto-continuer = "codex_auto_continuer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "scripts/tests"]
+addopts = "-ra"

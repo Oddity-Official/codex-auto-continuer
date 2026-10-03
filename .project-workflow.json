@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "name": "codex-auto-continuer",
+  "required_files": [
+    "Docs/PRODUCT.md",
+    "Docs/RESEARCH.md",
+    "Docs/ARCHITECTURE.md",
+    "pyproject.toml",
+    "src/codex_auto_continuer/cli.py",
+    "src/codex_auto_continuer/supervisor.py",
+    "tests/test_supervisor.py"
+  ],
+  "exclude_directories": [],
+  "exclude_files": [],
+  "windows_python": "3.13"
+}
