@@ -1,6 +1,6 @@
 # Verification
 
-Current verification: 3 October 2026. Source base: verified ChatGPT v001, bootstrap commit `643ba04`, native 0.1.0 commit `1ef490f`. The current application is 0.2.0.
+Current verification: 3 October 2026. Source base: verified ChatGPT v001, bootstrap commit `643ba04`, native 0.1.0 commit `1ef490f`, tray release commit `0c523dc`. The current application is 0.2.1.
 
 ## Environment and settings
 
@@ -32,7 +32,7 @@ Current verification: 3 October 2026. Source base: verified ChatGPT v001, bootst
 pwsh -NoProfile -File scripts/verify-windows.ps1
 ```
 
-Final gate result: 132 passed, no skips, in 29.25 seconds. Bytecode compilation and version smoke passed; version 0.2.0. Native shortcut tests passed with both PowerShell 7 and built-in Windows PowerShell, including Unicode, spaces and percent signs.
+Final gate result: 134 passed, no skips, in 24.59 seconds. Bytecode compilation and version smoke passed; version 0.2.1. Native shortcut tests passed with both PowerShell 7 and built-in Windows PowerShell, including Unicode, spaces and percent signs.
 
 The gate bounds pytest at 180 seconds, compileall at 120 seconds and version import at 30 seconds. Its runner stops the process tree on timeout.
 
@@ -40,9 +40,21 @@ Regressions cover exact quota classification, false/null authority, failure rece
 
 Tray-release regressions cover saved prompt reload and invalid-prompt refusal, durable subsequent-turn observations, active-runtime precedence, private correlated IDs, content/credential canaries in detailed mode, local portable data with shared locks, companion EXE selection, exact Markdown association launch, tray command parity, tray privacy reconfiguration, installed CLI owner lookup and native Codex binary discovery.
 
+## Native menu lifecycle
+
+The 0.2.0 watcher called `update_menu()` every 2 seconds. The upstream Win32 backend destroys the previous HMENU on each update, including when Windows is tracking that popup. A focused reproducer using real native menu handles confirmed 5 destroys during 5 background updates, invalidating the tracked menu. This is a lifecycle defect, not a missing hover-color style.
+
+The 0.2.1 adapter builds each popup only on the UI thread at right-click, retains it until tracking ends, and refreshes dynamic descriptors on the next opening. The watcher updates the icon and status without rebuilding menus.
+
+```powershell
+& './scripts/run-project-command.ps1' -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m', 'pytest', 'tests/test_windows_tray.py', 'tests/test_tray_and_telemetry.py', '-q') -TimeoutSeconds 30
+```
+
+Focused result: 10 passed in 2.67s. Two new native lifecycle regressions check that Windows' `MFS_HILITE` item state survives background updates, selected-item callbacks do not rebuild the tracked menu, reentrant right-clicks do not replace it, and the next opening reflects current text, checkmarks and disabled states. Native handles and item states are real; `TrackPopupMenuEx`, cursor queries and foreground changes are intercepted so the tests do not operate the user's desktop. This is not a visual mouse-hover inspection.
+
 ## Native integration evidence
 
-Current probes live in `Docs/Audits/2026-10-03-02/`. They do not save user conversation bodies. Full settings and diagnostic refinements belong to [the audit](Audits/2026-10-03-02/AUDIT.md).
+The 0.2.0 integration probes live in `Docs/Audits/2026-10-03-02/`. Their results remain evidence for unchanged recovery and control paths; they were not all repeated for the menu-only patch. They do not save user conversation bodies. Full settings and diagnostic refinements belong to [the audit](Audits/2026-10-03-02/AUDIT.md).
 
 | Probe | Full settings and bounds | Result |
 | --- | --- | --- |
@@ -74,7 +86,11 @@ The portable deployment is `App/CodexAutoContinuer.exe` in this checkout. Its se
 
 The managed login shortcut now targets the GUI EXE with an absolute App/data config path and the tray command. Launching that shortcut produced `tray.ready` with detailed privacy and a live monitoring snapshot. The first cycle scanned 3 recent interactive chats, with detected=0, dispatched=0 and pending=0. No existing user chat was continued by activation checks.
 
-The installed Python package is also 0.2.0. Its default CLI resolved the registered App config and reported supervisorRunning=true, allInteractive scope, detailedTelemetry=true, startupInstalled=true and zero pending obligations. The tray and supervisor were left running. This proves shortcut launch, not a fresh Windows login.
+The 0.2.1 patch was staged from the verified clean portable ZIP. The old supervisor was stopped gracefully; the exact verified tray process was stopped before moving any executable. A recoverable copy of the previous App folder remains in ignored local staging. All 6 existing data files were copied with matching SHA-256 hashes before activation, including settings, saved prompt and logs. No runtime data was packaged.
+
+The updated GUI was launched through the existing login shortcut and emitted `tray.ready` for 0.2.1. A new supervisor reached monitoring: scanned=3, detected=0, dispatched=0, pending=0. All 522 release files matched their staged manifest; the new Win32 adapter was present in the frozen bundle. A separate real native UI-loop startup/shutdown smoke passed without opening a popup.
+
+The installed Python package is also 0.2.1. Its default CLI resolved App/data and confirmed supervisorRunning=true, startupInstalled=true, detailedTelemetry=true, allInteractive and zero pending obligations. Dependency installation used `--no-index --no-deps`, preserving unrelated global packages. The tray and supervisor were left running. Shortcut launch is not proof of a fresh Windows login; visual mouse-hover confirmation is still requested from the user.
 
 ## Remaining limits
 

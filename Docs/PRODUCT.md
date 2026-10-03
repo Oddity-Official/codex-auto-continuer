@@ -35,4 +35,4 @@ Continue existing local interactive Codex tasks after account usage recovers, wi
 
 ## Supported release
 
-Version 0.2.0 targets Windows 11 x86_64 and Codex 0.160.0-compatible local interfaces. The portable release bundles Python. Source development uses Python 3.13 and PowerShell 7. Current results and limits belong to [VALIDATION.md](VALIDATION.md).
+Version 0.2.1 targets Windows 11 x86_64 and Codex 0.160.0-compatible local interfaces. The portable release bundles Python. Source development uses Python 3.13 and PowerShell 7. Current results and limits belong to [VALIDATION.md](VALIDATION.md).

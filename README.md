@@ -6,7 +6,7 @@ This is an independent tool, not an OpenAI product. It uses experimental local C
 
 ## Launch and use
 
-1. Extract `codex-auto-continuer-0.2.0-windows-x86_64.zip` into a writable folder. Keep both EXEs and `_internal` together.
+1. Extract `codex-auto-continuer-0.2.1-windows-x86_64.zip` into a writable folder. Keep both EXEs and `_internal` together.
 2. Launch `CodexAutoContinuer.exe`. Monitoring starts automatically. Look in Windows' hidden tray icons if needed.
 3. Right-click the tray icon. Select `Start with Windows` to enable per-user login launch.
 4. Select `Modify prompt` to open `data/continue-prompt.md` in your default Markdown editor. Save as UTF-8. The next continuation reads the saved file; no restart is needed.
@@ -117,4 +117,4 @@ The native gate uses the configured `py -3.13` interpreter; install `.[dev]` the
 
 The portable builder creates a clean folder release, dependency notices and source, a per-file SHA-256 manifest and a verified ZIP. It never copies deployed runtime data. One-folder packaging avoids a self-extracting runtime on every launch and keeps tray libraries replaceable. [PyInstaller operating modes](https://pyinstaller.org/en/stable/operating-mode.html) explain this tradeoff.
 
-The wheel is `dist/codex_auto_continuer-0.2.0-py3-none-any.whl`. The stable source handoff is `codex-auto-continuer-codex-handoff.zip`, produced by `scripts/pack-codex-handoff.ps1`. Our code uses the [MIT license](LICENSE). See [dependency notices](Docs/THIRD-PARTY.md) and [the documentation index](Docs/README.md).
+The wheel is `dist/codex_auto_continuer-0.2.1-py3-none-any.whl`. The stable source handoff is `codex-auto-continuer-codex-handoff.zip`, produced by `scripts/pack-codex-handoff.ps1`. Our code uses the [MIT license](LICENSE). See [dependency notices](Docs/THIRD-PARTY.md) and [the documentation index](Docs/README.md).

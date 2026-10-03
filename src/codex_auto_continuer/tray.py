@@ -121,14 +121,14 @@ class TrayController:
             phase = "failed"
             if self._last_phase != phase:
                 telemetry.failure("tray.status_failed", exc)
+        previous_state = self.state
+        self.state = phase
         if self.icon:
             self.icon.title = f"Codex Auto Continuer {__version__}: {phase}; {waiting} pending"
-            if phase != self.state:
+            if phase != previous_state:
                 self.icon.icon = tray_image(phase)
             if phase == "failed" and self._last_phase != "failed":
                 self.icon.notify("Monitoring stopped or settings could not be read. Open telemetry and settings, then restart monitoring.")
-            self.icon.update_menu()
-        self.state = phase
         self._last_phase = phase
 
     def watch(self) -> None:
@@ -174,13 +174,13 @@ class TrayController:
 def run_tray(config_file: Path) -> int:
     if os.name != "nt":
         raise AutoContinuerError("The system tray application currently supports Windows only.")
-    from pystray import Icon
+    from .windows_tray import TrayIcon
     try:
         with SingleInstanceLock(control_dir() / "tray.lock"):
             controller = TrayController(config_file)
             telemetry.setup(config_file.parent / "tray.jsonl", controller.cfg)
             telemetry.emit("tray.started", configPath=str(config_file))
-            controller.icon = Icon("CodexAutoContinuer", tray_image("stopped"), "Codex Auto Continuer", menu=controller.menu())
+            controller.icon = TrayIcon("CodexAutoContinuer", tray_image("stopped"), "Codex Auto Continuer", menu=controller.menu())
             def ready(icon):
                 icon.visible = True
                 telemetry.emit("tray.ready", menuItems=[item.text for item in icon.menu.items])

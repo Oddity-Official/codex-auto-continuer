@@ -8,6 +8,8 @@ The GUI entry point defaults to `tray`. A tray instance starts a hidden supervis
 
 Both interfaces call the same CLI implementation. The menu has start, stop, restart, scan, one cycle, settings, Markdown prompt, logs, initialization, scope, privacy and login controls. Prompt edits apply at the next send. Other manual settings edits require restart.
 
+The Win32 tray adapter builds the native menu on the UI thread immediately before each right-click popup. Labels, checks and enabled states are snapshots for that opening. Background updates and selected-item callbacks never replace a tracked menu; changes appear on the next opening. This preserves Windows' native hover highlighting and selection. The adapter uses the pinned pystray 0.19.5 backend without modifying its bundled sources.
+
 ## Codex control path
 
 1. Find the native Codex executable from explicit configuration, PATH, the standard Desktop location or recognized npm vendor layout. Never execute an arbitrary shell launcher.

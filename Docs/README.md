@@ -15,3 +15,4 @@
 - [ChatGPT v001 verification, 3 October 2026](History/2026-10-03-chatgpt-v001-validation.md)
 - [ChatGPT v001 research, 3 October 2026](History/2026-10-03-chatgpt-v001-research.md)
 - [Native 0.1.0 verification, 3 October 2026](History/2026-10-03-native-0.1.0-validation.md)
+- [Native 0.2.0 verification, 3 October 2026](History/2026-10-03-native-0.2.0-validation.md)
