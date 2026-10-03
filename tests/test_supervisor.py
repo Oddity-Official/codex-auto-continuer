@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from codex_auto_continuer.config import Config
+from codex_auto_continuer.config import Config, DEFAULT_CONTINUE_PROMPT
 from codex_auto_continuer.appserver import RpcError
 from codex_auto_continuer.errors import ProtocolError, TransportError
 from codex_auto_continuer.state import Obligation, State, load_state, save_state
@@ -73,6 +73,9 @@ class FakeClient:
 
 
 def supervisor(tmp_path: Path, client: FakeClient, *, cfg=None, clock=lambda:1000.0):
+    prompt = tmp_path / "continue-prompt.md"
+    if not prompt.exists():
+        prompt.write_text(DEFAULT_CONTINUE_PROMPT, encoding="utf-8")
     s=Supervisor(cfg or Config(dispatch_spacing_seconds=0), tmp_path/"state.json", clock=clock, sleep=lambda _:None)
     s.client=client
     return s
@@ -186,14 +189,14 @@ def test_recent_scan_does_not_cache_failed_read(tmp_path: Path):
     assert s.run_cycle().detected==1
 
 
-def test_default_scope_only_desktop_custom_sources(tmp_path: Path):
+def test_desktop_scope_only_desktop_custom_sources(tmp_path: Path):
     c=FakeClient([
         thread("chat",source={"custom":"chatgpt"}),
         thread("atlas",source={"custom":"atlas"}),
         thread("cli",source="cli"),
         thread("app",source="appServer"),
     ], {x:failed_turn(x) for x in ["chat","atlas","cli","app"]}, allowed=False)
-    s=supervisor(tmp_path,c); r=s.run_cycle()
+    s=supervisor(tmp_path,c,cfg=Config(thread_scope="desktop")); r=s.run_cycle()
     assert r.detected==2
     assert {o.thread_id for o in s.state.obligations}=={"chat","atlas"}
 
@@ -262,7 +265,7 @@ def test_scope_change_cancels_existing_out_of_scope_obligation(tmp_path: Path):
     ob=Obligation.create("cli","turn-1",900,None)
     save_state(tmp_path/"state.json",State(obligations=[ob]))
     c=FakeClient([thread("cli",source="cli")], {"cli":failed_turn()}, allowed=False)
-    s=supervisor(tmp_path,c)
+    s=supervisor(tmp_path,c,cfg=Config(thread_scope="desktop"))
     r=s.run_cycle()
     assert r.cancelled==1 and not s.state.obligations
 
@@ -276,9 +279,42 @@ def test_desktop_originator_is_not_confused_with_vscode_extension(tmp_path):
     desktop = thread("desktop", source="vscode") | {"originator": "Codex Desktop"}
     extension = thread("extension", source="vscode") | {"originator": "codex_vscode"}
     c = FakeClient([desktop, extension], {x: failed_turn(x) for x in ("desktop", "extension")})
-    s = supervisor(tmp_path, c)
+    s = supervisor(tmp_path, c, cfg=Config(thread_scope="desktop"))
     assert s.run_cycle().detected == 1
     assert s.state.obligations[0].thread_id == "desktop"
+
+
+def test_prompt_saved_after_start_is_used_and_empty_prompt_never_dispatches(tmp_path):
+    from codex_auto_continuer.errors import ConfigurationError
+    c = FakeClient([thread()], {"t": failed_turn()}, allowed=False)
+    s = supervisor(tmp_path, c)
+    s.run_cycle()
+    prompt = tmp_path / "continue-prompt.md"
+    prompt.write_text("", encoding="utf-8")
+    c.allowed = True
+    with pytest.raises(ConfigurationError, match="empty"):
+        s.run_cycle()
+    assert not c.added
+    assert s.state.obligations[0].phase == "pending"
+    prompt.write_text("Continue with the saved instruction.\n", encoding="utf-8")
+    s.run_cycle()
+    assert c.added[0][1] == "Continue with the saved instruction.\n"
+
+
+def test_delivery_observation_survives_restart_and_waits_for_runtime_completion(tmp_path):
+    c = FakeClient([thread()], {"t": failed_turn()}, allowed=True)
+    s = supervisor(tmp_path, c)
+    s.run_cycle()
+    assert len(load_state(tmp_path / "state.json").observations) == 1
+    c.threads[0]["status"] = {"type": "active", "activeFlags": []}
+    c.turns["t"] = {"id": "next", "status": "interrupted"}
+    restarted = supervisor(tmp_path, c)
+    restarted.run_cycle()
+    assert len(restarted.state.observations) == 1
+    c.threads[0]["status"] = {"type": "idle"}
+    c.turns["t"]["status"] = "completed"
+    restarted.run_cycle()
+    assert not load_state(tmp_path / "state.json").observations
 
 
 def test_recent_metadata_cannot_revive_old_failure(tmp_path):

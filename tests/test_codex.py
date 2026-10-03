@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import subprocess
+import os
+from pathlib import Path
 
 import pytest
 
@@ -45,3 +47,25 @@ def test_ensure_daemon_no_autostart(monkeypatch):
     monkeypatch.setattr(codex, "_run", lambda *_: cp(1, err="nope"))
     with pytest.raises(CodexCommandError, match="auto_start_daemon"):
         codex.ensure_daemon("codex", 1, False)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows native executable discovery")
+def test_windows_desktop_binary_discovery_without_shell_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(codex.shutil, "which", lambda name: None)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    binary = tmp_path / "Programs/OpenAI/Codex/bin/codex.exe"
+    binary.parent.mkdir(parents=True)
+    binary.touch()
+    assert codex.find_codex() == str(binary)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows npm executable discovery")
+def test_windows_npm_shim_resolves_native_binary_without_shell(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "missing"))
+    shim = tmp_path / "codex.cmd"
+    monkeypatch.setattr(codex.shutil, "which", lambda name: str(shim) if name == "codex.cmd" else None)
+    monkeypatch.setattr(codex.platform, "machine", lambda: "AMD64")
+    binary = tmp_path / "node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe"
+    binary.parent.mkdir(parents=True)
+    binary.touch()
+    assert codex.find_codex() == str(binary)

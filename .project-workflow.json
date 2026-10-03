@@ -10,7 +10,7 @@
     "src/codex_auto_continuer/supervisor.py",
     "tests/test_supervisor.py"
   ],
-  "exclude_directories": [],
+  "exclude_directories": ["App"],
   "exclude_files": [],
   "windows_python": "3.13"
 }

@@ -10,7 +10,7 @@ from typing import Any
 
 from .errors import ProtocolError
 
-STATE_VERSION = 1
+STATE_VERSION = 2
 CLIENT_ID_NAMESPACE = uuid.UUID("64277943-c127-56b7-aaaf-bf6f761767b7")
 VALID_PHASES = {"pending", "dispatching", "submitted", "uncertain"}
 
@@ -44,6 +44,7 @@ class Obligation:
 class State:
     version: int = STATE_VERSION
     obligations: list[Obligation] = field(default_factory=list)
+    observations: list[Obligation] = field(default_factory=list)
 
     def by_thread(self) -> dict[str, Obligation]:
         return {item.thread_id: item for item in self.obligations}
@@ -108,21 +109,30 @@ def load_state(path: Path) -> State:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ProtocolError(f"Cannot read durable state {path}: {exc}") from exc
-    if not isinstance(raw, dict) or set(raw) != {"version", "obligations"}:
+    if not isinstance(raw, dict) or set(raw) != {"version", "obligations", "observations"}:
         raise ProtocolError(f"State {path} has an unsupported shape.")
     if type(raw["version"]) is not int or raw["version"] != STATE_VERSION:
         raise ProtocolError(f"Unsupported state version {raw['version']!r}; expected {STATE_VERSION}.")
     if not isinstance(raw["obligations"], list):
         raise ProtocolError("State obligations must be an array.")
     obligations = [_parse_obligation(item) for item in raw["obligations"]]
+    if not isinstance(raw["observations"], list):
+        raise ProtocolError("State observations must be an array.")
+    observations = [_parse_obligation(item) for item in raw["observations"]]
+    if any(item.phase != "submitted" for item in observations):
+        raise ProtocolError("Only verified submitted deliveries may be observed.")
+    clients = [item.client_user_message_id for item in observations]
+    if len(clients) != len(set(clients)):
+        raise ProtocolError("State contains duplicate delivery observations.")
     ids = [item.thread_id for item in obligations]
     if len(ids) != len(set(ids)):
         raise ProtocolError("State contains more than one obligation for the same thread.")
-    return State(version=STATE_VERSION, obligations=obligations)
+    return State(version=STATE_VERSION, obligations=obligations, observations=observations)
 
 
 def save_state(path: Path, state: State) -> None:
-    payload = {"version": STATE_VERSION, "obligations": [asdict(item) for item in state.obligations]}
+    payload = {"version": STATE_VERSION, "obligations": [asdict(item) for item in state.obligations],
+               "observations": [asdict(item) for item in state.observations]}
     tmp = path.with_suffix(path.suffix + ".tmp")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)

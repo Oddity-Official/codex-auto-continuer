@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import time
 from collections import deque
 from pathlib import Path
 from typing import Any
 
 from .errors import ProtocolError
 from .ws_unix import UnixWebSocket
+from . import __version__
+from .telemetry import emit, failure, rpc_summary, rpc_request_fields, notification_summary
 
 
 class RpcError(ProtocolError):
@@ -51,7 +54,7 @@ class AppServerClient:
                 "clientInfo": {
                     "name": "codex_auto_continuer",
                     "title": "Codex Auto Continuer",
-                    "version": "0.1.0",
+                    "version": __version__,
                 },
                 "capabilities": {
                     "experimentalApi": True,
@@ -72,6 +75,7 @@ class AppServerClient:
         self.notify("initialized", None)
 
     def close(self) -> None:
+        emit("rpc.connection_closed", subscriptions=len(self.thread_subscriptions))
         self.thread_subscriptions.clear()
         self._ws.close()
 
@@ -82,6 +86,22 @@ class AppServerClient:
         self._ws.send_text(json.dumps(message, separators=(",", ":")))
 
     def request(self, method: str, params: dict[str, Any] | None = None) -> Any:
+        started = time.monotonic()
+        request_id = self._next_id
+        emit("rpc.request", method=method, requestId=request_id, **rpc_request_fields(params))
+        try:
+            result = self._request(method, params)
+        except BaseException as exc:
+            code = exc.error.get("code") if isinstance(exc, RpcError) else None
+            failure("rpc.failed", exc, method=method, requestId=request_id,
+                    durationMs=round((time.monotonic() - started) * 1000, 2),
+                    errorCode=code if type(code) is int else None)
+            raise
+        emit("rpc.response", method=method, requestId=request_id,
+             durationMs=round((time.monotonic() - started) * 1000, 2), **rpc_summary(method, result))
+        return result
+
+    def _request(self, method: str, params: dict[str, Any] | None = None) -> Any:
         self._ws.begin_request()
         request_id = self._next_id
         self._next_id += 1
@@ -100,9 +120,13 @@ class AppServerClient:
             if "id" in incoming and "method" in incoming:
                 # Deliberately do not answer app-server -> client approvals/input requests.
                 self.server_requests.append(incoming)
+                emit("rpc.server_request_ignored", method=incoming.get("method"))
                 continue
             if "method" in incoming and "id" not in incoming:
                 self.notifications.append(incoming)
+                payload = incoming.get("params")
+                emit("rpc.notification", method=incoming.get("method"),
+                     **notification_summary(incoming.get("method"), payload))
                 continue
             if incoming.get("id") != request_id:
                 raise ProtocolError(

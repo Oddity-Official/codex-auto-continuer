@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import subprocess
+import platform
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,11 +23,36 @@ class DaemonInfo:
     app_server_version: str | None
 
 
-def find_codex() -> str:
-    path = shutil.which("codex")
-    if not path:
-        raise CodexCommandError("Could not find `codex` on PATH. Install or expose Codex CLI first.")
-    return path
+def find_codex(executable: str | None = None) -> str:
+    if executable is not None:
+        if not Path(executable).is_file() or (os.name == "nt" and Path(executable).suffix.lower() != ".exe"):
+            raise CodexCommandError("codex_executable must point to an existing native Codex executable, not an npm .cmd shim.")
+        return executable
+    if os.name != "nt":
+        path = shutil.which("codex")
+        if path:
+            return path
+    else:
+        path = shutil.which("codex.exe")
+        if path:
+            return path
+        local = os.environ.get("LOCALAPPDATA")
+        if local:
+            desktop = Path(local) / "Programs/OpenAI/Codex/bin/codex.exe"
+            if desktop.is_file():
+                return str(desktop)
+        shim = shutil.which("codex.cmd")
+        if shim:
+            packages = Path(shim).parent / "node_modules/@openai"
+            arch = "arm64" if platform.machine().lower() in {"arm64", "aarch64"} else "x64"
+            triple = "aarch64-pc-windows-msvc" if arch == "arm64" else "x86_64-pc-windows-msvc"
+            roots = [packages / f"codex-win32-{arch}", packages / "codex/node_modules/@openai" / f"codex-win32-{arch}", packages / "codex"]
+            for root in roots:
+                for directory in ("bin", "codex"):
+                    candidate = root / "vendor" / triple / directory / "codex.exe"
+                    if candidate.is_file():
+                        return str(candidate)
+    raise CodexCommandError("Cannot locate native Codex. Install and sign in to Codex, or set codex_executable to its absolute executable path in settings.")
 
 
 def _run(codex_bin: str, args: list[str], timeout: float) -> subprocess.CompletedProcess[str]:

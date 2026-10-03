@@ -1,61 +1,74 @@
 # Research and provenance
 
-Verified on 3 October 2026 using native Windows 11 (10.0.26300), PowerShell 7.6.6, Python 3.13.7 and Codex CLI/app-server 0.160.0. The reviewed base is ChatGPT checkpoint v001, whose 46 file hashes matched before local edits. Exact checks belong to [VALIDATION.md](VALIDATION.md). Probe source and essential results are in [the dated audit](Audits/2026-10-03/AUDIT.md).
+Reviewed on 3 October 2026 on native Windows 11, Python 3.13.7 and Codex CLI/app-server 0.160.0. The imported base was ChatGPT v001, with all 46 file hashes verified before local edits. Native 0.1.0 work is committed as `1ef490f`. Version 0.2.0 adds portable tray controls and metadata telemetry.
 
-## Authoritative interface evidence
+Current results belong to [VALIDATION.md](VALIDATION.md). Current probe source is in [the tray-release audit](Audits/2026-10-03-02/AUDIT.md). Earlier native evidence is retained in [the 0.1.0 audit](Audits/History/2026-10-03/AUDIT.md).
 
-The installed CLI generated its own experimental JSON schemas with:
+## Interface authority
+
+The installed CLI generated experimental schemas with:
 
 ```powershell
 codex app-server generate-json-schema --experimental --out .data/schema
 ```
 
-Generated schemas are temporary reference data, excluded from source transports. Relevant observed fields and methods are recorded here and in the audit.
+These are temporary references, not exported runtime dependencies. [Official app-server documentation](https://learn.chatgpt.com/docs/app-server) describes the integration layer, initialization, thread/turn lifecycle and approval requests. Installed schemas and native probes establish the experimental queue and quota fields used here. General documentation does not establish a queue idempotency or atomic turn-precondition guarantee.
 
-[Official OpenAI app-server documentation](https://learn.chatgpt.com/docs/app-server) describes schema generation, initialization, thread/turn lifecycle and approval requests. The installed schema and native probes establish the experimental queue and recovery fields used by this project. General documentation alone does not establish their complete contract.
+The guarded minimum version is 0.160.0. Only that installation has current native evidence. Required methods and fields are checked at runtime; a version number alone is insufficient.
 
-## Native socket transport
+## Verified native facts
 
-Standard Windows Python does not export `socket.AF_UNIX`. Windows Winsock does support family 1. Native tests and live connections passed using a Python-owned socket with a small `ctypes` address-marshalling bridge.
+Windows Python does not export socket.AF_UNIX, but Winsock supports Unix-domain sockets. The Python-owned socket plus ctypes address bridge passed native tests and real daemon connections.
 
-The running daemon returned a private control socket and matching CLI/app-server versions, both 0.160.0. The WebSocket initialization, metadata reads, turn reads, queue RPCs and account rate-limit read succeeded through that socket.
+A live Desktop sample contained 74 vscode-source chats with Codex Desktop originator. Source alone cannot distinguish Desktop from the extension. Desktop-only mode checks both; default allInteractive includes both kinds and CLI.
 
-## Desktop provenance
+A separately owned server reported notLoaded through the daemon. Resume returned -32600 with the exact thread's active-writer error. Shared-queue submission reached the original owner and completed. Unrelated resume errors remain fatal.
 
-A live sample returned 74 non-archived interactive threads. Every sampled thread had `source = vscode` and `originator = Codex Desktop`. The initial custom-only Desktop filter would exclude this installation.
+A second probe confirmed unloaded queue add/list/delete, exact deletion preserving another item, and completion after the submitting client disconnected. An isolated native localhost HTTP 429 fixture persisted failed/usageLimitExceeded with a numeric completedAt. It used a fixture key and made no real account request.
 
-The runtime accepts this verified pair plus configured `chatgpt` and `atlas` custom sources. Ordinary VS Code extension threads remain excluded from default Desktop scope. Originator absence does not authorize accepting an arbitrary VS Code thread.
+Persisted history can say interrupted while a live turn is active. Runtime active status takes precedence. Discovery ignores active threads, and delivery observations do not end until the runtime is inactive.
 
-## Separate app-server ownership
+The 0.2.0 real CLI probe launched one private interactive TUI with `--no-daemon`, read-only sandbox, approvals never and fixed no-tools token replies. It established source=cli, separate-writer ownership, an acknowledged queue ID and a completed second turn. The CLI still reported originator=Codex Desktop from this installation; CLI selection deliberately relies on its source.
 
-The running Desktop app and managed daemon use separate app-server processes. On an owned probe thread, a separate server reported `notLoaded` even while the original server owned it. Resume returned JSON-RPC code `-32600` and the exact error:
+## Client support and inference
 
-```text
-thread <exact-thread-id> already has an active writer
-```
+The supported scope is local interactive CLI, VS Code and Desktop visible to one native Codex home/account. Executor and sub-agent sessions are explicitly excluded by the user.
 
-Queue submission through the daemon reached the original owner and produced a completed turn. This verified condition permits shared-queue dispatch without taking ownership. Other resume errors do not.
+Actual CLI delivery and Desktop-style separate-owner delivery have native evidence. Scope regressions cover ordinary VS Code extension metadata. No Codex extension installation was found in this account's standard VS Code extension directories, so its UI was not launched for an end-to-end probe. Extension delivery is inferred from the shared protocol and source contract, not presented as directly observed.
 
-A separate native probe confirmed queue addition, listing and exact deletion while unloaded. Deleting the owned item preserved the unrelated probe item. Resume followed by queue submission also completed after the submitting client disconnected.
+Remote, WSL, cloud, different homes, accounts or users are separate environments. A native supervisor cannot assume visibility into them.
 
-## Usage failure persistence
+## Public tool survey
 
-A temporary isolated Codex home used a localhost HTTP fixture returning 429 with `error.type = usage_limit_reached`. It used a non-secret fixture key and made no real account request.
+We searched public Codex quota recovery, auto-continue, auto-resume, queue, tray, usage and reset tools. We fetched the projects' own documentation. This is a broad discoverable survey, not an exhaustive inventory, security audit or performance comparison. [The README](../README.md#why-this-design-suits-us) owns the concise comparison.
 
-The native server reported `status = failed` and `codexErrorInfo = usageLimitExceeded`. A persisted `thread/turns/list` read returned the same classification and a numeric `completedAt`. This verifies both structured detection and the 24-hour failure-time cutoff.
+The survey covered:
 
-Persisted turn history can show `interrupted` while a live turn is still active. The unloaded probe waits for inactive runtime status before accepting a terminal result. Runtime discovery avoids active threads and revalidates the exact latest turn before sending.
+- [codex-charge](https://github.com/Autumnpoem/codex-autocontinue): CLI terminal wrapper and Desktop input automation, with tray controls
+- [MrPanica watchdog](https://github.com/MrPanica/codex-auto-resume): native Windows accessibility invocation of retry controls, including broader transient errors
+- [progressrdx auto-resume](https://github.com/progressrdx/codex-auto-resume): macOS selected-task recovery with task fingerprints and continuation bounds
+- [auto-resume-trio](https://github.com/awslew/codex-auto-resume-trio): same-session structured CLI/app-server recovery, host service and dashboards
+- [Claude Codex Queue](https://github.com/ravhello/claude-codex-queue): structured existing-task queues, ordered prompts and web/CLI controls; Windows instructions require WSL
+- [claude-codex-auto-resume](https://github.com/TheOnlyFusionCube/claude-codex-auto-resume): configurable multi-tool terminal wrapper, reset-text parsing and resume modes
+- [automode](https://github.com/adrielmendes28/automode): POSIX terminal wrapper, parsed usage resets, menu handling and scheduled auto-ping
+- [Codex Dashboard](https://github.com/Justin1491/codex-dashboard): quota display and project auto-resume through executor resume-last
+- [Perpetual](https://github.com/SakethSripada/Perpetual): VS Code orchestration across providers, cloud handoff and Docker
+- [rate-tray](https://github.com/nowrap/rate-tray): native Windows quota display rather than exact-task recovery
+- [Codex Companion](https://github.com/heycarollan/codex-usage-status): VS Code usage, remote controls, completion alerts and chat reopening
+- [Limit Reset Tracker](https://codexlimitreset.com/): manually configured countdowns and reminders rather than account-connected task recovery
 
-## Recovery authority and delivery safety
+Structured targeting is not unique to this project. Our chosen fit is portable native Windows, existing interactive chats, quota-only authority, no UI input, simple Markdown editing and local diagnostics. The cost is dependence on guarded experimental Codex interfaces.
 
-The live account returned `ordinaryUsageAllowed = true`. Portable regressions cover false and null authority, reset hints without permission, rechecks after resume and between threads, stale cancellation, exact queue ownership and ambiguous-send refusal.
+## Packaging choices
 
-No verified queue-add idempotency contract was found. Deterministic client message IDs support reconciliation, not blind retries. The queue API has no verified compare-and-swap condition against the failed turn. A narrow race between final revalidation and queue acceptance remains.
+[pystray's public API](https://pystray.readthedocs.io/en/latest/usage.html) supplies native Windows menus and notifications. Pillow generates our own icon; no OpenAI artwork is reused. We do not implement a second tray framework.
+
+[PyInstaller's folder mode](https://pyinstaller.org/en/stable/operating-mode.html) avoids repeated self-extraction and lets the bundled LGPL tray library remain replaceable. Matching tray source and original notices travel with releases. Builds happen in a virtual environment, not by changing unrelated globally installed dependencies.
 
 ## Observational limits
 
-The installed supervisor observed a real usage-limit failure in the current Desktop chat. It detected one obligation, kept it pending through 9 scans with ordinaryUsageAllowed false, then cancelled it when the user manually resumed and a later read returned true. No continuation was dispatched. This verifies real detection, waiting and stale cancellation without duplicate work; it does not establish automatic continuation at natural recovery or the cause of availability recovery.
+The earlier installed supervisor detected a real quota failure, waited through 9 unavailable-usage scans, then cancelled after the user manually resumed. No automatic continuation was dispatched. That is detection, waiting and stale-cancellation evidence, not a natural quota-reset delivery demonstration.
 
-Two simultaneous quota-stalled threads were covered by regression fixtures, not two real-account failures. The native delivery and isolated failure-serialization probes establish the component paths separately.
+Two simultaneous real quota failures were not available. Regression fixtures cover multi-chat permission rechecks. A fresh Windows login was not performed; shortcut launch can be tested separately.
 
-The generated Windows login shortcut was launched and its background process verified. A fresh Windows login was not performed. Cross-version support remains guarded at runtime; this evidence establishes the tested 0.160.0 installation.
+The API lacks verified atomic turn preconditions and queue-add idempotency. Immediate revalidation and exact stale deletion reduce risk without eliminating the narrow concurrent-progress race.

@@ -28,7 +28,7 @@ def test_startup_pins_absolute_config(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(startup, "_shortcut", shortcut)
     config = tmp_path / "Config with spaces.json"
     startup.install_startup(config)
-    assert '--config "' + str(config) + '" run --background' in saved[0]["arguments"]
+    assert '--config "' + str(config) + '" tray' in saved[0]["arguments"]
     startup.uninstall_startup()
     assert not target.exists()
 
@@ -46,7 +46,11 @@ def test_uninstall_refuses_unmanaged_file(tmp_path: Path, monkeypatch):
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Native Windows shortcut integration")
-def test_native_shortcut_with_unicode_spaces_and_percent_path(tmp_path, monkeypatch):
+@pytest.mark.parametrize("shell_name", ["pwsh", "powershell.exe"])
+def test_native_shortcut_with_unicode_spaces_and_percent_path(tmp_path, monkeypatch, shell_name):
+    executable = startup.shutil.which(shell_name)
+    assert executable, f"Required native shell is unavailable: {shell_name}"
+    monkeypatch.setattr(startup.shutil, "which", lambda name: executable if name == shell_name else None)
     target = tmp_path / "Codex Auto Continuer.lnk"
     monkeypatch.setattr(startup, "startup_path", lambda: target)
     config = tmp_path / "caf\u00e9 100% config.json"

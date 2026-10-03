@@ -1,17 +1,20 @@
 [build-system]
-requires = ["setuptools>=75"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "codex-auto-continuer"
-version = "0.1.0"
+version = "0.2.0"
 description = "Windows-native supervisor that resumes Codex threads after verified usage-limit recovery"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = ["pystray==0.19.5; sys_platform == 'win32'", "Pillow>=10,<13; sys_platform == 'win32'"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+build = ["PyInstaller>=6.20,<7"]
 
 [project.scripts]
 codex-auto-continuer = "codex_auto_continuer.cli:main"

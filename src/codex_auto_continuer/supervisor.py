@@ -3,15 +3,17 @@ from __future__ import annotations
 import logging
 import math
 import time
-from dataclasses import dataclass
+import hashlib
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
 
 from .appserver import AppServerClient, RpcError
 from .codex import codex_version, ensure_daemon, find_codex
-from .config import Config
+from .config import Config, read_prompt
 from .errors import ProtocolError, TransportError
 from .state import Obligation, State, load_state, save_state
+from .telemetry import emit, failure, thread_summary, turn_summary
 
 LOG = logging.getLogger(__name__)
 _ALLOWED_ACTIVE_FLAGS = {"waitingOnApproval", "waitingOnUserInput"}
@@ -43,11 +45,15 @@ class Supervisor:
         *,
         clock: Callable[[], float] = time.time,
         sleep: Callable[[float], None] = time.sleep,
+        prompt_file: Path | None = None,
+        on_cycle: Callable[[CycleResult], None] | None = None,
     ):
         self.config = config
         self.state_file = state_file
         self.clock = clock
         self.sleep = sleep
+        self.prompt_file = prompt_file or state_file.parent / config.prompt_file
+        self.on_cycle = on_cycle
         self.state: State = load_state(state_file)
         self.client: AppServerClient | None = None
         self.codex_bin: str | None = None
@@ -56,7 +62,7 @@ class Supervisor:
     def connect(self) -> None:
         if self.client is not None:
             return
-        codex_bin = self.codex_bin or find_codex()
+        codex_bin = self.codex_bin or find_codex(self.config.codex_executable)
         cli_version = self._cli_version or codex_version(codex_bin, self.config.codex_command_timeout_seconds)
         daemon = ensure_daemon(codex_bin, self.config.codex_command_timeout_seconds, self.config.auto_start_daemon)
         client = AppServerClient.connect(daemon.socket_path, self.config.rpc_timeout_seconds)
@@ -64,6 +70,8 @@ class Supervisor:
         self._cli_version = cli_version
         self.client = client
         LOG.info("Connected to Codex %s app-server %s", cli_version, client.user_agent)
+        emit("codex.connected", cliVersion=cli_version, daemonVersion=daemon.app_server_version,
+             socketPath=str(daemon.socket_path), userAgent=client.user_agent)
         self._probe_required_methods()
 
     def close(self) -> None:
@@ -88,10 +96,13 @@ class Supervisor:
             )
         _parse_rate_limits(limits)
 
-    def run_forever(self, stop_requested: Callable[[], bool] = lambda: False) -> None:
+    def run_forever(self, stop_requested: Callable[[], bool] = lambda: False,
+                    wake_requested: Callable[[], bool] = lambda: False) -> None:
         def wait(seconds: float) -> None:
             remaining = seconds
             while remaining > 0 and not stop_requested():
+                if wake_requested():
+                    return
                 step = min(1.0, remaining)
                 self.sleep(step)
                 remaining -= step
@@ -100,6 +111,8 @@ class Supervisor:
             try:
                 self.connect()
                 result = self.run_cycle()
+                if self.on_cycle:
+                    self.on_cycle(result)
                 LOG.info(
                     "cycle scanned=%d detected=%d cancelled=%d dispatched=%d pending=%d usageAllowed=%r",
                     result.scanned_threads,
@@ -115,6 +128,7 @@ class Supervisor:
                 self.close()
                 wait(delay)
             except TransportError as exc:
+                failure("transport.reconnecting", exc, delaySeconds=self.config.reconnect_backoff_seconds)
                 LOG.warning("Codex transport lost: %s; reconnecting in %.1fs", exc, self.config.reconnect_backoff_seconds)
                 self.close()
                 wait(max(1.0, self.config.reconnect_backoff_seconds))
@@ -127,6 +141,9 @@ class Supervisor:
             ordinary_usage_allowed=limits.ordinary_usage_allowed,
             next_reset_at=limits.next_reset_at,
         )
+        emit("cycle.started", scope=self.config.thread_scope, lookbackHours=self.config.scan_lookback_hours,
+             ordinaryUsageAllowed=limits.ordinary_usage_allowed, nextResetAt=limits.next_reset_at)
+        self._observe_deliveries()
 
         threads = self._recent_threads(now)
         result.scanned_threads = len(threads)
@@ -164,6 +181,8 @@ class Supervisor:
                 result.detected += 1
                 save_state(self.state_file, self.state)
                 LOG.info("Recorded usage-limit obligation thread=%s turn=%s", thread_id, turn_id)
+                emit("obligation.detected", threadId=thread_id, failedTurnId=turn_id,
+                     completedAt=completed, detectedAt=now, resetAt=limits.next_reset_at)
 
         if limits.ordinary_usage_allowed is True:
             for obligation in sorted(list(self.state.obligations), key=lambda item: item.detected_at):
@@ -181,7 +200,33 @@ class Supervisor:
             LOG.warning("Codex did not verify ordinary usage availability; pending obligations will not dispatch.")
 
         result.pending = len(self.state.obligations)
+        emit("cycle.completed", **result.__dict__, observations=len(self.state.observations))
         return result
+
+    def _observe_deliveries(self) -> None:
+        client = self._require_client()
+        for observation in self.state.observations[:]:
+            thread = client.thread_read(observation.thread_id)
+            if thread is None or thread.get("archived") is True:
+                emit("delivery.observation_ended", threadId=observation.thread_id, reason="missing_or_archived")
+                self.state.observations.remove(observation)
+                save_state(self.state_file, self.state)
+                continue
+            turn = client.latest_turn(observation.thread_id)
+            if turn is None or turn.get("id") == observation.failed_turn_id:
+                emit("delivery.waiting_for_next_turn", threadId=observation.thread_id,
+                     queuedSubmissionId=observation.queued_submission_id)
+                continue
+            emit("delivery.subsequent_turn", threadId=observation.thread_id,
+                 failedTurnId=observation.failed_turn_id, queuedSubmissionId=observation.queued_submission_id,
+                 runtimeStatus=_thread_status(thread)[0], **turn_summary(turn))
+            if _thread_status(thread)[0] != "active" and turn.get("status") in {"completed", "failed", "interrupted"}:
+                self.state.observations.remove(observation)
+                save_state(self.state_file, self.state)
+
+    def _track_delivery(self, obligation: Obligation) -> None:
+        if not any(item.client_user_message_id == obligation.client_user_message_id for item in self.state.observations):
+            self.state.observations.append(replace(obligation))
 
     def _recent_threads(self, now: float) -> list[dict[str, Any]]:
         client = self._require_client()
@@ -205,6 +250,9 @@ class Supervisor:
                     break
                 if self._scope_accepts(thread):
                     out.append(thread)
+                    emit("discovery.thread", **thread_summary(thread), decision="in_scope")
+                else:
+                    emit("discovery.thread", **thread_summary(thread), decision="out_of_scope")
             if stop:
                 return out
             next_cursor = page.get("nextCursor")
@@ -228,22 +276,30 @@ class Supervisor:
         return self._require_client().thread_read(thread_id)
 
     def _revalidate_obligation(self, obligation: Obligation, thread: dict[str, Any] | None) -> bool:
+        emit("obligation.revalidate", threadId=obligation.thread_id, failedTurnId=obligation.failed_turn_id,
+             phase=obligation.phase, thread=thread_summary(thread) if thread else None)
         if thread is None:
+            emit("obligation.stale", threadId=obligation.thread_id, reason="missing_thread")
             LOG.info("Cancelling obligation for missing thread %s", obligation.thread_id)
             return False
         if thread.get("archived") is True or not self._scope_accepts(thread):
+            emit("obligation.stale", threadId=obligation.thread_id, reason="archived_or_out_of_scope")
             LOG.info("Cancelling obligation because thread %s is no longer in configured scope", obligation.thread_id)
             return False
         status_type, _ = _thread_status(thread)
         if status_type == "active" and obligation.phase == "pending":
+            emit("obligation.stale", threadId=obligation.thread_id, reason="active_thread")
             LOG.info("Cancelling obligation because thread %s is active", obligation.thread_id)
             return False
         turn = self._require_client().latest_turn(obligation.thread_id)
         if turn is None:
+            emit("obligation.stale", threadId=obligation.thread_id, reason="missing_latest_turn")
             LOG.info("Cancelling obligation because thread %s has no latest turn", obligation.thread_id)
             return False
         turn_id = _required_string(turn, "id", "thread/turns/list")
         if turn_id != obligation.failed_turn_id or not _is_usage_limit_failure(turn):
+            emit("obligation.stale", threadId=obligation.thread_id, failedTurnId=obligation.failed_turn_id,
+                 phase=obligation.phase, latestTurn=turn_summary(turn), reason="latest_turn_changed")
             LOG.info("Cancelling stale obligation thread=%s failedTurn=%s latest=%s", obligation.thread_id, obligation.failed_turn_id, turn_id)
             return False
         return True
@@ -274,16 +330,19 @@ class Supervisor:
                 # consumes the shared queue; never steal or duplicate ownership.
                 LOG.info("Thread %s is owned by another Codex server; dispatching through its shared queue.", obligation.thread_id)
                 status_type = "idle"
+                emit("dispatch.separate_owner", threadId=obligation.thread_id)
             else:
                 resumed_thread = resumed.get("thread")
                 if not isinstance(resumed_thread, dict) or resumed_thread.get("id") != obligation.thread_id:
                     raise ProtocolError("thread/resume did not return the exact requested thread.")
                 status_type, _ = _thread_status(resumed_thread)
         if status_type == "active":
+            emit("dispatch.cancelled", threadId=obligation.thread_id, reason="active_after_resume")
             self.state.obligations.remove(obligation)
             save_state(self.state_file, self.state)
             return False
         if status_type == "systemError":
+            emit("dispatch.deferred", threadId=obligation.thread_id, reason="runtime_system_error")
             LOG.warning("Thread %s is in systemError; leaving obligation pending.", obligation.thread_id)
             return False
         if status_type != "idle":
@@ -297,22 +356,28 @@ class Supervisor:
             save_state(self.state_file, self.state)
             return False
         if _parse_rate_limits(client.rate_limits()).ordinary_usage_allowed is not True:
+            emit("dispatch.deferred", threadId=obligation.thread_id, reason="quota_recheck_denied")
             return False
 
+        prompt = read_prompt(self.prompt_file)
+        emit("prompt.loaded", sha256=hashlib.sha256(prompt.encode()).hexdigest(), characters=len(prompt), path=str(self.prompt_file))
         obligation.phase = "dispatching"
         obligation.phase_changed_at = now
         obligation.queued_submission_id = None
         save_state(self.state_file, self.state)
+        emit("dispatch.intent_saved", threadId=obligation.thread_id, failedTurnId=obligation.failed_turn_id,
+             clientUserMessageId=obligation.client_user_message_id)
         try:
             response = client.queue_add(
                 obligation.thread_id,
-                self.config.continue_prompt,
+                prompt,
                 obligation.client_user_message_id,
             )
         except (TransportError, RpcError):
             obligation.phase = "uncertain"
             obligation.phase_changed_at = self.clock()
             save_state(self.state_file, self.state)
+            emit("dispatch.uncertain", threadId=obligation.thread_id, failedTurnId=obligation.failed_turn_id)
             raise
         queued = response.get("queuedSubmission")
         if not isinstance(queued, dict):
@@ -324,7 +389,10 @@ class Supervisor:
         obligation.phase = "submitted"
         obligation.phase_changed_at = self.clock()
         obligation.queued_submission_id = queue_id
+        self._track_delivery(obligation)
         save_state(self.state_file, self.state)
+        emit("dispatch.submitted", threadId=obligation.thread_id, failedTurnId=obligation.failed_turn_id,
+             queuedSubmissionId=queue_id, clientUserMessageId=obligation.client_user_message_id)
         LOG.info("Submitted continuation thread=%s queuedSubmission=%s", obligation.thread_id, queue_id)
         return True
 
@@ -340,6 +408,7 @@ class Supervisor:
         for item in matches:
             queue_id = _required_string(item, "id", "thread/queue/list")
             deleted = client.queue_delete(obligation.thread_id, queue_id)
+            emit("queue.stale_item_deleted", threadId=obligation.thread_id, queuedSubmissionId=queue_id, deleted=deleted)
             LOG.info(
                 "Stale continuation queue cancellation thread=%s queuedSubmission=%s deleted=%s",
                 obligation.thread_id,
@@ -378,7 +447,10 @@ class Supervisor:
                 obligation.phase = "submitted"
                 obligation.queued_submission_id = queue_id
                 obligation.phase_changed_at = now
+                self._track_delivery(obligation)
                 save_state(self.state_file, self.state)
+                emit("dispatch.reconciled", threadId=obligation.thread_id, queuedSubmissionId=queue_id,
+                     clientUserMessageId=obligation.client_user_message_id)
                 return
         if now - obligation.phase_changed_at < self.config.dispatch_recovery_seconds:
             return

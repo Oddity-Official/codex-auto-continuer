@@ -2,31 +2,37 @@
 
 ## Goal
 
-Automatically resume Codex Desktop work that stopped specifically because account usage was exhausted, without requiring the user to remember the reset time or manually send `Continue`.
+Continue existing local interactive Codex tasks after account usage recovers, without asking the user to remember reset times. Make the tool easy to launch, control, inspect and share on native Windows.
 
 ## Required behavior
 
-- Target the exact Codex thread that stalled, never whichever window happens to be focused.
-- Use structured Codex thread/session state and first-party CLI/app-server interfaces. Do not rely on clipboard, focus stealing, keystroke injection, screen scraping or window-title matching.
-- Detect usage exhaustion as a distinct condition from network failures, server overload, policy blocks, approvals, user-input waits and unrelated failed turns.
-- Associate a continuation obligation with the exact failed thread/turn and its relevant reset window.
-- Revalidate immediately before continuing. If the user or another client has already advanced the thread, cancel the stale obligation instead of sending a duplicate message.
-- Support more than one stalled thread without cross-thread mixups or duplicate dispatch.
-- Make the continuation prompt user-configurable without source edits.
-- Discover failures completed in the last 24 hours and new failures during operation. Keep recorded obligations until resolved, even beyond the discovery window.
-- Support hidden per-user login launch, explicit background start/stop, and observable running status.
-- Fail loudly and diagnostically when Codex interfaces change or required state cannot be verified. Do not silently fall back to UI automation.
-- Keep durable state minimal, explicit and non-secret. Avoid storing conversation bodies unless a verified design need appears.
-- Target native Windows 11 and PowerShell 7. WSL must not be required.
+- target the exact chat and failed turn, never the focused window or the latest project session
+- use structured first-party Codex state; no clipboard, keystrokes, screen scraping or UI automation
+- recognize only failed turns with structured `usageLimitExceeded`
+- dispatch only after `ordinaryUsageAllowed == true`, with an immediate exact-thread and quota recheck
+- cancel stale obligations after manual progress, deleting only our own remaining queue items
+- cover local interactive CLI, VS Code and Desktop by default; exclude executor and sub-agent sessions
+- offer a guarded Desktop-only scope using source and originator provenance
+- discover failures completed during the last 24 hours, including pre-launch failures; preserve recorded obligations beyond lookback
+- re-read a UTF-8 Markdown prompt immediately before each send; open it in the default associated editor
+- provide a native tray menu for all user-facing CLI controls, with observable status, failure notifications and graceful quit
+- ship a portable Windows x86_64 folder containing GUI and console EXEs, dependencies, notices and a checksum manifest
+- support optional per-user Windows login launch without administrator rights or WSL
+- keep runtime data beside the app or source checkout; coordinate one supervisor and one tray across app copies
+- write bounded local metadata telemetry with private defaults and explicit detailed mode
+- never store conversation bodies, credentials, raw request payloads or exception locals in telemetry
+- preserve submitted-delivery observations across restart, without claiming a later turn necessarily came from our message
+- stop diagnostically on unsupported versions, protocol drift, unreadable prompts or ambiguous sends; never silently substitute a guessed recovery path
 
 ## Non-goals
 
-- General-purpose desktop macro automation.
-- Circumventing Codex usage limits or causing model work before usage is available.
-- Automatically resolving approvals, security prompts or explicit requests for user input.
-- Treating every failed/interrupted turn as eligible for automatic continuation.
-- Backward-compatibility layers for undocumented Codex interfaces unless a concrete supported version needs them.
+- bypassing account limits, switching accounts or providers, or spending credits before ordinary usage is allowed
+- automatically answering approvals, security prompts, tool elicitations or explicit user-input requests
+- resuming arbitrary network failures, interrupted work, CI jobs or sub-agents
+- monitoring remote, cloud or WSL sessions outside the visible native Codex home
+- uploading telemetry, collecting credentials or maintaining a remote analytics service
+- supporting unverified queue retry or atomicity guarantees
 
-## Current phase
+## Supported release
 
-Version 0.1.0 is validated for native use with Windows 11, PowerShell 7, Python 3.13 and Codex 0.160.0. Current checks and remaining observational limits belong to [VALIDATION.md](VALIDATION.md).
+Version 0.2.0 targets Windows 11 x86_64 and Codex 0.160.0-compatible local interfaces. The portable release bundles Python. Source development uses Python 3.13 and PowerShell 7. Current results and limits belong to [VALIDATION.md](VALIDATION.md).

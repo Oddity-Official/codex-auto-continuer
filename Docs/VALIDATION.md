@@ -1,33 +1,30 @@
 # Verification
 
-Current native verification: 3 October 2026. Source base: verified ChatGPT checkpoint v001, bootstrap Git commit `643ba04`.
+Current verification: 3 October 2026. Source base: verified ChatGPT v001, bootstrap commit `643ba04`, native 0.1.0 commit `1ef490f`. The current application is 0.2.0.
 
-## Readiness
-
-Version 0.1.0 is installed and enabled for native use on the tested Windows account. The native gate, package installation, live socket/RPC integration, delivery probes and installed process controls passed.
-
-The installed supervisor observed a real quota failure, waited while ordinary usage was unavailable, then cancelled the stale obligation after the user's manual resume. Automatic continuation at natural recovery was not observed; no simulated transition is presented as a real account reset.
-
-## Environment and runtime settings
+## Environment and settings
 
 | Item | Exact value |
 | --- | --- |
-| Operating system | Windows 11, build 10.0.26300, x86_64 |
+| Operating system | Windows 11 build 10.0.26300, x86_64 |
 | Shell | PowerShell 7.6.6 |
 | Python | CPython 3.13.7 |
 | Codex CLI and daemon | 0.160.0 |
-| Application | 0.1.0 |
-| Runtime dependencies | Standard library only |
-| Discovery | 24 hours, using failed-turn completion time |
-| Scope | Desktop; vscode with Codex Desktop originator, plus configured chatgpt/atlas custom sources |
+| Tray dependencies | pystray 0.19.5; Pillow 12.3.0 in the isolated build environment |
+| Portable builder | PyInstaller 6.22.3, hooks 2026.8; one-folder GUI and console EXEs |
+| Source test interpreter | py -3.13; global Pillow 10.4.0 remains compatible with unrelated installed tools |
+| Discovery and scope | 24 hours from failed-turn completion; allInteractive; no exec or subAgent |
 | Poll interval | 30 seconds |
 | RPC total deadline | 12 seconds |
-| Codex subprocess deadline | 20 seconds, process-tree cleanup on timeout |
+| Codex subprocess deadline | 20 seconds with process-tree cleanup |
 | Dispatch spacing | 2 seconds |
 | Reconnect backoff | 5 seconds |
-| Ambiguous-dispatch recovery interval | 15 seconds; no blind retry |
+| Ambiguous-send recovery interval | 15 seconds; no automatic retry |
 | Daemon autostart | Enabled |
-| Log limit | 2 MiB per file, 2 backups |
+| Private release telemetry | 16 MiB per stream, 8 backups; keyed IDs without names/paths |
+| User deployment telemetry | Detailed; 64 MiB per stream, 16 backups |
+| Prompt | UTF-8 Markdown; read immediately before sending; maximum 64 KiB |
+| Tray controls | Serialized subprocess commands, 90s or 120s; local status refresh 2s |
 
 ## Native gate
 
@@ -35,61 +32,57 @@ The installed supervisor observed a real quota failure, waited while ordinary us
 pwsh -NoProfile -File scripts/verify-windows.ps1
 ```
 
-Result: 119 passed, no skips, in 31.78 seconds. The gate also passed bytecode compilation for `src`, `tests` and `scripts`, and reported application version 0.1.0.
+Final gate result: 132 passed, no skips, in 29.25 seconds. Bytecode compilation and version smoke passed; version 0.2.0. Native shortcut tests passed with both PowerShell 7 and built-in Windows PowerShell, including Unicode, spaces and percent signs.
 
-The script gives pytest 180 seconds, compileall 120 seconds and import/version smoke 30 seconds. Its runner stops the process tree on timeout.
+The gate bounds pytest at 180 seconds, compileall at 120 seconds and version import at 30 seconds. Its runner stops the process tree on timeout.
 
-Regressions cover exact quota classification, false/null recovery authority, 24-hour failure recency, durable obligations beyond lookback, Desktop originator filtering, same-second turn changes, revalidation after resume, separate-server writer ownership, sequential rate-limit rechecks, stale queue deletion confirmation, ambiguous sends, state ownership, actual Windows sockets, total RPC deadlines, initialization cleanup, Windows process locking and native shortcut ownership/quoting.
+Regressions cover exact quota classification, false/null authority, failure recency, durable obligations, client filtering, same-second progress, revalidation after resume, separate-writer errors, sequential quota rechecks, exact stale queue deletion, ambiguous sends, state ownership, real Windows sockets, total RPC deadlines, initialization cleanup, native locks and shortcut ownership/quoting.
 
-Historical ChatGPT/Linux results are preserved in [the v001 record](History/2026-10-03-chatgpt-v001-validation.md). They are not substituted for these Windows results.
+Tray-release regressions cover saved prompt reload and invalid-prompt refusal, durable subsequent-turn observations, active-runtime precedence, private correlated IDs, content/credential canaries in detailed mode, local portable data with shared locks, companion EXE selection, exact Markdown association launch, tray command parity, tray privacy reconfiguration, installed CLI owner lookup and native Codex binary discovery.
 
-## Native integration matrix
+## Native integration evidence
 
-All probes are under `Docs/Audits/2026-10-03/`. They store no user prompt/response bodies.
+Current probes live in `Docs/Audits/2026-10-03-02/`. They do not save user conversation bodies. Full settings and diagnostic refinements belong to [the audit](Audits/2026-10-03-02/AUDIT.md).
 
-| Probe | Exact settings and bounds | Result |
+| Probe | Full settings and bounds | Result |
 | --- | --- | --- |
-| `probe_live.py` | Existing daemon 0.160.0; CLI deadline 10s; RPC deadline 5s; 100-thread page; at most 12 latest turns; outer deadline 90s; read-only | Socket, initialization, rate limits, source labels and persisted turn shape passed. 74 vscode/Codex Desktop threads sampled; usage allowed true |
-| `probe_coexistence.py` | Separate local native stdio server plus existing daemon; one owned read-only gpt-6-luna thread; fixed token reply; no tools; RPC 12s, completion waits 35s, daemon RPC 5s; outer deadline 100s | Daemon saw notLoaded, resume refused another active writer, queue delivery completed on original owner |
-| `probe_unloaded.py` | Existing daemon; one owned read-only gpt-6-luna thread; fixed token reply; no tools; archive/unarchive to unload; 2 queued probe items; RPC 5s, completion waits 35s, unload wait 5s; outer deadline 110s | Exact queue CRUD passed; unrelated item preserved; resumed queued turn completed after disconnect |
-| `probe_quota_serialization.py` | Temporary isolated CODEX_HOME; localhost HTTP 429 usage_limit_reached fixture; non-secret key; no real account requests; connect wait 10s, RPC 2s, turn wait 20s; outer deadline 60s | Live and persisted failed/usageLimitExceeded, numeric completedAt |
-| `probe_installation.py` | Installed site-packages version; existing background instance; start/once 15s, status 45s, stop 65s; outer deadline 120s | Running status, idempotent start, competing once exit 2, graceful stop and stopped status passed |
+| Native tray | Real Windows pystray icon and HMENU; owned temporary config; existing daemon; start wait 15s, cycle 20s, scan 10s, graceful stop 65s, one cycle 35s; outer 120s | 21 native menu entries; start, immediate scan, stop, one cycle and quit passed |
+| Real interactive CLI | Private temporary working directory; gpt-6-luna, low reasoning, fixed no-tools token replies; read-only sandbox; approvals never; --no-alt-screen and --no-daemon; TERM=xterm-256color; RPC 5s; each completion wait 35s; outer 100s | source=cli; exact separate active writer; queue ID acknowledged; second turn completed; process stopped and owned chat archived |
+| Portable EXEs | Clean extraction to an owned folder containing spaces and percent; init/status/start/scan/exclusive once/privacy restart/stop; ordinary child 45s, settings 90s, stop 65s, state waits 20s; outer 160s | Correct local data, competing once exit 2 without snapshot corruption, immediate scan, new PID after setting change, private and detailed telemetry, graceful stop |
 
-The probes create only their owned test threads and archive them. The isolated quota probe removes its temporary home and process. Diagnostic refinements and initial failures are documented in the audit.
+Tray checks invoke public menu callbacks on a real native menu. Message dialogs are intercepted inside the owned probe. They are not a manual mouse inspection or a visual accessibility review. The Markdown test verifies the exact `os.startfile` target; it does not edit a document in the user's editor.
 
-Rerun a probe through the bounded native runner, for example:
+The CLI probe makes 2 small real model turns. pywinpty 3.0.2 is audit-only, not a shipped dependency. Its terminal reader handles cursor-position queries, not approvals or trust questions.
 
-```powershell
-pwsh -NoProfile -File scripts/run-project-command.ps1 -FileName (Get-Command py -CommandType Application).Source -Arguments '-3.13','Docs/Audits/2026-10-03/probe_live.py' -TimeoutSeconds 90
-```
+Earlier native evidence is preserved in [the 0.1.0 verification record](History/2026-10-03-native-0.1.0-validation.md) and archived audit. It covers Desktop-style separate-owner queue delivery, unloaded queue CRUD, exact deletion preserving another item, detached completion, and isolated 429 classification persistence. Those probes were not repeated merely to increase test counts.
 
-The coexistence and unloaded probes make small real model requests. The installation probe stops the running supervisor; restart it afterward. They are audit tools, not production refreshes or part of the standard gate.
+## Release and data boundaries
 
-## Package and activation
+Build the portable ZIP with:
 
 ```powershell
-py -3.13 -m pip wheel --no-deps --no-build-isolation --wheel-dir dist .
-py -3.13 -m pip install --no-deps --force-reinstall dist/codex_auto_continuer-0.1.0-py3-none-any.whl
-py -3.13 -m codex_auto_continuer init
-py -3.13 -m codex_auto_continuer status
-py -3.13 -m codex_auto_continuer once
-py -3.13 -m codex_auto_continuer install-startup
-py -3.13 -m codex_auto_continuer start
+pwsh -NoProfile -File scripts/build-portable.ps1
 ```
 
-Wheel build and installed module checks passed. The installed console command resolves from Python 3.13's Scripts directory. The foreground native cycle scanned 3 recent Desktop threads and reported zero detected, dispatched or pending obligations. No existing user thread was continued by these activation checks.
+The build wrapper uses `.venv`, bounds the child at 360 seconds and PyInstaller at 300 seconds, includes original notices plus matching pystray source, hashes every file and verifies ZIP CRCs and file hashes. Runtime data and the deployed App directory are excluded from both portable release and source handoff.
 
-The final wheel matches all 13 runtime modules byte-for-byte and declares version 0.1.0, Python >=3.13 and no third-party runtime dependencies. SHA-256: `c8c6101f43103314125803bd58b687d2cd5f97e53a9c0b254b44cdc9a7b235dc`. Markdown file targets and `git diff --check` passed.
+The source handoff is `codex-auto-continuer-codex-handoff.zip`. Portable artifact identity is in its internal `RELEASE-MANIFEST.json`; the ZIP's external SHA-256 is reported at delivery to avoid a self-referential checksum.
 
-The managed native shortcut targets Python 3.13 `pythonw.exe` with an absolute config path. Launching the shortcut produced a hidden supervisor. The process was left running after installed stop/start verification. Actual fresh-login behavior has not been observed.
+## Installed activation
+
+The portable deployment is `App/CodexAutoContinuer.exe` in this checkout. Its settings, prompt and logs are under `App/data`. Detailed telemetry is enabled with 64 MiB and 16 backups per stream. The previous inline prompt was preserved unchanged. The previous per-user 0.1.0 state was verified empty; its original config, state and logs remain intact, not silently migrated or deleted.
+
+The managed login shortcut now targets the GUI EXE with an absolute App/data config path and the tray command. Launching that shortcut produced `tray.ready` with detailed privacy and a live monitoring snapshot. The first cycle scanned 3 recent interactive chats, with detected=0, dispatched=0 and pending=0. No existing user chat was continued by activation checks.
+
+The installed Python package is also 0.2.0. Its default CLI resolved the registered App config and reported supervisorRunning=true, allInteractive scope, detailedTelemetry=true, startupInstalled=true and zero pending obligations. The tray and supervisor were left running. This proves shortcut launch, not a fresh Windows login.
 
 ## Remaining limits
 
-The real runtime log recorded one usage-limit obligation, 9 scans with pending=1 and usageAllowed=False, then cancelled=1, dispatched=0, pending=0 with usageAllowed=True after manual resume. The current state contains zero obligations. This was observed after initial activation, not manufactured by an audit probe. The log's local timestamp labels are not assigned a client timezone here.
-
-- Automatic continuation at natural usage recovery has not been observed. The user resumed first, so stale cancellation correctly prevented duplicate dispatch. The reason usage availability recovered was not established.
-- Two simultaneously quota-stalled real Desktop threads were not available; sequential permission rechecks were exercised in regressions.
-- Queue submission cannot be made atomic against a turn revision with the verified API. The runtime revalidates immediately and deletes its stale queue entries, but does not claim an unavailable atomic guarantee.
-- Only the tested Windows/Codex installation has native evidence. Unsupported protocol drift fails diagnostically.
-
-The audit contains reproduction settings and source locations. The handoff builder validates every transported file and excludes installed dependencies, build output and runtime data.
+- Actual VS Code extension UI delivery was not exercised: no installation was found in standard extension directories. Its metadata scope is covered by fixtures, and delivery is inferred from the common protocol.
+- Automatic continuation at a natural account reset has not been observed. The earlier production supervisor detected one real quota failure, waited through 9 unavailable-usage scans and cancelled after manual resume, with zero automatic dispatches.
+- Two simultaneous real quota failures were not available; multi-chat safety is covered by regression fixtures.
+- A fresh Windows login has not been performed. Shortcut launch is a separate observable check, not proof of a fresh login.
+- Queue addition has no verified atomic turn precondition or idempotency contract. Immediate revalidation cannot eliminate every concurrent-progress race.
+- Subsequent-turn telemetry reports observed metadata, not guaranteed attribution to a queued message.
+- Native evidence covers this Windows/Codex installation. Other versions must pass capability checks.
+- EXEs are unsigned; Windows reputation behavior and other machines have not been tested.

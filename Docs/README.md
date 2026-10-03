@@ -8,8 +8,10 @@
 - [Workflow](WORKFLOW.md): environment ownership, checkpoint import/export and transport boundaries
 - [Verification](VALIDATION.md): current checks, exact commands, results and environment limits
 - [Audits](Audits/README.md): dated audit evidence, rotation and retention
+- [Third-party components](THIRD-PARTY.md): bundled dependency notices and replacement/source locations
 
 ## Historical records
 
 - [ChatGPT v001 verification, 3 October 2026](History/2026-10-03-chatgpt-v001-validation.md)
 - [ChatGPT v001 research, 3 October 2026](History/2026-10-03-chatgpt-v001-research.md)
+- [Native 0.1.0 verification, 3 October 2026](History/2026-10-03-native-0.1.0-validation.md)

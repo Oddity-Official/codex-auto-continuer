@@ -48,10 +48,27 @@ def _pythonw() -> Path:
     return candidate
 
 
+def launch_command(config_file: Path, *arguments: str, console: bool = False) -> list[str]:
+    if getattr(sys, "frozen", False):
+        name = "CodexAutoContinuer-CLI.exe" if console else "CodexAutoContinuer.exe"
+        target = Path(sys.executable).with_name(name)
+        if not target.is_file():
+            raise ConfigurationError(f"Portable release is incomplete: {target}. Extract the whole ZIP into one folder.")
+        prefix = [str(target)]
+    else:
+        executable = Path(sys.executable) if console else _pythonw()
+        if console and executable.name.lower() == "pythonw.exe":
+            executable = executable.with_name("python.exe")
+        prefix = [str(executable), "-m", "codex_auto_continuer"]
+    return [*prefix, "--config", str(config_file.resolve()), *arguments]
+
+
 def _shortcut(path: Path, *, target: Path | None = None, arguments: str = "", directory: Path | None = None) -> dict:
     pwsh = shutil.which("pwsh")
     if not pwsh:
-        raise ConfigurationError("PowerShell 7 (pwsh) is required to manage the native Windows Startup shortcut.")
+        pwsh = shutil.which("powershell.exe")
+    if not pwsh:
+        raise ConfigurationError("Windows PowerShell or PowerShell 7 is required to manage the native login shortcut.")
     payload = {"path": str(path), "mode": "read" if target is None else "write", "description": _MARKER,
                "target": str(target or ""), "arguments": arguments, "directory": str(directory or "")}
     try:
@@ -78,15 +95,16 @@ def install_startup(config_file: Path | None = None) -> Path:
     target = startup_path()
     _check_owned(target)
     target.parent.mkdir(parents=True, exist_ok=True)
-    from .config import default_config_path, load_config, app_data_dir
+    from .config import default_config_path, initialize_files
     config_file = (config_file or default_config_path()).resolve()
-    load_config(config_file)
-    directory = app_data_dir()
+    initialize_files(config_file)
+    directory = config_file.parent
     directory.mkdir(parents=True, exist_ok=True)
-    arguments = subprocess.list2cmdline(["-m", "codex_auto_continuer", "--config", str(config_file), "run", "--background"])
+    command = launch_command(config_file, "tray")
+    arguments = subprocess.list2cmdline(command[1:])
     with tempfile.TemporaryDirectory(prefix=".cac-", dir=target.parent) as temporary:
         link = Path(temporary) / target.name
-        _shortcut(link, target=_pythonw(), arguments=arguments, directory=directory)
+        _shortcut(link, target=Path(command[0]), arguments=arguments, directory=directory)
         if not link.is_file() or _shortcut(link).get("description") != _MARKER:
             raise ConfigurationError("Windows did not save the managed Startup shortcut.")
         os.replace(link, target)

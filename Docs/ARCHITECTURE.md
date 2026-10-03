@@ -1,76 +1,82 @@
 # Architecture
 
-## Runtime
+## Runtime and controls
 
-The product runtime is Python 3.13 with no third-party runtime dependencies. `pytest` is development-only. The supervisor is a per-user process intended to run on native Windows 11.
+The supervisor is a per-user Python 3.13 process. Its recovery engine uses the standard library. The Windows tray uses pystray and Pillow. PyInstaller packages GUI and console EXEs sharing an adjacent `_internal` folder.
 
-## Control path
+The GUI entry point defaults to `tray`. A tray instance starts a hidden supervisor, polls a small local status snapshot every 2 seconds, and sends serialized control commands through the companion console EXE. Commands have 90-second bounds, or 120 seconds for one-cycle controls. Timed-out process trees are stopped. The tray does not poll Codex independently for its icon status.
 
-1. Resolve `codex` from `PATH` and require CLI version 0.160.0 or newer.
-2. Probe the first-party local app-server daemon with `codex app-server daemon version`; optionally start it with `codex app-server daemon start`.
-3. Connect to the private Unix-domain control socket and perform WebSocket `initialize` / `initialized`. On Windows, a small standard-library `ctypes` bridge marshals the Winsock `sockaddr_un` address. Python owns the socket and all I/O. Socket paths must fit in 107 UTF-8 bytes.
-4. Poll `account/rateLimits/read` and `thread/list` through JSON-RPC.
-5. For in-scope threads updated within the 24-hour discovery window, read the newest turn with `itemsView = notLoaded`. Record an obligation only for `failed / usageLimitExceeded` with a completion timestamp inside that window. Do not cache by second-granularity thread timestamps: a new turn can share the previous turn's timestamp.
-6. Persist that obligation before attempting any continuation.
-7. Dispatch only when `ordinaryUsageAllowed` is explicitly `true`.
-8. Immediately re-read the exact thread and turn. Any user/manual progress cancels the stale obligation.
-9. If the daemon reports `notLoaded`, try `thread/resume` and verify the exact returned thread ID. If that method returns the verified `-32600` active-writer error for this exact thread, another Codex server owns it. Queue to that owner through the shared queue. Never steal its lock. All unrelated resume errors remain fatal. The connection closes after the cycle so this supervisor cannot remain a sleeping approval/input subscriber.
-10. Submit the configured continuation through `thread/queue/add` using a deterministic `clientUserMessageId` derived from the exact thread/failed-turn pair.
-11. On subsequent cycles, reconcile the durable obligation against the latest turn and `thread/queue/list` before doing anything else.
+Both interfaces call the same CLI implementation. The menu has start, stop, restart, scan, one cycle, settings, Markdown prompt, logs, initialization, scope, privacy and login controls. Prompt edits apply at the next send. Other manual settings edits require restart.
 
-No UI automation path exists.
+## Codex control path
+
+1. Find the native Codex executable from explicit configuration, PATH, the standard Desktop location or recognized npm vendor layout. Never execute an arbitrary shell launcher.
+2. Require CLI version 0.160.0 or newer. Probe the daemon version; optionally start it.
+3. Connect to its private Unix-domain control socket and perform WebSocket initialization. On Windows, a standard-library ctypes bridge marshals Winsock's Unix-domain address. Python owns all socket I/O; paths must fit 107 UTF-8 bytes.
+4. Read account limits and paginated thread metadata. Discovery uses descending update time, but eligibility uses the failed turn's completion time.
+5. Read the latest turn with `itemsView = notLoaded`. Record only `failed / usageLimitExceeded` within the 24-hour window. Never cache by second-granularity thread timestamps.
+6. Persist the exact thread/turn obligation before dispatch.
+7. Require `ordinaryUsageAllowed == true`, then revalidate the exact thread and latest failed turn.
+8. For `notLoaded`, resume and verify the exact returned thread ID. Accept only the verified -32600 active-writer error naming this exact thread as evidence of a separate owner.
+9. Re-read the exact thread/turn and quota after ownership handling. Read the current Markdown prompt, validate it and log only its hash and length.
+10. Save dispatch intent before `thread/queue/add`. Require the returned queue ID and matching deterministic client message ID.
+11. Reconcile the queue and latest turn on later cycles. Close each connection before sleeping, so a resume subscription cannot become a sleeping approval/input subscriber.
+
+No UI automation or model-switching path exists. Each RPC has a total deadline that notifications, pings and fragmented frames cannot extend.
 
 ## Thread scope
 
-The default `thread_scope = "desktop"` accepts `source = vscode` only when its originator matches `desktop_originators`, initially `Codex Desktop`. It also accepts configured custom sources, initially `chatgpt` and `atlas`. `allInteractive` additionally accepts CLI and all VS Code sessions, but never arbitrary custom, executor, app-server, sub-agent or unknown sources.
+Default `allInteractive` accepts CLI and VS Code sources plus configured Desktop custom sources, initially chatgpt and atlas. It excludes exec, appServer, unknown and subAgent sources. Desktop-only mode accepts vscode only with a configured Desktop originator, initially Codex Desktop, or those configured custom sources.
 
-Discovery uses `scan_lookback_hours`, default 24. Existing obligations are revalidated by exact metadata reads, not discarded when they age outside discovery. Turn reads omit conversation items. Missing completion time on a quota-failed turn is a protocol error, not permission to guess recency.
+All visible sessions must share the same native Codex home and account. This is not a cross-host or cloud monitor.
 
-The `status` command reports only counts by observed source label. It does not print thread previews or conversation bodies.
+Discovery uses `scan_lookback_hours`, default 24. Recorded obligations age independently and are revalidated by exact metadata reads. A quota failure without completion time is a protocol error, not permission to guess recency.
 
-## Durable obligation state
+## Durable state
 
-One obligation is permitted per thread. Each contains:
-
-- exact `thread_id`
-- exact `failed_turn_id`
-- detection timestamp
-- advisory reset timestamp, if exposed
-- deterministic `client_user_message_id`
-- phase and phase-change timestamp
-- exact queued submission ID once known
-
-The phases are:
+State schema version 2 stores obligations and delivery observations. An obligation contains exact thread/failed-turn IDs, detection time, advisory reset time, deterministic client message ID, phase-change time and any known queue ID. Only one obligation per thread is permitted.
 
 ```text
 pending -> dispatching -> submitted
                  \-> uncertain
 ```
 
-`dispatching` is persisted **before** the queue RPC. If the process loses transport around the send, the state becomes `uncertain`. On restart, the supervisor looks for either an advanced turn or its exact deterministic client message ID in Codex's queue. If neither can be established after the recovery interval, it stops with a diagnostic. There is no unverified automatic retry because that could duplicate work.
+`dispatching` is synced before the queue RPC. A lost response makes the send uncertain. Restart reconciliation looks for an advanced turn or the exact client message ID in the queue. It never assumes that a client message ID makes queue addition idempotent. An unresolved ambiguous send stops after the recovery interval.
 
-## Stale cancellation
+Submitted deliveries also create durable observations. These survive removal of a stale obligation and process restart, allowing later metadata to record a subsequent completed, failed or interrupted turn. Live active status takes precedence over an apparently terminal persisted history entry.
 
-A stale obligation is not merely forgotten. If it could have produced a queued submission (`dispatching`, `uncertain`, or `submitted`), the supervisor enumerates the exact thread queue, selects entries carrying its own deterministic client message ID, and deletes those exact queue IDs with `thread/queue/delete`. Unrelated user or client queue entries are left untouched.
+A subsequent turn is not proof that our message caused it: a user can advance the chat concurrently. Telemetry labels it `delivery.subsequent_turn`, not guaranteed delivery success. Missing or archived chats end observations.
 
-There remains an unavoidable narrow concurrency window between the final revalidation and Codex accepting a queue operation because the 0.160.0 queue API does not expose a compare-and-swap precondition against a turn revision. The implementation minimizes this window and cleans stale queued work as soon as it is observable; it does not claim atomicity the API does not provide.
+State writes flush and sync a temporary file before atomic replacement. Invalid versions, identities, duplicate records or queue ownership fail closed. Schema changes are deliberate, not silent data-loss migrations.
 
-## Rate-limit policy
+## Stale cancellation and quota policy
 
-`ordinaryUsageAllowed` is the authority for recovery. A reset timestamp or `usedPercent` is never treated as proof that usage is available. Exhausted-window reset times are retained only as an advisory wake/sleep hint and for diagnostics.
+Manual progress, active work, missing chats, archive or scope changes invalidate pending obligations. If a send may already have happened, enumerate that exact thread's queue and delete only entries carrying our deterministic client message ID. Verify their removal before forgetting the obligation. Unrelated queue entries remain untouched.
 
-Multiple obligations are dispatched oldest-first. After each successful submission, the supervisor re-reads account rate-limit permission before considering another thread.
+The verified API has no compare-and-swap precondition against a turn revision. A narrow race remains between final revalidation and queue acceptance. We minimize it and remove observable stale queued work, without claiming unavailable atomicity.
 
-## Approvals and user input
+Reset timestamps and percentages never authorize dispatch. Exhausted-window resets are only sleep hints and diagnostics. Dispatch runs oldest-first, with another account-permission read between chats.
 
-The app-server can send requests from server to client for approvals and explicit user input. This supervisor deliberately never responds to them. It closes the app-server connection after each cycle, and specifically after any `thread/resume`, so it cannot remain a long-lived competing subscriber.
+The supervisor never answers approvals, security prompts, tool elicitations or user-input requests. Active threads are not eligible for new obligations.
 
-## Single instance and startup
+## Data location and single instance
 
-`run` and `once` acquire the per-user OS file lock before loading state. A second supervisor fails immediately. State writes flush and sync the temporary file before atomic replacement. Loaded state must carry the deterministic client message ID for its exact thread/turn identity before it can claim or delete queue entries.
+Portable EXEs use adjacent `data`; source checkouts use `.data/runtime`. Explicit config paths put state, prompt and logs beside that config. Pip installations default to the per-user directory, or attach to the last registered app's absolute config path. A moved/missing registered config fails clearly instead of guessing.
 
-`install-startup` creates a description-owned native `.lnk` shortcut in the user's Startup folder using Windows Shell through bounded PowerShell 7. It directly targets `pythonw.exe`, pins an absolute config path, and invokes no batch shell. Standard Windows `pythonw.exe` is required. Installation and removal refuse unmanaged or link/reparse targets.
+Small global control files remain under the per-user state directory: supervisor/tray OS locks, stop and scan requests, and the owner record. Locks prevent concurrent copies from dispatching or creating duplicate tray icons. They are not stale PID assertions.
 
-`start` launches one hidden supervisor and verifies that it acquired its lock. `stop` writes a per-user stop request and waits up to 60 seconds for lock release. The supervisor finishes its current cycle, closes its connection and stops. Sleep and reconnect waits check the request every second. Pending obligations remain durable. A fresh run clears an old stop request only after acquiring the lock.
+The supervisor takes its OS lock before loading state and initializing telemetry. A conflicting command cannot overwrite an active runtime snapshot. `start` checks the owner, launches a hidden process and waits up to 10 seconds for its lock. `stop` waits up to 60 seconds for the current cycle to finish. Sleep/reconnect waits check stop/scan requests every second.
 
-`status` probes the instance lock to report whether a supervisor is running. The main log rotates at 2 MiB with 2 backups. RPC diagnostics report the method and numeric error code, without server-provided error bodies. Each RPC has a total deadline that notifications, pings and fragmented frames cannot extend.
+A description-owned native Startup shortcut targets the GUI EXE, or pythonw for a source install, with an absolute config path and no batch shell. Windows Shell creates it through bounded PowerShell. It refuses unmanaged or link/reparse targets. Moving a deployment requires reinstalling the shortcut.
+
+## Local telemetry
+
+The supervisor writes `telemetry.jsonl`; the tray writes `tray.jsonl`. Separate streams prevent multiprocess log rotation races. Schema 1 events carry UTC timestamp, PID, application version, privacy mode, event name and structured metadata.
+
+RPC summaries are allowlisted, never raw payload dumps. Errors retain classes, numeric RPC codes, timings and stack module/function/line locations. Detailed mode enables actual identifiers, names and paths, not arbitrary exception text or conversation content.
+
+Private mode omits personal metadata and uses HMAC-SHA256 keyed pseudonyms for thread, turn and queue IDs. The key persists locally for correlation. State still needs real identifiers; privacy applies to telemetry, not the whole data folder. Files are not encrypted.
+
+Rotation defaults to 16 MiB and 8 backups per stream. A privacy change reconfigures the tray stream and restarts the supervisor; old logs remain unchanged. I/O failures stop rather than silently discard diagnostics.
+
+Runtime status records phase, PID, cycle counts, quota permission, update time and error class. It supports the tray without storing conversation bodies. Build and handoff tools exclude runtime files, secrets, caches and the deployed App directory.
