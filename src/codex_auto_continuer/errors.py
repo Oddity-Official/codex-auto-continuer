@@ -6,6 +6,10 @@ class ConfigurationError(AutoContinuerError):
     pass
 
 
+class AlreadyRunningError(AutoContinuerError):
+    pass
+
+
 class CodexCommandError(AutoContinuerError):
     pass
 

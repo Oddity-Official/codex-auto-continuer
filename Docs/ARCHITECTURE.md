@@ -8,13 +8,13 @@ The product runtime is Python 3.13 with no third-party runtime dependencies. `py
 
 1. Resolve `codex` from `PATH` and require CLI version 0.160.0 or newer.
 2. Probe the first-party local app-server daemon with `codex app-server daemon version`; optionally start it with `codex app-server daemon start`.
-3. Connect to the returned private AF_UNIX control socket and perform the WebSocket `initialize` / `initialized` handshake used by Codex's own daemon client.
+3. Connect to the private Unix-domain control socket and perform WebSocket `initialize` / `initialized`. On Windows, a small standard-library `ctypes` bridge marshals the Winsock `sockaddr_un` address. Python owns the socket and all I/O. Socket paths must fit in 107 UTF-8 bytes.
 4. Poll `account/rateLimits/read` and `thread/list` through JSON-RPC.
-5. For recent in-scope threads, read only the newest turn. A continuation obligation is created only for a terminal failed turn whose structured `codexErrorInfo` is `usageLimitExceeded`.
+5. For in-scope threads updated within the 24-hour discovery window, read the newest turn with `itemsView = notLoaded`. Record an obligation only for `failed / usageLimitExceeded` with a completion timestamp inside that window. Do not cache by second-granularity thread timestamps: a new turn can share the previous turn's timestamp.
 6. Persist that obligation before attempting any continuation.
 7. Dispatch only when `ordinaryUsageAllowed` is explicitly `true`.
 8. Immediately re-read the exact thread and turn. Any user/manual progress cancels the stale obligation.
-9. If an unloaded thread must be joined, use `thread/resume` on the same shared app-server and verify the returned thread ID. The app-server connection is closed after the cycle so this supervisor cannot remain a sleeping approval/input subscriber.
+9. If the daemon reports `notLoaded`, try `thread/resume` and verify the exact returned thread ID. If that method returns the verified `-32600` active-writer error for this exact thread, another Codex server owns it. Queue to that owner through the shared queue. Never steal its lock. All unrelated resume errors remain fatal. The connection closes after the cycle so this supervisor cannot remain a sleeping approval/input subscriber.
 10. Submit the configured continuation through `thread/queue/add` using a deterministic `clientUserMessageId` derived from the exact thread/failed-turn pair.
 11. On subsequent cycles, reconcile the durable obligation against the latest turn and `thread/queue/list` before doing anything else.
 
@@ -22,7 +22,9 @@ No UI automation path exists.
 
 ## Thread scope
 
-The default `thread_scope = "desktop"` accepts only the configured custom session sources, initially `chatgpt` and `atlas`. This matches the source classifications Codex uses for its interactive ChatGPT/Atlas clients. `thread_scope = "allInteractive"` additionally accepts CLI and VS Code interactive threads; it does not admit `exec`, `appServer`, sub-agent, or unknown sources.
+The default `thread_scope = "desktop"` accepts `source = vscode` only when its originator matches `desktop_originators`, initially `Codex Desktop`. It also accepts configured custom sources, initially `chatgpt` and `atlas`. `allInteractive` additionally accepts CLI and all VS Code sessions, but never arbitrary custom, executor, app-server, sub-agent or unknown sources.
+
+Discovery uses `scan_lookback_hours`, default 24. Existing obligations are revalidated by exact metadata reads, not discarded when they age outside discovery. Turn reads omit conversation items. Missing completion time on a quota-failed turn is a protocol error, not permission to guess recency.
 
 The `status` command reports only counts by observed source label. It does not print thread previews or conversation bodies.
 
@@ -65,6 +67,10 @@ The app-server can send requests from server to client for approvals and explici
 
 ## Single instance and startup
 
-`run` and `once` take a per-user OS file lock. A second supervisor process fails immediately with the lock path instead of racing the same obligation.
+`run` and `once` acquire the per-user OS file lock before loading state. A second supervisor fails immediately. State writes flush and sync the temporary file before atomic replacement. Loaded state must carry the deterministic client message ID for its exact thread/turn identity before it can claim or delete queue entries.
 
-`install-startup` writes one marker-owned `.cmd` file into the current user's Windows Startup folder and launches `pythonw.exe` when available. Installation and removal refuse to overwrite or delete an unmanaged file at that path.
+`install-startup` creates a description-owned native `.lnk` shortcut in the user's Startup folder using Windows Shell through bounded PowerShell 7. It directly targets `pythonw.exe`, pins an absolute config path, and invokes no batch shell. Standard Windows `pythonw.exe` is required. Installation and removal refuse unmanaged or link/reparse targets.
+
+`start` launches one hidden supervisor and verifies that it acquired its lock. `stop` writes a per-user stop request and waits up to 60 seconds for lock release. The supervisor finishes its current cycle, closes its connection and stops. Sleep and reconnect waits check the request every second. Pending obligations remain durable. A fresh run clears an old stop request only after acquiring the lock.
+
+`status` probes the instance lock to report whether a supervisor is running. The main log rotates at 2 MiB with 2 backups. RPC diagnostics report the method and numeric error code, without server-provided error bodies. Each RPC has a total deadline that notifications, pings and fragmented frames cannot extend.

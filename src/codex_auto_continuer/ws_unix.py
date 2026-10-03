@@ -5,9 +5,11 @@ import hashlib
 import os
 import socket
 import struct
+import time
 from pathlib import Path
 
 from .errors import ProtocolError, TransportError
+from .uds import connect_socket
 
 _GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 _MAX_HANDSHAKE = 64 * 1024
@@ -19,15 +21,24 @@ class UnixWebSocket:
         self._sock = sock
         self._prefetched = bytearray(prefetched)
         self._closed = False
+        self._timeout = sock.gettimeout()
+        self._deadline: float | None = None
+
+    def begin_request(self) -> None:
+        self._deadline = None if self._timeout is None else time.monotonic() + self._timeout
+
+    def _apply_timeout(self) -> None:
+        if self._deadline is not None:
+            remaining = self._deadline - time.monotonic()
+            if remaining <= 0:
+                raise TransportError("Codex app-server exceeded the total RPC deadline.")
+            self._sock.settimeout(remaining)
 
     @classmethod
     def connect(cls, path: Path, timeout: float) -> "UnixWebSocket":
-        if not hasattr(socket, "AF_UNIX"):
-            raise TransportError("This Python build does not support AF_UNIX sockets required by Codex app-server.")
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(timeout)
+        sock = None
         try:
-            sock.connect(str(path))
+            sock = connect_socket(path, timeout)
             key = base64.b64encode(os.urandom(16)).decode("ascii")
             request = (
                 "GET / HTTP/1.1\r\n"
@@ -40,25 +51,38 @@ class UnixWebSocket:
             sock.sendall(request)
             header, rest = cls._read_handshake(sock)
             cls._validate_handshake(header, key)
+            sock.settimeout(timeout)
             return cls(sock, rest)
-        except (OSError, ProtocolError) as exc:
-            sock.close()
+        except (OSError, ValueError, ProtocolError, TransportError) as exc:
+            if sock is not None:
+                sock.close()
             if isinstance(exc, ProtocolError):
                 raise
+            if isinstance(exc, ValueError):
+                raise ProtocolError(f"Unsupported Codex socket path {path}: {exc}. Use a shorter Codex home path.") from exc
             raise TransportError(f"Could not connect to Codex app-server socket {path}: {exc}") from exc
 
     @staticmethod
     def _read_handshake(sock: socket.socket) -> tuple[bytes, bytes]:
         data = bytearray()
         marker = b"\r\n\r\n"
+        timeout = sock.gettimeout()
+        deadline = None if timeout is None else time.monotonic() + timeout
         while True:
             pos = data.find(marker)
             if pos >= 0:
                 end = pos + len(marker)
+                if end > _MAX_HANDSHAKE:
+                    raise ProtocolError("Codex WebSocket handshake exceeded 64 KiB.")
                 return bytes(data[:end]), bytes(data[end:])
             if len(data) >= _MAX_HANDSHAKE:
                 raise ProtocolError("Codex WebSocket handshake exceeded 64 KiB.")
             try:
+                if deadline is not None:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise TimeoutError("Total WebSocket handshake deadline exceeded.")
+                    sock.settimeout(remaining)
                 chunk = sock.recv(4096)
             except OSError as exc:
                 raise TransportError(f"Codex WebSocket handshake read failed: {exc}") from exc
@@ -92,6 +116,7 @@ class UnixWebSocket:
             raise ProtocolError("Codex app-server WebSocket handshake omitted Connection: Upgrade.")
 
     def _read_exact(self, count: int) -> bytes:
+        self._apply_timeout()
         out = bytearray()
         if self._prefetched:
             take = min(count, len(self._prefetched))
@@ -99,6 +124,7 @@ class UnixWebSocket:
             del self._prefetched[:take]
         while len(out) < count:
             try:
+                self._apply_timeout()
                 chunk = self._sock.recv(count - len(out))
             except socket.timeout as exc:
                 raise TransportError("Timed out waiting for Codex app-server.") from exc
@@ -150,6 +176,7 @@ class UnixWebSocket:
             header = bytes([first, 0x80 | 127]) + struct.pack("!Q", length)
         masked = bytes(byte ^ mask[i % 4] for i, byte in enumerate(payload))
         try:
+            self._apply_timeout()
             self._sock.sendall(header + mask + masked)
         except OSError as exc:
             raise TransportError(f"Codex app-server socket write failed: {exc}") from exc
@@ -198,6 +225,7 @@ class UnixWebSocket:
             finally:
                 return
         try:
+            self._deadline = time.monotonic() + 1
             self._send_frame(0x8, b"")
         except Exception:
             pass

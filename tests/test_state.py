@@ -54,3 +54,12 @@ def test_submitted_requires_queue_id(tmp_path: Path):
     path.write_text(json.dumps({"version": 1, "obligations": [o]}), encoding="utf-8")
     with pytest.raises(ProtocolError, match="queued_submission_id"):
         load_state(path)
+
+
+def test_state_cannot_claim_somebody_elses_queue_identity(tmp_path):
+    obligation = Obligation.create("t", "x", 1.0, None).__dict__
+    obligation["client_user_message_id"] = "another-client"
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps({"version": 1, "obligations": [obligation]}))
+    with pytest.raises(ProtocolError, match="refusing queue ownership"):
+        load_state(path)

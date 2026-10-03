@@ -13,6 +13,8 @@ Automatically resume Codex Desktop work that stopped specifically because accoun
 - Revalidate immediately before continuing. If the user or another client has already advanced the thread, cancel the stale obligation instead of sending a duplicate message.
 - Support more than one stalled thread without cross-thread mixups or duplicate dispatch.
 - Make the continuation prompt user-configurable without source edits.
+- Discover failures completed in the last 24 hours and new failures during operation. Keep recorded obligations until resolved, even beyond the discovery window.
+- Support hidden per-user login launch, explicit background start/stop, and observable running status.
 - Fail loudly and diagnostically when Codex interfaces change or required state cannot be verified. Do not silently fall back to UI automation.
 - Keep durable state minimal, explicit and non-secret. Avoid storing conversation bodies unless a verified design need appears.
 - Target native Windows 11 and PowerShell 7. WSL must not be required.
@@ -27,4 +29,4 @@ Automatically resume Codex Desktop work that stopped specifically because accoun
 
 ## Current phase
 
-First implementation complete in the v0.1 design: Python 3.13 supervisor, shared app-server integration, durable obligation state machine, CLI and Windows Startup launcher. Portable regression/package checks pass in ChatGPT/Linux. Native Windows + live Codex Desktop validation remains required before release.
+Version 0.1.0 is validated for native use with Windows 11, PowerShell 7, Python 3.13 and Codex 0.160.0. Current checks and remaining observational limits belong to [VALIDATION.md](VALIDATION.md).

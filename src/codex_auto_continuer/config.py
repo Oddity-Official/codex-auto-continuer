@@ -20,7 +20,7 @@ DEFAULT_CONTINUE_PROMPT = (
 class Config:
     continue_prompt: str = DEFAULT_CONTINUE_PROMPT
     poll_seconds: float = 30.0
-    scan_lookback_hours: float = 168.0
+    scan_lookback_hours: float = 24.0
     dispatch_spacing_seconds: float = 2.0
     rpc_timeout_seconds: float = 12.0
     codex_command_timeout_seconds: float = 20.0
@@ -28,6 +28,7 @@ class Config:
     dispatch_recovery_seconds: float = 15.0
     thread_scope: str = "desktop"
     desktop_custom_sources: tuple[str, ...] = ("chatgpt", "atlas")
+    desktop_originators: tuple[str, ...] = ("Codex Desktop",)
     auto_start_daemon: bool = True
 
 
@@ -59,17 +60,22 @@ def lock_path() -> Path:
     return app_data_dir() / "supervisor.lock"
 
 
+def stop_path() -> Path:
+    return app_data_dir() / "stop.request"
+
+
 def _coerce(data: dict[str, Any]) -> Config:
     valid = {f.name for f in fields(Config)}
     unknown = sorted(set(data) - valid)
     if unknown:
         raise ConfigurationError(f"Unknown config field(s): {', '.join(unknown)}")
-    if "desktop_custom_sources" in data:
-        value = data["desktop_custom_sources"]
-        if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
-            raise ConfigurationError("desktop_custom_sources must be an array of strings.")
-        data = dict(data)
-        data["desktop_custom_sources"] = tuple(value)
+    data = dict(data)
+    for name in ("desktop_custom_sources", "desktop_originators"):
+        if name in data:
+            value = data[name]
+            if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                raise ConfigurationError(f"{name} must be an array of strings.")
+            data[name] = tuple(value)
     try:
         cfg = Config(**data)
     except TypeError as exc:
@@ -103,10 +109,12 @@ def validate_config(cfg: Config) -> Config:
         raise ConfigurationError("rpc_timeout_seconds must be at least 1 second.")
     if cfg.codex_command_timeout_seconds < 1:
         raise ConfigurationError("codex_command_timeout_seconds must be at least 1 second.")
-    if cfg.thread_scope not in {"desktop", "allInteractive"}:
+    if not isinstance(cfg.thread_scope, str) or cfg.thread_scope not in {"desktop", "allInteractive"}:
         raise ConfigurationError("thread_scope must be 'desktop' or 'allInteractive'.")
-    if not cfg.desktop_custom_sources or any(not x.strip() for x in cfg.desktop_custom_sources):
-        raise ConfigurationError("desktop_custom_sources must contain at least one non-empty source name.")
+    for name in ("desktop_custom_sources", "desktop_originators"):
+        values = getattr(cfg, name)
+        if not isinstance(values, tuple) or not values or any(not isinstance(x, str) or not x.strip() for x in values):
+            raise ConfigurationError(f"{name} must contain at least one non-empty name.")
     if not isinstance(cfg.auto_start_daemon, bool):
         raise ConfigurationError("auto_start_daemon must be true or false.")
     return cfg
@@ -118,7 +126,7 @@ def load_config(path: Path | None = None) -> Config:
         return Config()
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ConfigurationError(f"Cannot read config {path}: {exc}") from exc
     if not isinstance(raw, dict):
         raise ConfigurationError(f"Config {path} must contain a JSON object.")
@@ -131,7 +139,6 @@ def write_config(path: Path | None = None, *, force: bool = False) -> Path:
         raise ConfigurationError(f"Config already exists: {path}. Use --force to replace it.")
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = asdict(Config())
-    payload["desktop_custom_sources"] = list(payload["desktop_custom_sources"])
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     os.replace(tmp, path)

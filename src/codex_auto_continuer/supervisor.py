@@ -52,7 +52,6 @@ class Supervisor:
         self.client: AppServerClient | None = None
         self.codex_bin: str | None = None
         self._cli_version: str | None = None
-        self._seen_updated_at: dict[str, float] = {}
 
     def connect(self) -> None:
         if self.client is not None:
@@ -89,8 +88,15 @@ class Supervisor:
             )
         _parse_rate_limits(limits)
 
-    def run_forever(self) -> None:
-        while True:
+    def run_forever(self, stop_requested: Callable[[], bool] = lambda: False) -> None:
+        def wait(seconds: float) -> None:
+            remaining = seconds
+            while remaining > 0 and not stop_requested():
+                step = min(1.0, remaining)
+                self.sleep(step)
+                remaining -= step
+
+        while not stop_requested():
             try:
                 self.connect()
                 result = self.run_cycle()
@@ -107,11 +113,11 @@ class Supervisor:
                 # Every cycle uses a fresh client. This guarantees a thread/resume subscription
                 # cannot linger and receive approval or requestUserInput traffic while sleeping.
                 self.close()
-                self.sleep(delay)
+                wait(delay)
             except TransportError as exc:
                 LOG.warning("Codex transport lost: %s; reconnecting in %.1fs", exc, self.config.reconnect_backoff_seconds)
                 self.close()
-                self.sleep(max(1.0, self.config.reconnect_backoff_seconds))
+                wait(max(1.0, self.config.reconnect_backoff_seconds))
 
     def run_cycle(self) -> CycleResult:
         client = self._require_client()
@@ -144,16 +150,13 @@ class Supervisor:
             if thread_id in existing:
                 continue
             status_type, _flags = _thread_status(thread)
-            updated = _required_timestamp(thread, "updatedAt", "thread/list")
             if status_type == "active":
-                self._seen_updated_at[thread_id] = updated
                 continue
-            if self._seen_updated_at.get(thread_id) == updated:
-                continue
-            # Cache only after a successful turn read; transient read failures remain retriable.
             turn = client.latest_turn(thread_id)
-            self._seen_updated_at[thread_id] = updated
             if turn is not None and _is_usage_limit_failure(turn):
+                completed = _required_timestamp(turn, "completedAt", "failed thread/turns/list")
+                if completed < now - self.config.scan_lookback_hours * 3600:
+                    continue
                 turn_id = _required_string(turn, "id", "thread/turns/list")
                 obligation = Obligation.create(thread_id, turn_id, now, limits.next_reset_at)
                 self.state.obligations.append(obligation)
@@ -200,7 +203,7 @@ class Supervisor:
                 if updated < cutoff:
                     stop = True
                     break
-                if self._scope_accepts(thread.get("source")):
+                if self._scope_accepts(thread):
                     out.append(thread)
             if stop:
                 return out
@@ -214,40 +217,21 @@ class Supervisor:
             seen_cursors.add(next_cursor)
             cursor = next_cursor
 
-    def _scope_accepts(self, source: Any) -> bool:
-        label = _session_source_label(source)
+    def _scope_accepts(self, thread: dict[str, Any]) -> bool:
+        label = _session_source_label(thread.get("source"))
+        custom = label in {f"custom:{x}" for x in self.config.desktop_custom_sources}
         if self.config.thread_scope == "desktop":
-            return label in {f"custom:{x}" for x in self.config.desktop_custom_sources}
-        return label in {"cli", "vscode"} or label.startswith("custom:")
+            return custom or (label == "vscode" and thread.get("originator") in self.config.desktop_originators)
+        return label in {"cli", "vscode"} or custom
 
     def _find_thread_by_id(self, thread_id: str) -> dict[str, Any] | None:
-        client = self._require_client()
-        cursor: str | None = None
-        seen: set[str] = set()
-        while True:
-            page = client.thread_list(cursor=cursor, limit=100)
-            data = page.get("data")
-            if not isinstance(data, list):
-                raise ProtocolError("thread/list response omitted data array.")
-            for thread in data:
-                if not isinstance(thread, dict):
-                    raise ProtocolError("thread/list returned a non-object thread.")
-                if thread.get("id") == thread_id:
-                    _thread_status(thread)
-                    return thread
-            cursor_value = page.get("nextCursor")
-            if cursor_value is None:
-                return None
-            if not isinstance(cursor_value, str) or not cursor_value or cursor_value in seen:
-                raise ProtocolError("thread/list pagination is invalid while finding a thread by id.")
-            seen.add(cursor_value)
-            cursor = cursor_value
+        return self._require_client().thread_read(thread_id)
 
     def _revalidate_obligation(self, obligation: Obligation, thread: dict[str, Any] | None) -> bool:
         if thread is None:
             LOG.info("Cancelling obligation for missing thread %s", obligation.thread_id)
             return False
-        if not self._scope_accepts(thread.get("source")):
+        if thread.get("archived") is True or not self._scope_accepts(thread):
             LOG.info("Cancelling obligation because thread %s is no longer in configured scope", obligation.thread_id)
             return False
         status_type, _ = _thread_status(thread)
@@ -275,25 +259,26 @@ class Supervisor:
             return False
 
         if obligation.phase in {"dispatching", "uncertain", "submitted"}:
-            recovered = self._recover_submission_state(obligation, now)
-            if recovered != "retry":
-                return False
-
-        thread = self._find_thread_by_id(obligation.thread_id)
-        if not self._revalidate_obligation(obligation, thread):
-            if thread is not None:
-                self._cancel_queued_continuations(obligation)
-            self.state.obligations.remove(obligation)
-            save_state(self.state_file, self.state)
+            self._recover_submission_state(obligation, now)
             return False
+
         assert thread is not None
         status_type, _ = _thread_status(thread)
         if status_type == "notLoaded":
-            resumed = client.resume_thread(obligation.thread_id)
-            resumed_thread = resumed.get("thread")
-            if not isinstance(resumed_thread, dict) or resumed_thread.get("id") != obligation.thread_id:
-                raise ProtocolError("thread/resume did not return the exact requested thread.")
-            status_type, _ = _thread_status(resumed_thread)
+            try:
+                resumed = client.resume_thread(obligation.thread_id)
+            except RpcError as exc:
+                if not exc.is_active_writer(obligation.thread_id):
+                    raise
+                # The Desktop app has a separate server. Its verified writer
+                # consumes the shared queue; never steal or duplicate ownership.
+                LOG.info("Thread %s is owned by another Codex server; dispatching through its shared queue.", obligation.thread_id)
+                status_type = "idle"
+            else:
+                resumed_thread = resumed.get("thread")
+                if not isinstance(resumed_thread, dict) or resumed_thread.get("id") != obligation.thread_id:
+                    raise ProtocolError("thread/resume did not return the exact requested thread.")
+                status_type, _ = _thread_status(resumed_thread)
         if status_type == "active":
             self.state.obligations.remove(obligation)
             save_state(self.state_file, self.state)
@@ -303,6 +288,16 @@ class Supervisor:
             return False
         if status_type != "idle":
             raise ProtocolError(f"Thread {obligation.thread_id} is in unsupported dispatch state {status_type!r}.")
+
+        # Resuming and other RPCs take time. Both quota and the exact failed turn
+        # must still be valid immediately before the non-idempotent queue send.
+        if not self._revalidate_obligation(obligation, client.thread_read(obligation.thread_id)):
+            self._cancel_queued_continuations(obligation)
+            self.state.obligations.remove(obligation)
+            save_state(self.state_file, self.state)
+            return False
+        if _parse_rate_limits(client.rate_limits()).ordinary_usage_allowed is not True:
+            return False
 
         obligation.phase = "dispatching"
         obligation.phase_changed_at = now
@@ -351,27 +346,32 @@ class Supervisor:
                 queue_id,
                 deleted,
             )
+        if matches and any(
+            item.get("clientUserMessageId") == obligation.client_user_message_id
+            for item in client.queue_items(obligation.thread_id)
+        ):
+            raise ProtocolError("Codex still has this tool's stale queue item after deletion; retaining the obligation.")
 
-    def _recover_submission_state(self, obligation: Obligation, now: float) -> str:
+    def _recover_submission_state(self, obligation: Obligation, now: float) -> None:
         client = self._require_client()
         turn = client.latest_turn(obligation.thread_id)
         if turn is None:
             self._cancel_queued_continuations(obligation)
             self.state.obligations.remove(obligation)
             save_state(self.state_file, self.state)
-            return "advanced"
+            return
         turn_id = _required_string(turn, "id", "thread/turns/list")
         if turn_id != obligation.failed_turn_id:
             self._cancel_queued_continuations(obligation)
             self.state.obligations.remove(obligation)
             save_state(self.state_file, self.state)
-            return "advanced"
+            return
         thread = self._find_thread_by_id(obligation.thread_id)
         if thread is not None and _thread_status(thread)[0] == "active":
             self._cancel_queued_continuations(obligation)
             self.state.obligations.remove(obligation)
             save_state(self.state_file, self.state)
-            return "advanced"
+            return
         for item in client.queue_items(obligation.thread_id):
             if item.get("clientUserMessageId") == obligation.client_user_message_id:
                 queue_id = _required_string(item, "id", "thread/queue/list")
@@ -379,9 +379,9 @@ class Supervisor:
                 obligation.queued_submission_id = queue_id
                 obligation.phase_changed_at = now
                 save_state(self.state_file, self.state)
-                return "queued"
+                return
         if now - obligation.phase_changed_at < self.config.dispatch_recovery_seconds:
-            return "waiting"
+            return
         # There is no verified idempotency contract for clientUserMessageId. Once a send is
         # ambiguous, retrying can duplicate a continuation. Fail loud instead.
         raise ProtocolError(

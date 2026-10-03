@@ -13,8 +13,16 @@ class RpcError(ProtocolError):
     def __init__(self, method: str, error: dict[str, Any]):
         self.method = method
         self.error = error
-        message = error.get("message") if isinstance(error, dict) else None
-        super().__init__(f"Codex RPC {method} failed: {message or error!r}")
+        code = error.get("code")
+        code = code if type(code) is int else "unknown"
+        super().__init__(f"Codex RPC {method} failed (code {code}). Inspect Codex's own logs for details; server error bodies are not logged here.")
+
+    def is_active_writer(self, thread_id: str) -> bool:
+        return (
+            self.method == "thread/resume"
+            and self.error.get("code") == -32600
+            and self.error.get("message") == f"thread {thread_id} already has an active writer"
+        )
 
 
 class AppServerClient:
@@ -29,7 +37,15 @@ class AppServerClient:
     @classmethod
     def connect(cls, socket_path: Path, timeout: float) -> "AppServerClient":
         client = cls(UnixWebSocket.connect(socket_path, timeout))
-        result = client.request(
+        try:
+            client._initialize()
+            return client
+        except BaseException:
+            client.close()
+            raise
+
+    def _initialize(self) -> None:
+        result = self.request(
             "initialize",
             {
                 "clientInfo": {
@@ -51,11 +67,9 @@ class AppServerClient:
             },
         )
         if not isinstance(result, dict) or not isinstance(result.get("userAgent"), str):
-            client.close()
             raise ProtocolError("Codex initialize response omitted userAgent.")
-        client.user_agent = result["userAgent"]
-        client.notify("initialized", None)
-        return client
+        self.user_agent = result["userAgent"]
+        self.notify("initialized", None)
 
     def close(self) -> None:
         self.thread_subscriptions.clear()
@@ -68,6 +82,7 @@ class AppServerClient:
         self._ws.send_text(json.dumps(message, separators=(",", ":")))
 
     def request(self, method: str, params: dict[str, Any] | None = None) -> Any:
+        self._ws.begin_request()
         request_id = self._next_id
         self._next_id += 1
         message: dict[str, Any] = {"id": request_id, "method": method}
@@ -129,7 +144,7 @@ class AppServerClient:
                     "cursor": None,
                     "limit": 1,
                     "sortDirection": "desc",
-                    "itemsView": "summary",
+                    "itemsView": "notLoaded",
                 },
             ),
         )
@@ -141,6 +156,15 @@ class AppServerClient:
         if not isinstance(data[0], dict):
             raise ProtocolError("thread/turns/list returned a non-object turn.")
         return data[0]
+
+    def thread_read(self, thread_id: str) -> dict[str, Any]:
+        result = self._expect_object(
+            "thread/read", self.request("thread/read", {"threadId": thread_id, "includeTurns": False})
+        )
+        thread = result.get("thread")
+        if not isinstance(thread, dict) or thread.get("id") != thread_id:
+            raise ProtocolError("thread/read did not return the exact requested thread.")
+        return thread
 
     def rate_limits(self) -> dict[str, Any]:
         return self._expect_object("account/rateLimits/read", self.request("account/rateLimits/read", {}))

@@ -3,16 +3,20 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 import sys
+import os
+import subprocess
+import time
 from pathlib import Path
 
 from . import __version__
 from .codex import codex_version, ensure_daemon, find_codex
-from .config import default_config_path, load_config, lock_path, log_path, state_path, write_config
+from .config import default_config_path, load_config, lock_path, log_path, state_path, stop_path, write_config
 from .errors import AutoContinuerError
-from .instance_lock import SingleInstanceLock
+from .instance_lock import SingleInstanceLock, is_running
 from .state import load_state
-from .startup import install_startup, uninstall_startup
+from .startup import _pythonw, install_startup, uninstall_startup
 from .supervisor import Supervisor, _parse_rate_limits, observed_interactive_sources
 from .appserver import AppServerClient
 
@@ -25,6 +29,8 @@ def _parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run", help="Run continuously.")
     run.add_argument("--background", action="store_true", help=argparse.SUPPRESS)
     sub.add_parser("once", help="Run one supervisor cycle and exit.")
+    sub.add_parser("start", help="Start one hidden background supervisor on Windows.")
+    sub.add_parser("stop", help="Stop the supervisor after its current cycle; keep pending obligations.")
     sub.add_parser("status", help="Read current Codex quota/source state and pending obligations.")
     sub.add_parser("config-path", help="Print the effective config path.")
     init = sub.add_parser("init", help="Write a default config file.")
@@ -37,7 +43,7 @@ def _parser() -> argparse.ArgumentParser:
 def _setup_logging(background: bool = False) -> None:
     path = log_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    handlers: list[logging.Handler] = [logging.FileHandler(path, encoding="utf-8")]
+    handlers: list[logging.Handler] = [RotatingFileHandler(path, maxBytes=2 * 1024 * 1024, backupCount=2, encoding="utf-8")]
     if not background:
         handlers.append(logging.StreamHandler())
     logging.basicConfig(
@@ -79,9 +85,50 @@ def _status(config_path: Path | None) -> int:
         "statePath": str(state_path()),
         "logPath": str(log_path()),
         "lockPath": str(lock_path()),
+        "supervisorRunning": is_running(lock_path()),
     }
     print(json.dumps(output, indent=2))
     return 0
+
+
+def _start(config_file: Path | None) -> int:
+    if os.name != "nt":
+        raise AutoContinuerError("Hidden background start is supported only on Windows.")
+    config_file = (config_file or default_config_path()).resolve()
+    load_config(config_file)
+    if is_running(lock_path()):
+        print("The supervisor is already running.")
+        return 0
+    process = subprocess.Popen(
+        [str(_pythonw()), "-m", "codex_auto_continuer", "--config", str(config_file), "run", "--background"],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise AutoContinuerError(f"Background supervisor exited during startup. Read {log_path()} and run `status`.")
+        if is_running(lock_path()):
+            print(f"Background supervisor started (PID {process.pid}). Log: {log_path()}")
+            return 0
+        time.sleep(0.1)
+    process.terminate()
+    process.wait(timeout=5)
+    raise AutoContinuerError(f"Background supervisor did not acquire its instance lock in 10s. Read {log_path()}.")
+
+
+def _stop() -> int:
+    if not is_running(lock_path()):
+        print("The supervisor is not running.")
+        return 0
+    stop_path().write_text("stop\n", encoding="ascii")
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        if not is_running(lock_path()):
+            print("Supervisor stopped. Pending obligations are preserved.")
+            return 0
+        time.sleep(0.2)
+    raise AutoContinuerError(f"Stop requested, but the current cycle is still finishing after 60s. Check {log_path()}.")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -103,25 +150,30 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         _setup_logging(background)
+        if command == "start":
+            return _start(args.config)
+        if command == "stop":
+            return _stop()
         if command == "status":
             return _status(args.config)
 
         cfg = load_config(args.config)
-        supervisor = Supervisor(cfg, state_path())
         with SingleInstanceLock(lock_path()):
+            stop_path().unlink(missing_ok=True)
+            supervisor = Supervisor(cfg, state_path())
             try:
                 if command == "once":
                     supervisor.connect()
                     result = supervisor.run_cycle()
                     print(json.dumps(result.__dict__, indent=2))
                     return 0
-                supervisor.run_forever()
+                supervisor.run_forever(stop_path().exists)
                 return 0
             finally:
                 supervisor.close()
     except KeyboardInterrupt:
         return 130
-    except AutoContinuerError as exc:
+    except (AutoContinuerError, OSError) as exc:
         logging.getLogger(__name__).error("%s", exc)
         if not background:
             print(f"error: {exc}", file=sys.stderr)

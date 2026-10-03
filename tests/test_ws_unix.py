@@ -64,10 +64,9 @@ def test_binary_application_message_rejected():
         ws.close(); b.close()
 
 
-def test_handshake_preserves_prefetched_frame(tmp_path: Path):
-    path = tmp_path / "ws.sock"
-    listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    listener.bind(str(path)); listener.listen(1)
+def test_handshake_preserves_prefetched_frame(unix_path, unix_listener):
+    path = unix_path
+    listener = unix_listener(path)
     def serve():
         conn, _ = listener.accept()
         request = b""

@@ -1,91 +1,61 @@
 # Research and provenance
 
-Evidence status is explicit here so implementation details do not turn assumptions into contracts.
+Verified on 3 October 2026 using native Windows 11 (10.0.26300), PowerShell 7.6.6, Python 3.13.7 and Codex CLI/app-server 0.160.0. The reviewed base is ChatGPT checkpoint v001, whose 46 file hashes matched before local edits. Exact checks belong to [VALIDATION.md](VALIDATION.md). Probe source and essential results are in [the dated audit](Audits/2026-10-03/AUDIT.md).
 
-## Verified — user environment
+## Authoritative interface evidence
 
-### Codex CLI/Desktop parity on the tested install
+The installed CLI generated its own experimental JSON schemas with:
 
-- Environment reported during project setup: Windows, `codex-cli 0.160.0`.
-- Observed command: `codex queue --thread <thread-uuid> --message "Continue"`.
-- Observed result: the queued text appeared in the already-existing Codex Desktop thread and started a turn there, including while the account had no remaining usage.
-- Provenance: direct user test supplied in the project-creation conversation on 2026-10-02/03.
+```powershell
+codex app-server generate-json-schema --experimental --out .data/schema
+```
 
-This establishes that a first-party CLI submission can target an existing Desktop-originated thread by ID on the tested installation.
+Generated schemas are temporary reference data, excluded from source transports. Relevant observed fields and methods are recorded here and in the audit.
 
-## Verified — OpenAI Codex source at 0.160.0
+[Official OpenAI app-server documentation](https://learn.chatgpt.com/docs/app-server) describes schema generation, initialization, thread/turn lifecycle and approval requests. The installed schema and native probes establish the experimental queue and recovery fields used by this project. General documentation alone does not establish their complete contract.
 
-Unless otherwise stated, source claims below were checked against `openai/codex`, release `rust-v0.160.0`, commit `a956835d020762cb2b570053af06f643a11c0ecc`.
+## Native socket transport
 
-### Shared app-server daemon discovery
+Standard Windows Python does not export `socket.AF_UNIX`. Windows Winsock does support family 1. Native tests and live connections passed using a Python-owned socket with a small `ctypes` address-marshalling bridge.
 
-- `codex app-server daemon version` and `start` return JSON lifecycle output containing the app-server control `socketPath` and version metadata.
-- The control path is under Codex home's `app-server-control/app-server-control.sock`.
-- Codex's own daemon client connects to that AF_UNIX socket, upgrades it as a WebSocket using `ws://localhost/`, sends `initialize`, then `initialized`.
-- Source: `codex-rs/app-server-daemon/src/lib.rs`, `codex-rs/app-server-daemon/src/client.rs`, `codex-rs/app-server-transport/src/transport/mod.rs`.
+The running daemon returned a private control socket and matching CLI/app-server versions, both 0.160.0. The WebSocket initialization, metadata reads, turn reads, queue RPCs and account rate-limit read succeeded through that socket.
 
-### Thread discovery and source scope
+## Desktop provenance
 
-- `thread/list` supports structured sorting/filtering and returns thread IDs, timestamps, status and session source.
-- Codex's interactive source set is CLI, VS Code, `Custom("atlas")`, and `Custom("chatgpt")`.
-- API session-source values also include `exec`, `appServer`, sub-agent variants and `unknown`, allowing the supervisor to reject non-interactive work explicitly.
-- Source: `codex-rs/app-server/src/filters.rs`, `codex-rs/rollout/src/lib.rs`, generated app-server v2 thread/session-source protocol types.
+A live sample returned 74 non-archived interactive threads. Every sampled thread had `source = vscode` and `originator = Codex Desktop`. The initial custom-only Desktop filter would exclude this installation.
 
-### Exact failed-turn detection
+The runtime accepts this verified pair plus configured `chatgpt` and `atlas` custom sources. Ordinary VS Code extension threads remain excluded from default Desktop scope. Originator absence does not authorize accepting an arbitrary VS Code thread.
 
-- Turns have terminal `completed`, `interrupted`, and `failed` statuses.
-- Failed turns carry structured error information including `codexErrorInfo`; usage exhaustion is represented as `UsageLimitExceeded` in Rust and serialized through the v2 protocol.
-- `thread/turns/list` exists for reading persisted/current turn history without scraping UI text.
-- Source: app-server v2 protocol and thread read/list implementation at the pinned commit.
+## Separate app-server ownership
 
-### Usage recovery authority
+The running Desktop app and managed daemon use separate app-server processes. On an owned probe thread, a separate server reported `notLoaded` even while the original server owned it. Resume returned JSON-RPC code `-32600` and the exact error:
 
-- `account/rateLimits/read` exposes `ordinaryUsageAllowed`.
-- Its protocol documentation states that null means unavailable and clients must not infer recovery from percentages or reset times.
-- Source: generated `GetAccountRateLimitsResponse` schema/type and app-server rate-limit tests at the pinned release.
+```text
+thread <exact-thread-id> already has an active writer
+```
 
-Implementation consequence: reset timestamps are advisory only. This project dispatches only on explicit `ordinaryUsageAllowed == true`.
+Queue submission through the daemon reached the original owner and produced a completed turn. This verified condition permits shared-queue dispatch without taking ownership. Other resume errors do not.
 
-### Queue semantics and stale deletion
+A separate native probe confirmed queue addition, listing and exact deletion while unloaded. Deleting the owned item preserved the unrelated probe item. Resume followed by queue submission also completed after the submitting client disconnected.
 
-- `thread/queue/add` accepts a thread ID, input, and `clientUserMessageId`, returning a `queuedSubmission`.
-- `thread/queue/list` returns queued submissions and pagination.
-- `thread/queue/delete` accepts `threadId` plus exact `queuedSubmissionId` and returns `deleted: bool`.
-- The queue service can consume an item into a loaded idle thread before successful model completion, so pre-queueing while exhausted is not a durable wait-for-reset mechanism.
-- Source: `codex-rs/app-server-protocol/src/protocol/v2/thread.rs`, `codex-rs/app-server/src/request_processors/thread_queue_processor.rs`, `codex-rs/ext/queue/src/service.rs`, CLI queue plumbing.
+## Usage failure persistence
 
-### Resuming an unloaded thread
+A temporary isolated Codex home used a localhost HTTP fixture returning 429 with `error.type = usage_limit_reached`. It used a non-secret fixture key and made no real account request.
 
-- `thread/resume` operates through the shared app-server thread manager. A running thread is rejoined; an unloaded stored thread can be materialized/resumed through the same server.
-- A resume connection becomes a thread subscriber. Pending server-to-client requests can be replayed to subscribers.
-- Source: `codex-rs/app-server/src/request_processors/thread_processor.rs`, `thread_lifecycle.rs`, `thread_state.rs`, `outgoing_message.rs`.
+The native server reported `status = failed` and `codexErrorInfo = usageLimitExceeded`. A persisted `thread/turns/list` read returned the same classification and a numeric `completedAt`. This verifies both structured detection and the 24-hour failure-time cutoff.
 
-Implementation consequence: this project uses `thread/resume` only when needed and closes its app-server connection after the cycle. It never answers approval or explicit-user-input requests.
+Persisted turn history can show `interrupted` while a live turn is still active. The unloaded probe waits for inactive runtime status before accepting a terminal result. Runtime discovery avoids active threads and revalidates the exact latest turn before sending.
 
-### No verified submission idempotency contract
+## Recovery authority and delivery safety
 
-- `clientUserMessageId` is persisted on queued/user-message data, which makes reconciliation possible.
-- The reviewed 0.160.0 sources do **not** establish that retrying `thread/queue/add` with the same client message ID is idempotent.
-- Provenance: queue protocol/service and turn-input source review at the pinned commit.
+The live account returned `ordinaryUsageAllowed = true`. Portable regressions cover false and null authority, reset hints without permission, rechecks after resume and between threads, stale cancellation, exact queue ownership and ambiguous-send refusal.
 
-Implementation consequence: an ambiguous post-send crash is reconciled against the queue/latest turn; if neither proves what happened, the supervisor fails rather than automatically retrying.
+No verified queue-add idempotency contract was found. Deterministic client message IDs support reconciliation, not blind retries. The queue API has no verified compare-and-swap condition against the failed turn. A narrow race between final revalidation and queue acceptance remains.
 
-## Verified — implementation tests in this checkpoint
+## Observational limits
 
-The Linux regression suite covers exact usage-limit classification, null recovery permission, stale/manual-progress cancellation, exact queued-submission deletion, multiple stalled threads, unloaded-thread resume flow, source scoping, crash ambiguity, transient reads, corrupt durable state, single-instance exclusion, WebSocket framing/fragmentation/handshake handling, JSON-RPC behavior, queue pagination and packaging smoke. Exact results belong in `VALIDATION.md`.
+The installed supervisor observed a real usage-limit failure in the current Desktop chat. It detected one obligation, kept it pending through 9 scans with ordinaryUsageAllowed false, then cancelled it when the user manually resumed and a later read returned true. No continuation was dispatched. This verifies real detection, waiting and stale cancellation without duplicate work; it does not establish automatic continuation at natural recovery or the cause of availability recovery.
 
-## Inferred / design assumptions
+Two simultaneous quota-stalled threads were covered by regression fixtures, not two real-account failures. The native delivery and isolated failure-serialization probes establish the component paths separately.
 
-- Polling `thread/list` sorted by `updated_at` is sufficient to discover a newly terminal usage-limit turn because a newly persisted turn should advance the thread's update timestamp. The source shape supports this design, but this exact Desktop timing behavior still needs live native verification.
-- Closing our connection after each cycle should remove our subscriber role through normal app-server disconnect cleanup. Source supports connection/subscription teardown, but live Desktop coexistence should still be exercised on Windows.
-
-## Missing / native verification required
-
-1. Run the full gate on native Windows 11 with Python 3.13.
-2. Exercise a real Codex Desktop usage-limit failure through reset and confirm one continuation lands in the same thread.
-3. Repeat with the Desktop thread unloaded before reset.
-4. Repeat with two simultaneously stalled Desktop threads and confirm sequential recovery/recheck behavior.
-5. Manually advance a thread while this tool has a queued continuation and confirm the exact queued item is deleted on the live 0.160.0 server.
-6. Confirm install/startup behavior with the user's actual Python/Codex installation paths.
-
-No UI-automation fallback is planned for any failed native check. Interface incompatibility should fail diagnostically instead.
+The generated Windows login shortcut was launched and its background process verified. A fresh Windows login was not performed. Cross-version support remains guarded at runtime; this evidence establishes the tested 0.160.0 installation.

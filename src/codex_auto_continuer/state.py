@@ -81,12 +81,20 @@ def _parse_obligation(raw: Any) -> Obligation:
     queued = _nonempty_string("queued_submission_id", raw["queued_submission_id"], optional=True)
     if phase == "submitted" and queued is None:
         raise ProtocolError("A submitted obligation must have queued_submission_id.")
+    if phase in {"pending", "dispatching", "uncertain"} and queued is not None:
+        raise ProtocolError(f"A {phase} obligation must not have queued_submission_id.")
+    thread_id = _nonempty_string("thread_id", raw["thread_id"])
+    turn_id = _nonempty_string("failed_turn_id", raw["failed_turn_id"])
+    client_id = _nonempty_string("client_user_message_id", raw["client_user_message_id"])
+    expected_id = Obligation.create(thread_id, turn_id, 0, None).client_user_message_id
+    if client_id != expected_id:
+        raise ProtocolError("State client message ID does not match its exact thread/turn identity; refusing queue ownership.")
     return Obligation(
-        thread_id=_nonempty_string("thread_id", raw["thread_id"]),
-        failed_turn_id=_nonempty_string("failed_turn_id", raw["failed_turn_id"]),
+        thread_id=thread_id,
+        failed_turn_id=turn_id,
         detected_at=_finite_number("detected_at", raw["detected_at"]),
         reset_at=_finite_number("reset_at", raw["reset_at"], optional=True),
-        client_user_message_id=_nonempty_string("client_user_message_id", raw["client_user_message_id"]),
+        client_user_message_id=client_id,
         phase=phase,
         phase_changed_at=_finite_number("phase_changed_at", raw["phase_changed_at"]),
         queued_submission_id=queued,
@@ -98,11 +106,11 @@ def load_state(path: Path) -> State:
         return State()
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ProtocolError(f"Cannot read durable state {path}: {exc}") from exc
     if not isinstance(raw, dict) or set(raw) != {"version", "obligations"}:
         raise ProtocolError(f"State {path} has an unsupported shape.")
-    if raw["version"] != STATE_VERSION:
+    if type(raw["version"]) is not int or raw["version"] != STATE_VERSION:
         raise ProtocolError(f"Unsupported state version {raw['version']!r}; expected {STATE_VERSION}.")
     if not isinstance(raw["obligations"], list):
         raise ProtocolError("State obligations must be an array.")
@@ -114,11 +122,14 @@ def load_state(path: Path) -> State:
 
 
 def save_state(path: Path, state: State) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
     payload = {"version": STATE_VERSION, "obligations": [asdict(item) for item in state.obligations]}
     tmp = path.with_suffix(path.suffix + ".tmp")
     try:
-        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with tmp.open("w", encoding="utf-8") as stream:
+            stream.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
         os.replace(tmp, path)
     except OSError as exc:
         try:

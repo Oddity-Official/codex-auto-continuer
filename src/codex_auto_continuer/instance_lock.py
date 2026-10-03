@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import BinaryIO
 
-from .errors import AutoContinuerError
+from .errors import AlreadyRunningError
 
 
 class SingleInstanceLock:
@@ -27,7 +27,7 @@ class SingleInstanceLock:
                 try:
                     msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
                 except OSError as exc:
-                    raise AutoContinuerError(
+                    raise AlreadyRunningError(
                         f"Another Codex Auto Continuer instance already holds {self.path}."
                     ) from exc
             else:
@@ -35,7 +35,7 @@ class SingleInstanceLock:
                 try:
                     fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 except OSError as exc:
-                    raise AutoContinuerError(
+                    raise AlreadyRunningError(
                         f"Another Codex Auto Continuer instance already holds {self.path}."
                     ) from exc
             f.seek(0)
@@ -69,3 +69,13 @@ class SingleInstanceLock:
 
     def __exit__(self, exc_type, exc, tb) -> None:
         self.release()
+
+
+def is_running(path: Path) -> bool:
+    if not path.exists():
+        return False
+    try:
+        with SingleInstanceLock(path):
+            return False
+    except AlreadyRunningError:
+        return True

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -29,8 +30,9 @@ def find_codex() -> str:
 
 
 def _run(codex_bin: str, args: list[str], timeout: float) -> subprocess.CompletedProcess[str]:
+    process = None
     try:
-        return subprocess.run(
+        process = subprocess.Popen(
             [codex_bin, *args],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
@@ -38,11 +40,27 @@ def _run(codex_bin: str, args: list[str], timeout: float) -> subprocess.Complete
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=timeout,
-            check=False,
             shell=False,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            start_new_session=os.name != "nt",
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+        stdout, stderr = process.communicate(timeout=timeout)
+        return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
+    except subprocess.TimeoutExpired as exc:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                           capture_output=True, timeout=5, check=False,
+                           creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            import signal
+            os.killpg(process.pid, signal.SIGKILL)
+        if process.poll() is None:
+            process.kill()
+        process.communicate(timeout=5)
+        raise CodexCommandError(
+            f"`codex {' '.join(args)}` exceeded {timeout}s; its process was stopped. Check Codex installation and daemon health."
+        ) from exc
+    except OSError as exc:
         raise CodexCommandError(f"Failed to run `codex {' '.join(args)}`: {exc}") from exc
 
 

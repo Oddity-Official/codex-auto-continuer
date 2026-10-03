@@ -2,7 +2,10 @@
 
 ## Project-specific contract
 
-- The first implementation now exists. Read `Docs/PRODUCT.md`, `Docs/ARCHITECTURE.md`, `Docs/RESEARCH.md`, and `Docs/VALIDATION.md` before changing product behavior.
+- Read `Docs/PRODUCT.md`, `Docs/ARCHITECTURE.md`, `Docs/RESEARCH.md`, and `Docs/VALIDATION.md` before changing product behavior.
+- Desktop scope must check the verified originator as well as session source. This Windows install uses `vscode` with originator `Codex Desktop`; ordinary VS Code extension sessions must remain excluded.
+- The daemon and Desktop can be separate app-server owners. Handle only the verified exact-thread active-writer error by using the shared queue; never treat unrelated resume errors as successful ownership detection.
+- Discovery defaults to the last 24 hours of failed-turn completion time. Recorded obligations remain durable beyond that window.
 - Target native Windows 11 / PowerShell 7 / Python 3.13 and Codex Desktop. Prefer Codex's first-party CLI/app-server/thread interfaces. UI automation, clipboard injection, focus stealing and screen scraping are not acceptable fallbacks because they destroy the purpose of the tool.
 - Runtime code is under `src/codex_auto_continuer/` and has no third-party runtime dependencies. `pytest` is development-only.
 - Fail fast and diagnostically on unsupported Codex versions, protocol drift, ambiguous dispatch state, or missing capabilities. Never silently continue a guessed thread or treat unrelated failures as quota stalls.

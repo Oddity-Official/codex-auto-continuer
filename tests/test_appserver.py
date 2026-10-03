@@ -14,6 +14,7 @@ class FakeWS:
         self.sent = []
         self.closed = False
     def send_text(self, text): self.sent.append(json.loads(text))
+    def begin_request(self): pass
     def recv_text(self): return json.dumps(self.incoming.pop(0))
     def close(self): self.closed = True
 
@@ -37,10 +38,48 @@ def test_rpc_error_is_precise():
         client.request("x", {})
 
 
+def test_rpc_error_diagnostic_does_not_leak_server_body():
+    error = RpcError("thread/queue/add", {"code": -32600, "message": "private conversation body"})
+    assert "private conversation body" not in str(error)
+    assert "-32600" in str(error)
+
+
 def test_wrong_response_id_fails():
     client = AppServerClient(FakeWS([{"id":2,"result":{}}]))
     with pytest.raises(ProtocolError, match="expected 1"):
         client.request("x", {})
+
+
+def test_initialize_failure_closes_transport(monkeypatch):
+    from codex_auto_continuer.ws_unix import UnixWebSocket
+    ws = FakeWS([{"id": 1, "error": {"code": -1, "message": "unsupported"}}])
+    monkeypatch.setattr(UnixWebSocket, "connect", lambda *_: ws)
+    with pytest.raises(RpcError):
+        AppServerClient.connect(None, 1)
+    assert ws.closed
+
+
+def test_notifications_cannot_extend_total_rpc_deadline():
+    import socket
+    import time
+    from codex_auto_continuer.ws_unix import UnixWebSocket
+    from codex_auto_continuer.errors import TransportError
+    from test_ws_unix import server_frame
+    a, b = socket.socketpair()
+    a.settimeout(0.03)
+    ws = UnixWebSocket(a)
+    original = ws.recv_text
+    def receive():
+        b.sendall(server_frame(1, b'{"method":"noise"}'))
+        time.sleep(0.015)
+        return original()
+    ws.recv_text = receive
+    try:
+        with pytest.raises(TransportError, match="deadline"):
+            AppServerClient(ws).request("neverResponds", {})
+    finally:
+        ws.close()
+        b.close()
 
 
 def test_queue_items_paginates():
@@ -63,7 +102,7 @@ def test_queue_delete_requires_boolean_deleted():
     assert client.queue_delete("t","q") is True
     assert client._ws.sent[0]["params"] == {"threadId":"t","queuedSubmissionId":"q"}
 
-def test_connect_performs_real_unix_websocket_initialize(tmp_path):
+def test_connect_performs_real_unix_websocket_initialize(unix_path, unix_listener):
     import base64
     import hashlib
     import socket
@@ -71,11 +110,8 @@ def test_connect_performs_real_unix_websocket_initialize(tmp_path):
     import threading
     from codex_auto_continuer.ws_unix import _GUID
 
-    if not hasattr(socket, "AF_UNIX"):
-        pytest.skip("AF_UNIX unavailable")
-    path = tmp_path / "app.sock"
-    listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    listener.bind(str(path)); listener.listen(1)
+    path = unix_path
+    listener = unix_listener(path)
     observed = []
 
     def read_exact(conn, n):

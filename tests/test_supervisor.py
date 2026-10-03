@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from codex_auto_continuer.config import Config
+from codex_auto_continuer.appserver import RpcError
 from codex_auto_continuer.errors import ProtocolError, TransportError
 from codex_auto_continuer.state import Obligation, State, load_state, save_state
 from codex_auto_continuer.supervisor import (
@@ -26,7 +27,7 @@ def thread(tid="t", *, updated=1000, status="idle", source=None):
 
 
 def failed_turn(tid="turn-1"):
-    return {"id":tid,"status":"failed","error":{"message":"quota","codexErrorInfo":"usageLimitExceeded"}}
+    return {"id":tid,"status":"failed","completedAt":1000,"error":{"message":"quota","codexErrorInfo":"usageLimitExceeded"}}
 
 
 class FakeClient:
@@ -53,6 +54,8 @@ class FakeClient:
             self.fail_latest_once.remove(tid)
             raise TransportError("transient")
         return self.turns.get(tid)
+    def thread_read(self, tid):
+        return next((x for x in self.threads if x["id"] == tid), None)
     def queue_items(self, tid): return list(self.queue.get(tid, []))
     def queue_add(self, tid, prompt, client_id):
         item={"id":f"q-{len(self.added)+1}","clientUserMessageId":client_id,"input":[{"type":"text","text":prompt}]}
@@ -180,7 +183,6 @@ def test_recent_scan_does_not_cache_failed_read(tmp_path: Path):
     c=FakeClient([thread()], {"t":failed_turn()}, allowed=False); c.fail_latest_once.add("t")
     s=supervisor(tmp_path,c)
     with pytest.raises(TransportError): s.run_cycle()
-    assert "t" not in s._seen_updated_at
     assert s.run_cycle().detected==1
 
 
@@ -268,3 +270,101 @@ def test_scope_change_cancels_existing_out_of_scope_obligation(tmp_path: Path):
 def test_rate_limits_requires_protocol_rate_limits_object():
     with pytest.raises(ProtocolError, match="required rateLimits object"):
         _parse_rate_limits({"ordinaryUsageAllowed":False})
+
+
+def test_desktop_originator_is_not_confused_with_vscode_extension(tmp_path):
+    desktop = thread("desktop", source="vscode") | {"originator": "Codex Desktop"}
+    extension = thread("extension", source="vscode") | {"originator": "codex_vscode"}
+    c = FakeClient([desktop, extension], {x: failed_turn(x) for x in ("desktop", "extension")})
+    s = supervisor(tmp_path, c)
+    assert s.run_cycle().detected == 1
+    assert s.state.obligations[0].thread_id == "desktop"
+
+
+def test_recent_metadata_cannot_revive_old_failure(tmp_path):
+    now = 100000
+    old = failed_turn() | {"completedAt": now - 86401}
+    c = FakeClient([thread(updated=now)], {"t": old}, allowed=True)
+    s = supervisor(tmp_path, c, clock=lambda: now)
+    assert s.run_cycle().detected == 0
+    assert not c.added
+
+
+def test_recorded_obligation_survives_discovery_lookback(tmp_path):
+    now = 100000
+    ob = Obligation.create("t", "turn-1", 1000, None)
+    save_state(tmp_path / "state.json", State(obligations=[ob]))
+    c = FakeClient([thread(updated=1000)], {"t": failed_turn()}, allowed=True)
+    s = supervisor(tmp_path, c, clock=lambda: now)
+    assert s.run_cycle().dispatched == 1
+
+
+def test_second_granularity_timestamp_cannot_hide_new_failure(tmp_path):
+    c = FakeClient([thread()], {"t": {"id": "old", "status": "completed"}})
+    s = supervisor(tmp_path, c)
+    assert s.run_cycle().detected == 0
+    c.turns["t"] = failed_turn()
+    assert s.run_cycle().detected == 1
+
+
+@pytest.mark.parametrize("change", ["quota", "manual"])
+def test_resume_revalidates_before_dispatch(tmp_path, change):
+    c = FakeClient([thread(status="notLoaded")], {"t": failed_turn()}, allowed=True)
+    original = c.resume_thread
+    def resume(tid):
+        response = original(tid)
+        if change == "quota":
+            c.allowed = False
+        else:
+            c.turns[tid] = {"id": "new", "status": "completed"}
+        return response
+    c.resume_thread = resume
+    s = supervisor(tmp_path, c)
+    assert s.run_cycle().dispatched == 0
+    assert not c.added
+
+
+@pytest.mark.parametrize("owned", [True, False])
+def test_other_server_ownership_queues_but_unrelated_resume_errors_stop(tmp_path, owned):
+    c = FakeClient([thread(status="notLoaded")], {"t": failed_turn()}, allowed=True)
+    def resume(tid):
+        message = f"thread {tid} already has an active writer" if owned else "unrelated resume failure"
+        raise RpcError("thread/resume", {"code": -32600, "message": message})
+    c.resume_thread = resume
+    s = supervisor(tmp_path, c)
+    if owned:
+        assert s.run_cycle().dispatched == 1
+        assert len(c.added) == 1
+    else:
+        with pytest.raises(RpcError):
+            s.run_cycle()
+        assert not c.added
+
+
+def test_stale_queue_deletion_must_be_verified_before_forgetting(tmp_path):
+    ob = Obligation.create("t", "turn-1", 900, None)
+    ob.phase = "submitted"
+    ob.queued_submission_id = "own"
+    save_state(tmp_path / "state.json", State(obligations=[ob]))
+    c = FakeClient([thread()], {"t": {"id": "new", "status": "completed"}})
+    c.queue["t"] = [{"id": "own", "clientUserMessageId": ob.client_user_message_id}]
+    c.queue_delete = lambda *_: False
+    s = supervisor(tmp_path, c)
+    with pytest.raises(ProtocolError, match="retaining the obligation"):
+        s.run_cycle()
+    assert len(load_state(tmp_path / "state.json").obligations) == 1
+
+
+def test_loop_closes_subscription_before_sleep_and_stops_gracefully(tmp_path):
+    c = FakeClient()
+    closed = []
+    c.close = lambda: closed.append(True)
+    s = supervisor(tmp_path, c)
+    stopped = []
+    def sleep(seconds):
+        assert closed
+        assert s.client is None
+        stopped.append(True)
+    s.sleep = sleep
+    s.run_forever(lambda: bool(stopped))
+    assert len(closed) == 1

@@ -11,4 +11,5 @@
 
 ## Historical records
 
-Completed design, implementation, verification and investigation records belong in `History/`. Index them here once when added. Do not maintain parallel active instructions.
+- [ChatGPT v001 verification, 3 October 2026](History/2026-10-03-chatgpt-v001-validation.md)
+- [ChatGPT v001 research, 3 October 2026](History/2026-10-03-chatgpt-v001-research.md)
