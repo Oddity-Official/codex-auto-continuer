@@ -33,7 +33,7 @@ print(sys.version.split()[0])
 )) -TimeoutSeconds 180
 
 & $runner -FileName $python -Arguments ($prefix + @(
-    '-m', 'compileall', '-q', 'src', 'tests', 'scripts'
+    '-m', 'compileall', '-q', 'src', 'tests', 'scripts', 'integration'
 )) -TimeoutSeconds 120
 
 & $runner -FileName $python -Arguments ($prefix + @(

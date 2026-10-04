@@ -93,6 +93,8 @@ Our preference is about fit: native Windows, existing interactive chats, exact-t
 
 [Contributing](CONTRIBUTING.md) covers the isolated Python setup, Windows verification, source launch and release build. Windows CI runs the tests and produces a clean portable ZIP and wheel; it does not publish releases automatically.
 
+[Native continuation tests](Docs/CONTINUATION-TESTS.md) exercise the installed Codex executable and CAC recovery engine against local quota and response fixtures. No real login, account exhaustion or user-chat continuation is needed. This proves the controlled native recovery chain, not a natural service reset or every client UI.
+
 `src/` owns runtime code and the [SVG icon](src/codex_auto_continuer/assets/cac.svg); `tests/` owns product regressions; `scripts/` owns build and verification tools. [Docs](Docs/README.md) links the user guide, technical contracts and dated evidence. Audit history and the ChatGPT/Codex manifests are tracked development records, not runtime requirements or downloadable-app contents.
 
 Our code uses the [MIT license](LICENSE). See [dependency notices](Docs/THIRD-PARTY.md). Runtime data, deployed apps, virtual environments and build output remain local and are excluded from source transports.

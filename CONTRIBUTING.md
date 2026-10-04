@@ -22,6 +22,14 @@ pwsh -NoProfile -File scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scri
 
 Add regressions for real failure modes, not implementation details. Keep recovery quota-only, exact-chat and fail-closed. Never add UI input, automatic approval answers or blind retries after ambiguous sends. [Architecture](Docs/ARCHITECTURE.md) owns these contracts.
 
+To exercise the actual native continuation chain with synthetic local service responses:
+
+```powershell
+pwsh -NoProfile -File scripts/verify-continuation.ps1
+```
+
+This separate gate requires native Codex, but no real login or allowance. It tests recovery, exact targeting, saved prompts, telemetry, multi-chat permission checks and ambiguous sends. [Native continuation tests](Docs/CONTINUATION-TESTS.md) explains isolation, deadlines and what is real versus simulated.
+
 ## Run from source
 
 ```powershell

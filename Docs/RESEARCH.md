@@ -28,6 +28,8 @@ A second probe confirmed unloaded queue add/list/delete, exact deletion preservi
 
 Persisted history can say interrupted while a live turn is active. Runtime active status takes precedence. Discovery ignores active threads, and delivery observations do not end until the runtime is inactive.
 
+The [native continuation suite](CONTINUATION-TESTS.md) joins quota failure, account validation, durable CAC detection, waiting, native queue dispatch and completed-turn observation in one isolated chain. It uses unmodified Codex with local service responses and synthetic authentication. Wrong account or user identity yields null permission. Two failed chats exercise the between-dispatch permission check. These are controlled native results, not natural account-reset or client-UI observations.
+
 The 0.2.0 real CLI probe launched one private interactive TUI with `--no-daemon`, read-only sandbox, approvals never and fixed no-tools token replies. It established source=cli, separate-writer ownership, an acknowledged queue ID and a completed second turn. The CLI still reported originator=Codex Desktop from this installation; CLI selection deliberately relies on its source.
 
 ## Client support and inference

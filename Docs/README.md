@@ -12,6 +12,7 @@
 - [Product contract](PRODUCT.md): goals, required behavior and non-goals
 - [Architecture](ARCHITECTURE.md): runtime, app-server integration, state machine and safety behavior
 - [Research and provenance](RESEARCH.md): verified facts, inferences and remaining native questions
+- [Native continuation tests](CONTINUATION-TESTS.md): repeatable isolated recovery scenarios without real account usage
 - [Third-party components](THIRD-PARTY.md): bundled dependency notices and replacement/source locations
 
 ## Development records

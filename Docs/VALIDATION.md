@@ -23,7 +23,7 @@ pwsh -NoProfile -File scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scri
 
 | Check | Observed result |
 | --- | --- |
-| Final native gate | 163 passed, no skips or warnings, 43.70s; compileall and version 0.3.0 passed; explicit interpreter selection exercised |
+| Final native gate | 163 passed, no skips or warnings, 43.79s; compileall including integration sources and version 0.3.0 passed; prior explicit interpreter selection exercised |
 | Fresh source export | 96 files copied through transport exclusions; no parent checkout, deployed app, data, Git metadata or pre-existing venv required |
 | Fresh dependency installation | `.[dev,build]` installed in a new venv without a second global installation |
 | Fresh native gate | 163 passed, no skips or warnings, 54.69s; compileall and version passed |
@@ -37,6 +37,30 @@ Native socket tests initially failed under the venv when their listeners were cr
 
 The suite covers quota authority, exact targeting, durable obligations, manual-progress cancellation, ownership, ambiguous sends, protocol deadlines, native sockets and locks, settings/prompt safety, native About closure, popup highlights, startup ownership, telemetry privacy/rotation and destructive-path/transport boundaries. Two new regressions verify Git exclusions and source-export privacy with synthetic canaries, including environment-file variants and non-default backup counts.
 
+## Native continuation chain
+
+```powershell
+pwsh -NoProfile -File scripts/verify-continuation.ps1
+```
+
+The standalone gate runs eight scenarios against installed, unmodified Codex 0.160.0, with two native app-server owners per case. [Native continuation tests](CONTINUATION-TESTS.md) owns the exact settings, service shapes, isolation, deadlines and assertions. No real account credentials, chat home or allowance are used. The existing installed tray/supervisor processes and saved prompt remain unchanged.
+
+Final result: 8 passed, no skips or warnings, in 60.77s, including compact Private telemetry checks. The earlier full native run also passed. The 163-test Windows gate is separate; native integration is not silently skipped by the normal gate or required by GitHub CI.
+
+| Scenario | Verified result |
+| --- | --- |
+| Quota-to-continuation chain | Native HTTP 429 persisted failed/usageLimitExceeded and numeric completedAt. Three denied scans after an advisory reset sent nothing. State reload retained the obligation. Verified allowance led CAC to send exactly one saved Continue through the original owner's native queue, completing the next turn of the exact chat. |
+| Unrelated chat and subsequent reload | Another successful chat stayed untouched. Reload and three further cycles created no duplicate turn or remaining queue item. |
+| Account and user mismatches | Both cases yielded native null permission despite backend allowance; no send. |
+| Manual progress | A native manual turn before recovery cancelled pending work; later allowance and reload did not continue it again. |
+| Invalid and repaired prompt | Empty prompt blocked before submission and preserved pending state. Repair sent newly saved text rather than a cached/default value. |
+| Two quota failures | Native failures were recorded independently. Permission denial after the first dispatch stopped the second; later verified permission resumed it exactly once. |
+| Lost queue response | Native acceptance and completion occurred despite discarded acknowledgement. CAC saved uncertainty; reload did not resend. |
+| Queue write not accepted | No native queue entry or advanced turn existed. Repeated reconciliation failed explicitly after its deadline without retrying the send. |
+| Local telemetry | Detection, permission transition, separate-owner handling, intent, one submission and observed completion were retained. Private logs excluded real fixture IDs, synthetic credentials and chat bodies. |
+
+This proves the controlled native recovery chain. It does not turn a service fixture into evidence of a real quota reset. The harness selects isolated sockets directly and reloads engine/state objects; it does not exercise production daemon discovery, actual UI clients, tray process restarts or Windows login.
+
 ## Publication privacy
 
 ```powershell
@@ -44,6 +68,8 @@ pwsh -NoProfile -File scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scri
 ```
 
 The initial scan checked all five existing commits and 171 unique Git blobs. No credential-shaped values, real local profile/project paths, runtime data or private author emails were found. Authors use a GitHub no-reply address. The changed working tree is scanned separately before delivery.
+
+The continuation-test follow-up scan checked six existing commits, 192 unique blobs and all 101 source files. It found no privacy matches, tracked runtime files, private author emails or broken Markdown file targets. The unchanged portable ZIP and refreshed wheel also passed deep inspection. Source transport is rebuilt and checked again after the scoped commit.
 
 The portable ZIP has 522 entries: 521 release files plus its manifest. Inspection covers both executable CArchives/PYZ archives, nested `base_library.zip`, 440 Python bytecode modules and embedded code filenames, not just compressed file bytes. No local profile/project paths or credential matches were found. The 30-entry wheel is also clean. These checks combine targeted scanning with manual review; they are not proof that an arbitrary secret can always be recognized.
 
@@ -55,7 +81,7 @@ The Windows workflow uses read-only permissions and commit-pinned official actio
 
 The unchanged portable ZIP is `dist/codex-auto-continuer-0.3.0-windows-x86_64.zip`, 16,299,281 bytes. SHA-256: `f3377108c1435400b6c6d723eb84f96e14245d12846dc1a6125b10a1ab5ed545`.
 
-The wheel is `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`, 72,538 bytes, with updated README metadata. SHA-256: `ff24973657c9482d457a5cb28319b49b07df447f848dd5c328014e6ff66076e1`.
+The wheel is `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`, 72,678 bytes, with updated README metadata. SHA-256: `911271df4f6539cbb3770ed115e1e2f82ffe25c3f2b0bd29c3bf07f4d7c8028c`.
 
 The stable full-source handoff is `codex-auto-continuer-codex-handoff.zip`; its manifest records source hashes and Git provenance. It includes development records, unlike the lean portable app. Builds are not claimed to be byte-for-byte reproducible.
 

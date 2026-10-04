@@ -31,7 +31,7 @@ The user chose one public repository. Sanitized audits, history and ChatGPT/Code
 
 Windows 11 build 10.0.26300 x86_64; PowerShell 7.6.6; CPython 3.13.7; Codex CLI/daemon 0.160.0.
 
-- Final native gate: 163 passed, no skips/warnings, 43.70s; compileall and 0.3.0 version smoke passed. Explicit interpreter selection was exercised.
+- Final native gate: 163 passed, no skips/warnings, 43.79s; compileall includes integration sources and 0.3.0 version smoke passed. Explicit interpreter selection was previously exercised.
 - Fresh self-contained 96-file source export: new venv installation, 163 tests in 54.69s, portable build, wheel build and frozen UX probe passed without a parent checkout or existing installation.
 - Frozen probe: isolated controls, no clients, one-second polling; implicit defaults, Continue, scan feedback, exclusive once, same-PID reload and settings/prompt pause/repair, graceful stop; zero Codex connections and zero user-chat dispatches.
 - Initial privacy inventory: all five existing commits, 171 distinct blobs, working tree, portable ZIP and wheel; no credential/profile/project-path matches, runtime files or private author emails. Pre-delivery scanning includes updated source and the source handoff.
@@ -43,10 +43,20 @@ Windows 11 build 10.0.26300 x86_64; PowerShell 7.6.6; CPython 3.13.7; Codex CLI/
 
 Exact settings, commands and limits are in Docs/VALIDATION.md and the dated publication audit.
 
+## Native continuation tests
+
+Added a standalone eight-scenario pytest suite and bounded `scripts/verify-continuation.ps1` gate. It uses unmodified installed Codex 0.160.0, two isolated native app-server owners, synthetic file-backed authentication and local model/account service responses. No user credentials, chats, allowance or deployed settings were used or changed. Runtime code and portable EXEs are unchanged.
+
+The native chain covers persisted quota failure, durable detection, denied waiting despite an expired reset, exact saved-prompt queue submission and successful completion on the original writer. Additional scenarios cover account/user identity validation, unrelated/manual chats, invalid/repaired prompts, two-chat permission checks, lost acknowledgement, unaccepted writes, state reload without duplicates and compact Private telemetry. Final native integration: 8 passed, no skips/warnings, 60.77s. Exact results are in Docs/VALIDATION.md.
+
+The regular Windows gate remains independent of Codex installation. Integration requires the native executable and fails rather than skipping if unavailable. Docs/CONTINUATION-TESTS.md records all boundaries and reproduction settings. Native service mocks are not claims of a natural quota reset, real extension/Desktop UI, production daemon discovery, tray process restart or atomic/idempotent queue guarantees.
+
+Follow-up privacy inspection covered all 101 source files, existing history, unchanged portable ZIP and refreshed wheel. No privacy matches, private author emails, tracked runtime data or broken Markdown file targets were found. All native fixture directories cleaned up; the installed tray/supervisor PIDs were unchanged. Audit cleanup reported zero deletions.
+
 ## Artifacts
 
 Portable: `dist/codex-auto-continuer-0.3.0-windows-x86_64.zip`, SHA-256 `f3377108c1435400b6c6d723eb84f96e14245d12846dc1a6125b10a1ab5ed545`.
 
-Optional wheel: `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`, SHA-256 `ff24973657c9482d457a5cb28319b49b07df447f848dd5c328014e6ff66076e1`.
+Optional wheel: `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`, README metadata refreshed, SHA-256 `911271df4f6539cbb3770ed115e1e2f82ffe25c3f2b0bd29c3bf07f4d7c8028c`.
 
 Stable source transport: `codex-auto-continuer-codex-handoff.zip`. It includes useful public development records and audit state with per-file hashes and Git provenance, excluding runtime data, App, dependencies, build output and secrets. Packaging runs retention and transport validation.
