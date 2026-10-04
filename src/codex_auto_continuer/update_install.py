@@ -217,6 +217,19 @@ class Replacement:
         self.save()
 
 
+def preflight_processes(request: dict, app: Path, config: Path) -> None:
+    tray_pid = request.get("tray_pid")
+    actual = process_path(tray_pid) if tray_pid is not None else None
+    if actual is not None and actual != app / "CodexAutoContinuer.exe":
+        raise UpdateError("The staged update names another process, not this exact CAC tray. No monitoring process was stopped.")
+    if actual is None and is_running(control_dir() / "tray.lock"):
+        raise UpdateError("Another tray is running or its identity is unavailable. No monitoring process was stopped.")
+    if is_running(lock_path()) and not owns_monitor(config):
+        raise UpdateError("Another app copy owns monitoring. No process was stopped.")
+    if "restart_monitor" in request and type(request["restart_monitor"]) is not bool:
+        raise UpdateError("Invalid monitor intent in update journal.")
+
+
 def run_worker(job: Path, *, recover=False) -> int:
     config = None
     try:
@@ -225,6 +238,7 @@ def run_worker(job: Path, *, recover=False) -> int:
             replacement = Replacement(job, request, app, bundle)
             if request.get("status") != "staged" and not recover:
                 raise UpdateError("This update was already started. Use update recover for an interrupted installation.")
+            preflight_processes(request, app, config)
             requester = request.get("requester_pid")
             if requester:
                 deadline = time.monotonic() + 10

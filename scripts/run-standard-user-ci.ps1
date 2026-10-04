@@ -15,41 +15,42 @@ $identity = 'cac' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
 $directory = Join-Path $root ".data/standard-user-ci/$identity"
 New-Item -ItemType Directory -Path $directory | Out-Null
 $request = Join-Path $directory 'request.json'
-@{ fileName = $FileName; arguments = $Arguments; timeout = $TimeoutSeconds } |
+@{ kind = 'github-native-ci'; fileName = $FileName; arguments = $Arguments; timeout = $TimeoutSeconds;
+   logPath = (Join-Path $directory 'output.txt'); resultPath = (Join-Path $directory 'result.json') } |
     ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $request -Encoding utf8NoBOM
-$password = ConvertTo-SecureString ([Guid]::NewGuid().ToString('N') + 'aA1!') -AsPlainText -Force
+$plainPassword = [Guid]::NewGuid().ToString('N') + 'aA1!'
+$password = ConvertTo-SecureString $plainPassword -AsPlainText -Force
 $user = $null
-$process = $null
+$registered = $false
 try {
     $user = New-LocalUser -Name $identity -Password $password -AccountNeverExpires -PasswordNeverExpires
     Add-LocalGroupMember -SID 'S-1-5-32-545' -Member $user
     & (Join-Path $PSScriptRoot 'run-project-command.ps1') -FileName (Get-Command icacls.exe).Source -Arguments @(
         $root, '/grant', "$($env:COMPUTERNAME)\${identity}:(OI)(CI)M"
     ) -TimeoutSeconds 30
-    $service = Get-Service -Name 'seclogon'
-    if ($service.Status -ne 'Running') {
-        Start-Service -Name 'seclogon'
-        $service.WaitForStatus('Running', [TimeSpan]::FromSeconds(10))
-    }
-    $credential = [PSCredential]::new("$($env:COMPUTERNAME)\$identity", $password)
-    $stdout = Join-Path $directory 'stdout.txt'
-    $stderr = Join-Path $directory 'stderr.txt'
     $entry = Join-Path $PSScriptRoot 'standard-user-entry.ps1'
-    $process = Start-Process -FilePath (Get-Command pwsh).Source -Credential $credential -LoadUserProfile -WindowStyle Hidden -WorkingDirectory $root -PassThru -ArgumentList @(
-        '-NoProfile', '-File', ('"{0}"' -f $entry), '-RequestPath', ('"{0}"' -f $request)
-    ) -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-    if (-not $process.WaitForExit(($TimeoutSeconds + 30) * 1000)) {
-        $process.Kill($true)
-        $process.WaitForExit(5000) | Out-Null
-        throw 'The standard-user CI probe exceeded its deadline; its process tree was stopped.'
+    # Task Scheduler starts outside the runner's non-breakaway job object. Codex's
+    # supported daemon launcher can then detach normally, without patching its guard.
+    $action = New-ScheduledTaskAction -Execute (Get-Command pwsh).Source -WorkingDirectory $root -Argument (
+        '-NoProfile -File "{0}" -RequestPath "{1}"' -f $entry, $request
+    )
+    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::FromSeconds($TimeoutSeconds + 30))
+    Register-ScheduledTask -TaskName $identity -Action $action -Settings $settings -User "$($env:COMPUTERNAME)\$identity" -Password $plainPassword -RunLevel Limited | Out-Null
+    $registered = $true
+    Start-ScheduledTask -TaskName $identity
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds + 30)
+    $resultPath = Join-Path $directory 'result.json'
+    while (-not (Test-Path -LiteralPath $resultPath) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 500 }
+    $logPath = Join-Path $directory 'output.txt'
+    if (Test-Path -LiteralPath $logPath) { Get-Content -LiteralPath $logPath -Raw | Write-Host }
+    if (-not (Test-Path -LiteralPath $resultPath)) {
+        Stop-ScheduledTask -TaskName $identity
+        throw 'The standard-user CI probe exceeded its scheduled deadline and was stopped.'
     }
-    $process.Refresh()
-    foreach ($path in @($stdout, $stderr)) {
-        if (Test-Path -LiteralPath $path) { Get-Content -LiteralPath $path -Raw | Write-Host }
-    }
-    if ($process.ExitCode -ne 0) { throw "Standard-user CI probe failed with exit $($process.ExitCode)." }
+    $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+    if ($result.exitCode -ne 0) { throw "Standard-user CI probe failed with exit $($result.exitCode)." }
 }
 finally {
-    if ($process) { $process.Dispose() }
+    if ($registered) { Unregister-ScheduledTask -TaskName $identity -Confirm:$false }
     if ($user) { Remove-LocalUser -SID $user.SID }
 }

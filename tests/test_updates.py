@@ -247,6 +247,7 @@ def test_health_failure_automatically_rolls_back_code_and_restarts_previous_buil
     control = tmp_path / "control"
     monkeypatch.setattr(update_install, "control_dir", lambda: control)
     monkeypatch.setattr(update_install, "validate_job", lambda _: (request, app, config, replacement.bundle, manifest))
+    monkeypatch.setattr(update_install, "preflight_processes", lambda *_: None)
     order = []
     monkeypatch.setattr(update_install, "stop_monitor", lambda *_: order.append("cycle_finished"))
     monkeypatch.setattr(update_install, "stop_tray", lambda *_: order.append("tray_stopped"))
@@ -284,3 +285,10 @@ def test_disabling_auto_update_during_download_prevents_installation(tmp_path, m
     while controller._update_busy and time.monotonic() < deadline:
         time.sleep(0.01)
     assert not controller._update_busy and controller.actions.empty()
+
+
+def test_updating_wrong_tray_refuses_before_stopping_any_monitor(tmp_path, monkeypatch):
+    monkeypatch.setattr(update_install, "process_path", lambda _: tmp_path / "OtherApp.exe")
+    monkeypatch.setattr(update_install, "stop_monitor", lambda *_: pytest.fail("Preflight must refuse before stopping a process"))
+    with pytest.raises(UpdateError, match="No monitoring process was stopped"):
+        update_install.preflight_processes({"tray_pid": 42}, tmp_path / "App", tmp_path / "settings.toml")
