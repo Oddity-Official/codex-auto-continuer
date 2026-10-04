@@ -17,7 +17,7 @@ The gate selects `.venv/Scripts/python.exe` when present; otherwise it uses the 
 For a focused check:
 
 ```powershell
-pwsh -NoProfile -File scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m', 'pytest', 'tests/test_supervisor.py', '-q') -TimeoutSeconds 60
+& ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m', 'pytest', 'tests/test_supervisor.py', '-q') -TimeoutSeconds 60
 ```
 
 Add regressions for real failure modes, not implementation details. Keep recovery quota-only, exact-chat and fail-closed. Never add UI input, automatic approval answers or blind retries after ambiguous sends. [Architecture](Docs/ARCHITECTURE.md) owns these contracts.
@@ -29,6 +29,8 @@ pwsh -NoProfile -File scripts/verify-continuation.ps1
 ```
 
 This separate gate requires native Codex, but no real login or allowance. It tests recovery, exact targeting, saved prompts, telemetry, multi-chat permission checks and ambiguous sends. [Native continuation tests](Docs/CONTINUATION-TESTS.md) explains isolation, deadlines and what is real versus simulated.
+
+An additional opt-in [VS Code extension gate](Docs/CONTINUATION-TESTS.md#installed-vs-code-extension) uses your installed editor and extension in a disposable test profile. It is separate from both regular CI and the native eight-scenario gate.
 
 ## Run from source
 
@@ -43,7 +45,7 @@ Source data lives in `.data/runtime`. A tray launch starts real monitoring. Use 
 
 ```powershell
 pwsh -NoProfile -File scripts/build-portable.ps1
-pwsh -NoProfile -File scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m', 'pip', 'wheel', '--timeout', '30', '--no-deps', '--no-build-isolation', '--wheel-dir', 'dist', '.') -TimeoutSeconds 120
+& ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m', 'pip', 'wheel', '--timeout', '30', '--no-deps', '--no-build-isolation', '--wheel-dir', 'dist', '.') -TimeoutSeconds 120
 Get-FileHash -LiteralPath 'dist/codex-auto-continuer-0.3.0-windows-x86_64.zip' -Algorithm SHA256
 ```
 

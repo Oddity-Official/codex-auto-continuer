@@ -31,7 +31,7 @@ The user chose one public repository. Sanitized audits, history and ChatGPT/Code
 
 Windows 11 build 10.0.26300 x86_64; PowerShell 7.6.6; CPython 3.13.7; Codex CLI/daemon 0.160.0.
 
-- Final native gate: 163 passed, no skips/warnings, 43.79s; compileall includes integration sources and 0.3.0 version smoke passed. Explicit interpreter selection was previously exercised.
+- Final native gate: 163 passed, no skips/warnings, 49.34s; compileall includes integration sources and 0.3.0 version smoke passed. Explicit interpreter selection was previously exercised.
 - Fresh self-contained 96-file source export: new venv installation, 163 tests in 54.69s, portable build, wheel build and frozen UX probe passed without a parent checkout or existing installation.
 - Frozen probe: isolated controls, no clients, one-second polling; implicit defaults, Continue, scan feedback, exclusive once, same-PID reload and settings/prompt pause/repair, graceful stop; zero Codex connections and zero user-chat dispatches.
 - Initial privacy inventory: all five existing commits, 171 distinct blobs, working tree, portable ZIP and wheel; no credential/profile/project-path matches, runtime files or private author emails. Pre-delivery scanning includes updated source and the source handoff.
@@ -53,10 +53,22 @@ The regular Windows gate remains independent of Codex installation. Integration 
 
 Follow-up privacy inspection covered all 101 source files, existing history, unchanged portable ZIP and refreshed wheel. No privacy matches, private author emails, tracked runtime data or broken Markdown file targets were found. All native fixture directories cleaned up; the installed tray/supervisor PIDs were unchanged. Audit cleanup reported zero deletions.
 
+## VS Code extension verification
+
+Added the separate, explicit `scripts/verify-vscode.ps1` gate with installed editor/extension paths. It runs the original installed bundle and native executable in an isolated VS Code extension host. A disposable bootstrap installs read-only process-transport taps before activation; no installed source is patched. Initial thread/turn RPCs are test-driven, so visual composer/rendering behavior is not claimed.
+
+VS Code 1.140.0, official openai.chatgpt 26.930.41038 and bundled Codex 0.160.0 passed all eight client-selection combinations, three denied quota scans, durable exact-thread state, one original-owner Continue/completed turn, three duplicate-prevention scans and Private telemetry assertions. Before-and-after hashes prove the installed manifest, bundle and native executable are unchanged. Extension gate: one passed in 15.80s; native eight-scenario rerun: 8 passed in 60.31s. Source filtering already matches the actual metadata, so runtime code and portable EXEs are unchanged.
+
+The local rejecting proxy counts expected blocked workbench/extension external requests separately; unexpected native account/model routes and invalid synthetic authorization still fail. Test-only profiles, chats and processes cleaned up. User authentication, normal editor profile, deployed CAC data/prompt and installed tray/supervisor processes were untouched. Documentation now distinguishes verified extension ownership from unobserved visual UI and describes generic vscode-source app-server classification accurately.
+
+Contributor array-argument commands now invoke the PowerShell runner directly; nesting `pwsh -File` flattened their arrays and misbound pip's timeout option. The corrected bounded wheel command passed, refreshing only README metadata.
+
+Pre-commit privacy inspection covered seven existing commits, 204 unique blobs, all 105 source files, the unchanged portable ZIP and refreshed wheel. No credential/profile/project-path matches, tracked runtime data, private author emails or broken Markdown file targets were found. Audit cleanup reported zero deletions. All test homes cleaned up; installed CAC PIDs remained unchanged. Scoped commit and stable source transport retain the repeatable tests without shipping them in the portable app.
+
 ## Artifacts
 
 Portable: `dist/codex-auto-continuer-0.3.0-windows-x86_64.zip`, SHA-256 `f3377108c1435400b6c6d723eb84f96e14245d12846dc1a6125b10a1ab5ed545`.
 
-Optional wheel: `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`, README metadata refreshed, SHA-256 `911271df4f6539cbb3770ed115e1e2f82ffe25c3f2b0bd29c3bf07f4d7c8028c`.
+Optional wheel: `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`, README metadata refreshed, SHA-256 `4e690e28bdb7ae36ac267c93ae40952a65645d9caceb3191605251b897bc3ef8`.
 
 Stable source transport: `codex-auto-continuer-codex-handoff.zip`. It includes useful public development records and audit state with per-file hashes and Git provenance, excluding runtime data, App, dependencies, build output and secrets. Packaging runs retention and transport validation.

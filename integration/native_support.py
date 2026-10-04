@@ -42,6 +42,8 @@ class Service:
         self.requests = []
         self.user_messages = []
         self.errors = []
+        self.allow_rejected_external = False
+        self.rejected_external = 0
         self.lock = threading.Lock()
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), self.handler())
         self.server.daemon_threads = True
@@ -85,7 +87,7 @@ class Service:
                 parsed = urlsplit(self.path)
                 # Also act as a rejecting proxy for any accidental external HTTP request.
                 if parsed.netloc:
-                    service.errors.append("Unexpected proxy destination")
+                    self.reject_external("Unexpected proxy destination")
                     self.reply(502, {"error": "External network is forbidden in this fixture"})
                     return None
                 with service.lock:
@@ -97,8 +99,14 @@ class Service:
                 return parsed.path
 
             def do_CONNECT(self):
-                service.errors.append("Unexpected external TLS destination")
+                self.reject_external("Unexpected external TLS destination")
                 self.reply(502, {"error": "External network is forbidden in this fixture"})
+
+            def reject_external(self, message):
+                with service.lock:
+                    service.rejected_external += 1
+                    if not service.allow_rejected_external:
+                        service.errors.append(message)
 
             def do_GET(self):
                 path = self.route()

@@ -89,3 +89,34 @@ The complete gate has a 240-second process-tree deadline. Server readiness allow
 ## What this cannot prove
 
 A passing suite proves the tested native recovery path under controlled service responses. It does not establish real OpenAI account-reset timing, live service availability, every Codex version, actual extension/Desktop UI behavior, or atomic queue idempotency. A natural quota-reset observation remains useful confirmation, but is not needed to exercise the recovery chain repeatedly and safely.
+
+## Installed VS Code extension
+
+Run the separate gate with absolute paths to your installed `Code.exe` and official `openai.chatgpt` extension directory:
+
+```powershell
+pwsh -NoProfile -File scripts/verify-vscode.ps1 -CodePath 'C:/path/to/Code.exe' -ExtensionPath 'C:/path/to/openai.chatgpt-version-win32-x64'
+```
+
+Optional `-PythonPath` selects the development interpreter. Both paths are required; missing software fails instead of silently skipping. This gate is not part of ordinary CI or `verify-continuation.ps1`. It uses [VS Code's official extension test host](https://code.visualstudio.com/api/working-with-extensions/testing-extension), with a fresh profile and extension directory.
+
+The disposable development manifest retains the installed manifest's version and contributions but selects a test bootstrap. The bootstrap installs read-only transport taps before activation, then loads the original installed JavaScript bundle. Its extension context points to the installed assets and bundled native executable. Before-and-after SHA-256 checks verify that the installed manifest, bundle and executable are unchanged.
+
+The original extension initializes its own app-server transport. The test sends initial thread/turn RPCs through that transport using a disjoint request-ID range. It does not fabricate initialization, metadata, queue responses or completion notifications. CAC connects through a separate isolated native socket and uses its unchanged recovery engine. The extension's original writer consumes the real shared queue and emits the recovered turn's completion notification.
+
+| Check | Required outcome |
+| --- | --- |
+| Original process and initialization | Bundled EXE, `codex_vscode` originator override, `VS Code` client name and `Codex Extension` title |
+| Native provenance | Persisted `source=vscode`, `originator=codex_vscode`; observer sees `notLoaded` |
+| Eight client-selection combinations | Accept if and only if VS Code is selected; CLI/Desktop alone and no clients discover nothing |
+| Quota denial and saved obligation | Three denied scans cause one durable exact-thread/failed-turn obligation and no send |
+| Recovery and original ownership | One saved Continue completes the same thread through the original extension process |
+| Duplicate prevention | Three subsequent cycles leave exactly two turns, two inference requests and no queued item |
+| Private telemetry | Detection, separate-owner queue submission and observed completion; no bodies, real fixture IDs or credentials |
+| Isolation and integrity | Original extension files unchanged; fixture profile, chats and owned processes cleaned up |
+
+This uses the native fixture settings above, except CAC selects only VS Code for recovery. VS Code telemetry and updates are disabled in the disposable profile. Its workbench and extension can still attempt remote feature/configuration requests: the loopback proxy rejects them without forwarding. Rejections are counted rather than treated as unexpected native API routes. Unrecognized local account/model routes or invalid fixture authentication still fail the test. This remains configuration-level isolation, not an OS network sandbox.
+
+The whole gate has a 180-second process-tree deadline. Fixture setup and RPC bounds remain unchanged. The extension driver allows 30 seconds for startup, 10 seconds per native RPC, 90 seconds for recovery and 30 seconds for final observer assertions. Python allows 45 seconds per driver result and 20 seconds for graceful VS Code exit; cleanup uses five-second process-tree commands. The regular installed editor profile, real authentication, user chats and deployed CAC processes are not used.
+
+This gate verifies the installed extension's native owner and client filtering, not typing in the composer or visual webview rendering. It does not prove WSL/remote coverage, actual service-reset timing, production daemon discovery or a fresh Windows login.

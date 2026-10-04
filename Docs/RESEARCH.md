@@ -36,7 +36,9 @@ The 0.2.0 real CLI probe launched one private interactive TUI with `--no-daemon`
 
 The supported scope is local interactive CLI, VS Code and Desktop visible to one native Codex home/account. Executor and sub-agent sessions are explicitly excluded by the user.
 
-Actual CLI delivery and Desktop-style separate-owner delivery have native evidence. Scope regressions cover ordinary VS Code extension metadata. No Codex extension installation was found in this account's standard VS Code extension directories, so its UI was not launched for an end-to-end probe. Extension delivery is inferred from the shared protocol and source contract, not presented as directly observed.
+Actual CLI delivery and Desktop-style separate-owner delivery have native evidence. On 4 October 2026, the installed official VS Code extension passed the [isolated extension-host gate](CONTINUATION-TESTS.md#installed-vs-code-extension). Its unchanged bundle launched and initialized its unchanged Codex executable. The resulting thread recorded `source=vscode` and `originator=codex_vscode`. All eight client-selection combinations classified it correctly. CAC waited through denied scans, then queued one Continue; the original extension-owned server completed the exact chat and subsequent scans did not duplicate it.
+
+The test supplies initial thread/turn RPCs through an instrumented native transport, not a clicked composer. It proves real extension-owned recovery, not visual chat rendering. Generic app-server processes can also report `vscode`; the bucket is not a positive extension-originator allowlist. Explicit `appServer`, executor, sub-agent and unknown source labels remain excluded. Current versions and measurements belong to [verification](VALIDATION.md#vs-code-extension-owner).
 
 Remote, WSL, cloud, different homes, accounts or users are separate environments. A native supervisor cannot assume visibility into them.
 

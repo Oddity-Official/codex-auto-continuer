@@ -45,11 +45,11 @@ Tray changes preserve comments. Valid edits apply between cycles without restart
 
 ## Client coverage
 
-Local interactive CLI, VS Code extension and Desktop sessions are selected by default. Each can be enabled independently. They must share the same native Codex home and account. `codex exec`, sub-agents, arbitrary app-server sessions and unknown sources are always excluded.
+Local interactive CLI, VS Code extension and Desktop sessions are selected by default. Each can be enabled independently. They must share the same native Codex home and account. `codex exec`, sub-agents, unknown sources and explicit `appServer` sources are excluded. Other app-server sessions reporting `vscode` use the VS Code bucket unless their originator identifies Desktop; this is client provenance, not proof of an open UI.
 
 Shared internals do not guarantee shared chats: clients may use different homes, accounts or app-server processes. CAC checks the exact active writer and uses Codex's shared queue without stealing ownership. [Native research](Docs/RESEARCH.md) records the tested recovery path and source-filter rules.
 
-Remote, cloud, WSL, different Windows users, different `CODEX_HOME` directories and different accounts are not automatically covered. Real CLI queue delivery and Desktop-owned server delivery have native evidence. VS Code filtering is tested, but the actual extension UI was not available for an end-to-end test.
+Remote, cloud, WSL, different Windows users, different `CODEX_HOME` directories and different accounts are not automatically covered. Real CLI queue delivery and Desktop-owned server delivery have native evidence. The installed VS Code extension's native owner also passed isolated filtering and quota-recovery tests. Visual chat rendering and a natural account reset remain unobserved.
 
 ## Recovery policy
 
