@@ -4,7 +4,7 @@ CAC defaults to Balanced mode: unknown stable Codex builds may continue after id
 
 ## What is certified
 
-The packaged `src/codex_auto_continuer/compatibility.json` records the CAC version, Windows architecture, full CLI/daemon versions, both executable SHA-256 hashes, consumer-contract hash, suite identity and dated evidence. CAC 0.5.0 certifies the official Windows x86_64 Codex 0.160.0 executable as both CLI and managed daemon. [Current verification](VALIDATION.md) owns test results.
+The packaged `src/codex_auto_continuer/compatibility.json` records the CAC version, Windows architecture, full CLI/daemon versions, both executable SHA-256 hashes, consumer-contract hash, suite identity and dated evidence. CAC 0.5.1 certifies the official Windows x86_64 Codex 0.160.0 executable as both CLI and managed daemon. [Current verification](VALIDATION.md) owns test results.
 
 This is compatibility evidence, not a security attestation. CAC's own EXEs are unsigned. A user who modifies installed code or its certificate file can modify the application.
 

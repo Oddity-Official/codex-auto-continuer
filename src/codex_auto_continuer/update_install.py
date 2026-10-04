@@ -30,17 +30,26 @@ def process_path(pid: int) -> Path | None:
     kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
     kernel.OpenProcess.restype = wintypes.HANDLE
     kernel.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
+    kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel.WaitForSingleObject.restype = wintypes.DWORD
     kernel.CloseHandle.argtypes = [wintypes.HANDLE]
-    handle = kernel.OpenProcess(0x1000, False, pid)
+    handle = kernel.OpenProcess(0x1000 | 0x100000, False, pid)
     if not handle:
         if ctypes.get_last_error() == 87:
             return None
         raise UpdateError("Cannot verify the running CAC process. Stop it manually before updating.")
     try:
+        # Retained parent handles keep an exited process queryable by PID on Windows.
+        # A signaled process handle establishes exit without guessing from image-query errors.
+        if kernel.WaitForSingleObject(handle, 0) == 0:
+            return None
         size = wintypes.DWORD(32768)
         text = ctypes.create_unicode_buffer(size.value)
         if not kernel.QueryFullProcessImageNameW(handle, 0, text, ctypes.byref(size)):
-            raise UpdateError("Cannot read the CAC process executable identity.")
+            error = ctypes.get_last_error()
+            if kernel.WaitForSingleObject(handle, 0) == 0:
+                return None
+            raise UpdateError(f"Cannot read the CAC process executable identity (Windows error {error}).")
         return Path(text.value).resolve()
     finally:
         kernel.CloseHandle(handle)
