@@ -15,7 +15,13 @@ CAC 0.5.2, 4 October 2026. Native Windows 11 x86_64, PowerShell 7 and project CP
 
 The certified CLI and daemon are official Codex 0.160.0, executable SHA-256 `fdda5fa3cf3fb3d000b876720742857676293e4315e4b045fae6f8bd7e866d1d`, consumer-schema SHA-256 `e738465218e57a4e519855347a7728e25813c148e4b09a5a4383cdf3b668dfeb`. The native suite explicitly verified the CAC 0.5.2 certificate. Full native settings and scope belong to [continuation tests](CONTINUATION-TESTS.md).
 
-The [dated investigation](Audits/2026-10-04/AUDIT.md) separates the observed quota-read internal error from queued input and causal limits. The new real native regression queues two synthetic follow-ups, observes three quota-failed turns, injects HTTP 503 at the local usage service, preserves pending-state bytes through reconnect, remains blocked while permission is false, then sends exactly one saved Continue after true permission. Existing uncertain-send, malformed-contract and exact-thread regressions remain green.
+The [dated investigation](Audits/History/2026-10-04/AUDIT.md) separates the observed quota-read internal error from queued input and causal limits. The new real native regression queues two synthetic follow-ups, observes three quota-failed turns, injects HTTP 503 at the local usage service, preserves pending-state bytes through reconnect, remains blocked while permission is false, then sends exactly one saved Continue after true permission. Existing uncertain-send, malformed-contract and exact-thread regressions remain green.
+
+## Queue control probes
+
+On 4 October 2026, the [separate queue-control investigation](Audits/2026-10-04-02/AUDIT.md) passed 6 native scenarios in 21.36 seconds against the same official Codex 0.160.0 binary. Two isolated app-server owners, synthetic authentication and a gated loopback inference service exercised client-ID history correlation, owner interruption, unavailable removal methods, selected Continue priority, lost deletion acknowledgement and a before-turn fork. The command deadline was 150 seconds; fixture RPC and gate deadlines were 12 and 15 seconds.
+
+These are investigation probes, not newly enabled product behavior or a certification of a queue-holding feature. CAC runtime code, release binaries and the installed prompt remain unchanged. No production chat, credential, account allowance or Codex installation was used or modified by the fixtures. The native application gate above is unchanged-source evidence from the release, not a fresh full-suite run for this audit-only change.
 
 ## Development workflow
 

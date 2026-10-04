@@ -1,0 +1,68 @@
+{
+  "consumedHistory": {
+    "ownerVerbatimMatches": 2,
+    "peerVerbatimMatches": 2,
+    "ownerClientIdMatches": 1,
+    "peerClientIdMatches": 1,
+    "distinctMatchingIds": 2,
+    "userItemKeys": [
+      "clientId",
+      "content",
+      "id",
+      "type"
+    ],
+    "crossOwnerInterrupt": {
+      "accepted": false,
+      "code": -32600
+    },
+    "deleteConsumedEntry": false
+  },
+  "interruption": {
+    "sameOwnerSecondConnectionAccepted": true,
+    "queuedAfterElevenSeconds": 1,
+    "newInferenceAfterInterrupt": 0,
+    "consumedInputStillInHistory": true
+  },
+  "historyRemoval": {
+    "thread/rollback": {
+      "accepted": false,
+      "code": -32600
+    },
+    "turn/delete": {
+      "accepted": false,
+      "code": -32600
+    },
+    "item/delete": {
+      "accepted": false,
+      "code": -32600
+    }
+  },
+  "selectedStart": {
+    "crossOwnerStart": {
+      "accepted": false,
+      "code": -32600
+    },
+    "ownerStartAccepted": true,
+    "responseKeys": [
+      "turn"
+    ],
+    "continueBeforeWaitingFollowup": true,
+    "continuationPromptExact": true,
+    "totalTurns": 4,
+    "remainingQueue": 0
+  },
+  "lostDeleteAck": {
+    "responseLost": true,
+    "queueAbsent": true,
+    "inputAbsentFromHistory": true,
+    "savedInputRestoredToPausedQueue": true
+  },
+  "fork": {
+    "newThread": true,
+    "sourceHistoryUnchanged": true,
+    "consumedInputExcludedInitially": true,
+    "continueThenFollowups": true,
+    "forkTurns": 4,
+    "sourceQueueStillHeld": 1
+  }
+}

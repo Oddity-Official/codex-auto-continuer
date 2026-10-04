@@ -14,7 +14,7 @@ codex app-server generate-json-schema --experimental --out .data/schema
 
 These are temporary references, not exported runtime dependencies. [Official app-server documentation](https://learn.chatgpt.com/docs/app-server) describes the integration layer, initialization, thread/turn lifecycle and approval requests. Installed schemas and native probes establish the experimental queue and quota fields used here. General documentation does not establish a queue idempotency or atomic turn-precondition guarantee.
 
-The guarded minimum version is 0.160.0. Dispatch additionally requires the reviewed exact CLI/daemon build certificate and generated experimental contract. [Compatibility](COMPATIBILITY.md) owns that policy and identity limits; [verification](VALIDATION.md#compatibility-certification) records current native evidence.
+The guarded minimum version is 0.160.0. Dispatch additionally requires verified identity, schema and runtime contracts. Balanced permits matching stable builds; Strict additionally requires exact CLI/daemon build certification. [Compatibility](COMPATIBILITY.md) owns that policy and identity limits; [verification](VALIDATION.md#compatibility-certification) records current native evidence.
 
 ## Verified native facts
 
@@ -33,6 +33,14 @@ The [native continuation suite](CONTINUATION-TESTS.md) joins quota failure, acco
 The 0.2.0 real CLI probe launched one private interactive TUI with `--no-daemon`, read-only sandbox, approvals never and fixed no-tools token replies. It established source=cli, separate-writer ownership, an acknowledged queue ID and a completed second turn. The CLI still reported originator=Codex Desktop from this installation; CLI selection deliberately relies on its source.
 
 ## Client support and inference
+
+Native queue-control probes on Codex 0.160.0 established that a consumed queued message's `clientUserMessageId` appears as the full-history user item's `clientId`, including through another server owner. This proves entry into history, not successful execution. Identical text can appear more than once, so identity is stronger than text equality.
+
+A second connection to the actual owner can interrupt the active turn. Its remaining queue stayed paused across the ten-second external watcher interval. The owning server can explicitly start a selected queued Continue before an earlier waiting item; automatic queue processing then resumes. The separate server used by CAC could read shared history and queues, but its interrupt and selected-start requests were rejected. Shared storage is not shared active-turn ownership.
+
+The installed schema and server do not provide `thread/rollback`, `turn/delete` or `item/delete`; tested calls were rejected without changing history. Current general documentation's deprecated rollback description does not establish availability on this build. An interrupted input remains in history. A verified `thread/fork` with `beforeTurnId` excludes that input in a new thread without changing the original. It does not restore filesystem state or preserve the original thread identity.
+
+Full settings, initial fixture limitations, sanitized results and reproduction are in the [queue-control audit](Audits/2026-10-04-02/AUDIT.md). No queue interception, replay, fork or cancellation mode is enabled in CAC. The saved continuation prompt remains the dispatch input without a recovery-instruction wrapper.
 
 The supported scope is local interactive CLI, VS Code and Desktop visible to one native Codex home/account. Executor and sub-agent sessions are explicitly excluded by the user.
 
