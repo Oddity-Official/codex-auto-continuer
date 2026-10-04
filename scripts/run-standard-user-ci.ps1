@@ -89,7 +89,9 @@ try {
         $task = Get-ScheduledTask -TaskName $identity
         $info = Get-ScheduledTaskInfo -TaskName $identity
         if ($task.State -eq 'Ready' -and $info.LastRunTime -gt [DateTime]::Now.AddMinutes(-10)) { break }
-        if (-not (Test-Path -LiteralPath $logPath) -and [DateTime]::UtcNow -gt $startupDeadline) { break }
+        # A fresh user's PowerShell/profile can load before the first log is written.
+        # Honour a live scheduler action; the overall execution deadline still applies.
+        if ($task.State -ne 'Running' -and -not (Test-Path -LiteralPath $logPath) -and [DateTime]::UtcNow -gt $startupDeadline) { break }
     }
     $logPath = Join-Path $directory 'output.txt'
     if (Test-Path -LiteralPath $logPath) { Get-Content -LiteralPath $logPath -Raw | Write-Host }
