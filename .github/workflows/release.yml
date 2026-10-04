@@ -1,0 +1,67 @@
+name: Signed stable release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: C:/cac-release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.13'
+      - name: Short Windows checkout
+        working-directory: ${{ github.workspace }}
+        run: |
+          & ./scripts/run-project-command.ps1 -FileName (Get-Command git).Source -Arguments @('worktree','add','--detach','C:/cac-release','HEAD') -TimeoutSeconds 30
+      - name: Install isolated dependencies
+        run: |
+          & ./scripts/run-project-command.ps1 -FileName (Get-Command python).Source -Arguments @('-m','venv','.venv') -TimeoutSeconds 60
+          & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m','pip','install','--timeout','30','.[dev,build]') -TimeoutSeconds 180
+      - name: Windows safety gate
+        run: ./scripts/verify-windows.ps1
+      - name: Official native baseline
+        run: |
+          & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('scripts/download-probe-codex.py','--version','0.160.0','--destination','.data/codex') -TimeoutSeconds 240
+          $download = Get-Content -LiteralPath '.data/codex/download.json' -Raw | ConvertFrom-Json
+          $binary = Join-Path "$PWD/.data/codex" $download.binary
+          ./scripts/verify-continuation.ps1 -CodexPath $binary
+      - name: Build portable ZIP and wheel
+        run: |
+          ./scripts/build-portable.ps1
+          & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m','pip','wheel','--timeout','30','--no-deps','--no-build-isolation','--wheel-dir','dist','.') -TimeoutSeconds 120
+      - name: Sign exact portable package
+        env:
+          CAC_RELEASE_SIGNING_KEY: ${{ secrets.CAC_RELEASE_SIGNING_KEY }}
+        run: |
+          $version = (& ./.venv/Scripts/python.exe -c 'from codex_auto_continuer import __version__; print(__version__)').Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot read release version.' }
+          "CAC_RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+          & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('scripts/release.py','sign',"dist/codex-auto-continuer-$version-windows-x86_64.zip") -TimeoutSeconds 60
+      - name: Publish only clean signed assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CAC_TARGET: ${{ github.sha }}
+        run: |
+          $tag = "v$env:CAC_RELEASE_VERSION"
+          $arguments = @('release','create',$tag,'--repo',$env:GH_REPO,'--target',$env:CAC_TARGET,'--draft','--title',"CAC $env:CAC_RELEASE_VERSION",'--notes','Native Windows exact-chat quota recovery. Balanced compatibility, local diagnostics and authenticated stable updates. Keep both EXEs and _internal together. No runtime data is included.',"dist/codex-auto-continuer-$env:CAC_RELEASE_VERSION-windows-x86_64.zip", "dist/codex_auto_continuer-$env:CAC_RELEASE_VERSION-py3-none-any.whl",'dist/UPDATE.json','dist/UPDATE.sig')
+          & ./scripts/run-project-command.ps1 -FileName (Get-Command gh).Source -Arguments $arguments -TimeoutSeconds 90
+          & ./scripts/run-project-command.ps1 -FileName (Get-Command gh).Source -Arguments @('release','edit',$tag,'--repo',$env:GH_REPO,'--draft=false','--latest') -TimeoutSeconds 30

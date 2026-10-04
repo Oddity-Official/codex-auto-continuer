@@ -218,14 +218,17 @@ def test_queue_recovery_avoids_duplicate(tmp_path: Path):
     assert s.state.obligations[0].phase=="submitted"
 
 
-def test_ambiguous_send_without_evidence_fails_loud(tmp_path: Path):
+def test_ambiguous_send_is_isolated_while_other_chats_continue(tmp_path: Path):
     ob=Obligation.create("t","turn-1",900,None); ob.phase="uncertain"; ob.phase_changed_at=800
     save_state(tmp_path/"state.json",State(obligations=[ob]))
-    c=FakeClient([thread()], {"t":failed_turn()}, allowed=True)
+    c=FakeClient([thread(), thread("safe")], {"t":failed_turn(), "safe":failed_turn()}, allowed=True)
     s=supervisor(tmp_path,c)
-    with pytest.raises(ProtocolError, match="Refusing an automatic retry"):
-        s.run_cycle()
-    assert not c.added
+    result = s.run_cycle()
+    assert result.dispatched == 1 and len(result.warnings) == 1
+    assert c.added[0][0] == "safe"
+    assert s.state.by_thread()["t"].phase == "uncertain"
+    assert s.run_cycle().dispatched == 0
+    assert len(c.added) == 1
 
 
 def test_recent_scan_does_not_cache_failed_read(tmp_path: Path):
@@ -359,6 +362,20 @@ def test_delivery_observation_survives_restart_and_waits_for_runtime_completion(
     assert len(restarted.state.observations) == 1
     c.threads[0]["status"] = {"type": "idle"}
     c.turns["t"]["status"] = "completed"
+    c.turns["t"]["completedAt"] = 1000
+    restarted.run_cycle()
+    assert not load_state(tmp_path / "state.json").observations
+
+
+def test_separate_owner_incomplete_terminal_history_keeps_observation(tmp_path):
+    c = FakeClient([thread()], {"t": failed_turn()}, allowed=True)
+    supervisor(tmp_path, c).run_cycle()
+    c.threads[0]["status"] = {"type": "notLoaded"}
+    c.turns["t"] = {"id": "next", "status": "interrupted", "completedAt": None}
+    restarted = supervisor(tmp_path, c)
+    restarted.run_cycle()
+    assert len(load_state(tmp_path / "state.json").observations) == 1
+    c.turns["t"].update(status="completed", completedAt=1000)
     restarted.run_cycle()
     assert not load_state(tmp_path / "state.json").observations
 

@@ -23,7 +23,9 @@ Continue existing local interactive Codex tasks after account usage recovers, wi
 - write bounded local metadata telemetry with private defaults and explicit detailed mode
 - never store conversation bodies, credentials, raw request payloads or exception locals in telemetry
 - preserve submitted-delivery observations across restart, without claiming a later turn necessarily came from our message
-- stop diagnostically on unsupported versions, protocol drift, unreadable prompts or ambiguous sends; never silently substitute a guessed recovery path
+- block diagnostically on unsupported identity, protocol drift or unreadable prompts; isolate ambiguous sends without retries while other safe chats continue
+- default to Balanced compatibility for schema-verified stable Codex builds; offer Strict exact-build certification and deduplicated warnings
+- update portable CAC from signed stable GitHub releases at cycle boundaries, preserving runtime data and a recoverable code backup
 
 ## Non-goals
 
@@ -33,8 +35,8 @@ Continue existing local interactive Codex tasks after account usage recovers, wi
 - monitoring remote, cloud or WSL sessions outside the visible native Codex home
 - uploading telemetry, collecting credentials or maintaining a remote analytics service
 - supporting unverified queue retry or atomicity guarantees
-- automatically trusting new Codex releases or modifying Codex's installation/update policy
+- trusting unknown Codex builds without identity, schema and runtime checks, or modifying Codex's installation/update policy
 
 ## Supported release
 
-Version 0.4.0 targets Windows 11 x86_64. Queue writes require a reviewed exact CLI/daemon version and binary-checksum certificate, plus schema and runtime checks. [Compatibility](COMPATIBILITY.md) owns that policy. The portable release bundles Python, a short user guide and dependency notices, not developer docs or audit history. Source development uses Python 3.13 and PowerShell 7. Current results and limits belong to [VALIDATION.md](VALIDATION.md).
+Version 0.5.0 targets Windows 11 x86_64. Balanced mode permits unknown stable builds only after identity, schema and runtime checks; Strict mode additionally requires an exact recovery certificate. [Compatibility](COMPATIBILITY.md) owns that policy. [Updates](UPDATES.md) owns signed CAC releases and rollback. The portable release bundles Python, a short guide and dependency notices, not developer docs or audit history. Source development uses Python 3.13 and PowerShell 7. Current results and limits belong to [VALIDATION.md](VALIDATION.md).

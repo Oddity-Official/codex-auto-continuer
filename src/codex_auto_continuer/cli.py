@@ -57,6 +57,14 @@ def _parser() -> argparse.ArgumentParser:
     privacy.add_argument("value", choices=["private", "detailed"])
     reset = sub.add_parser("restore-defaults", help="Restore settings, preserving the prompt, pending work, logs and startup shortcut.")
     reset.add_argument("--prompt-file", help=argparse.SUPPRESS)
+    policy = sub.add_parser("compatibility", help="Select balanced or strict Codex compatibility policy.")
+    policy.add_argument("value", choices=["balanced", "strict"])
+    update = sub.add_parser("update", help="Check/install signed stable portable CAC releases, or recover an interrupted update.")
+    update.add_argument("action", choices=["check", "stage", "apply", "install", "recover"])
+    update.add_argument("job", type=Path, nargs="?", help="Owned job.json path, required only for recover.")
+    worker = sub.add_parser("_update-worker", help=argparse.SUPPRESS)
+    worker.add_argument("job", type=Path)
+    worker.add_argument("--recover", action="store_true")
     return parser
 
 
@@ -100,7 +108,10 @@ def _status(config_path: Path, live: bool = False) -> int:
         "promptPath": str(prompt_path(cfg, config_path)),
         "startupInstalled": startup_path().exists() if os.name == "nt" else False,
         "deliveryObservations": len(state.observations),
+        "warnings": snapshot.get("warnings", []),
     }
+    from .updates import update_status
+    output["updates"] = update_status(config_path)
     if live:
         codex_bin = find_codex(cfg.codex_executable)
         output["cliVersion"] = codex_version(codex_bin, cfg.codex_command_timeout_seconds)
@@ -108,7 +119,7 @@ def _status(config_path: Path, live: bool = False) -> int:
         client = AppServerClient.connect(daemon.socket_path, cfg.rpc_timeout_seconds)
         try:
             report = CompatibilityGate(config_path.parent / "compatibility-cache").recheck(
-                codex_bin, client.user_agent, cfg.codex_command_timeout_seconds)
+                codex_bin, client.user_agent, cfg.codex_command_timeout_seconds, cfg.compatibility_policy)
             output["compatibility"] = report.report()
             if report.read_allowed:
                 limits = _parse_rate_limits(client.rate_limits())
@@ -225,6 +236,44 @@ def main(argv: list[str] | None = None) -> int:
         if command == "config-path":
             print(args.config or default_config_path())
             return 0
+        if command == "_update-worker":
+            from .update_install import run_worker
+            return run_worker(args.job.resolve(), recover=args.recover)
+        if command == "update":
+            from .updates import check_release, launch_update, update_status, write_json, UpdateError
+            from .config import control_dir
+            if args.action == "recover":
+                if args.job is None:
+                    raise UpdateError("Use update recover with the owned job.json path shown in update-status.json.")
+                from .update_install import run_worker
+                return run_worker(args.job.resolve(), recover=True)
+            if args.action == "install":
+                if args.job is None:
+                    raise UpdateError("update install requires a verified staged job.json path.")
+                from .update_install import validate_job
+                request, app, config, bundle, manifest = validate_job(args.job.resolve())
+                if config != args.config or app != Path(sys.executable).resolve().parent or request.get("status") != "staged":
+                    raise UpdateError("Staged update does not belong to this app/config or was already started.")
+                ready = args.config.parent / "tray-ready.json"
+                tray_pid = json.loads(ready.read_text(encoding="utf-8")).get("pid") if ready.exists() else None
+                launch_update(args.job.resolve(), tray_pid)
+                print(json.dumps({"status": "installing", "version": request["version"]}))
+                return 0
+            if args.job is not None:
+                raise UpdateError("A job path is only accepted for update install or recover.")
+            with SingleInstanceLock(control_dir() / "update.lock"):
+                try:
+                    result = check_release(args.config, load_config(args.config), stage=args.action in {"apply", "stage"})
+                except UpdateError as exc:
+                    write_json(args.config.parent / "update-status.json", {"status": "unavailable", "reason": str(exc), "checkedAt": time.time()})
+                    raise
+                write_json(args.config.parent / "update-status.json", result)
+                if result["status"] == "staged" and args.action == "apply":
+                    ready = args.config.parent / "tray-ready.json"
+                    tray_pid = json.loads(ready.read_text(encoding="utf-8")).get("pid") if ready.exists() else None
+                    launch_update(Path(result["job"]), tray_pid)
+                print(json.dumps(result, indent=2))
+            return 0
         if command == "init":
             if args.force or not args.config.exists():
                 write_config(args.config, force=args.force)
@@ -262,6 +311,8 @@ def main(argv: list[str] | None = None) -> int:
             return _update_setting(args.config, clients=ALL_CLIENTS if args.values == ["all"] else tuple(args.values))
         if command == "logging":
             return _update_setting(args.config, detailed_telemetry=args.value == "detailed")
+        if command == "compatibility":
+            return _update_setting(args.config, compatibility_policy=args.value)
         if command == "restore-defaults":
             if is_running(lock_path()):
                 _check_owner(args.config)

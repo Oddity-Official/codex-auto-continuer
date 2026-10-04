@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import hashlib
+import json
 import queue
 import subprocess
 import threading
@@ -17,6 +19,7 @@ from .icon import tray_image
 from .instance_lock import SingleInstanceLock
 from .startup import launch_command, startup_path
 from .status import read_runtime, owns_monitor, phase
+from .updates import update_status, write_json
 
 PRIVACY_TEXT = {
     "detailed": "Detailed local telemetry keeps real chat IDs, names and filesystem paths. This helps trace failures to the exact chat.\n\n",
@@ -51,6 +54,15 @@ class TrayController:
         self.dialogs = Dialogs(on_error=self.dialog_failed)
         self._last_phase = None
         self._log_settings = self.log_settings(self.cfg)
+        self._last_update_check = 0
+        self._update_busy = False
+        self._notices = set()
+        notice_file = config_file.parent / "notifications.json"
+        if notice_file.exists():
+            try:
+                self._notices = set(json.loads(notice_file.read_text(encoding="utf-8"))["keys"])
+            except (OSError, ValueError, KeyError, TypeError):
+                self.problem = "Notification history is unreadable. Repair notifications.json in the data folder; monitoring remains independently controlled."
 
     @staticmethod
     def log_settings(cfg):
@@ -65,7 +77,7 @@ class TrayController:
                                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                    text=True, encoding="utf-8", errors="replace", cwd=self.config_file.parent,
                                    creationflags=subprocess.CREATE_NO_WINDOW)
-        timeout = 120 if arguments[0] in {"once", "scan"} else 90
+        timeout = 300 if arguments[0] == "update" else 120 if arguments[0] in {"once", "scan"} else 90
         try:
             stdout, stderr = process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired as exc:
@@ -102,7 +114,13 @@ class TrayController:
                     self.icon.stop()
                     return
                 telemetry.emit("tray.action", action=label)
-                self.command(*arguments)
+                output = self.command(*arguments)
+                if label in {"update", "auto-update"}:
+                    result = json.loads(output)
+                    if result.get("status") == "staged":
+                        self.icon.notify("A signed CAC update is staged. It will restart CAC after the current monitoring cycle; your data stays in place.", "CAC")
+                    elif label == "update":
+                        self.icon.notify(f"Updates: {result.get('status', 'unknown')}. Select Status for details.", "CAC")
                 if label == "reset":
                     self.icon.notify("Default settings restored. Your prompt, pending work, logs and login shortcut were preserved.", "CAC")
             except Exception as exc:
@@ -110,7 +128,10 @@ class TrayController:
                     telemetry.failure("tray.action_failed", exc, action=label)
                 except OSError:
                     pass  # Repair dialogs must still work when the log destination is broken.
-                self.dialogs.show("action-error", str(exc), error=True)
+                if label in {"update", "auto-update"}:
+                    self.notify_once("update:" + str(exc), str(exc))
+                else:
+                    self.dialogs.show("action-error", str(exc), error=True)
             finally:
                 with self._guard:
                     self._pending -= 1
@@ -167,7 +188,55 @@ class TrayController:
                 self.icon.icon = tray_image(self.state)
             if self.state == "failed" and self._last_phase != "failed":
                 self.icon.notify("Continuation is blocked. Select Status for the issue, or Modify Settings to repair it.", "CAC")
+            compatibility = self.snapshot.get("compatibility") or {}
+            if compatibility.get("status") == "untested":
+                key = "compatibility:" + ":".join(str(compatibility.get(field)) for field in ("cli_sha256", "server_sha256"))
+                self.notify_once(key, "This Codex build passes schema checks but has no exact recovery certificate. "
+                    + ("Balanced mode continues with runtime checks." if compatibility.get("dispatch_allowed") else "Strict mode blocks writes.")
+                    + " Select Status for details.")
+            for warning in self.snapshot.get("warnings", []):
+                self.notify_once(warning["key"], warning["message"])
+            try:
+                updates = update_status(self.config_file)
+            except (OSError, AutoContinuerError):
+                updates = {"status": "failed", "reason": "Update status is unreadable. Inspect update-status.json; monitoring continues."}
+            if updates.get("status") in {"failed", "rolled_back"}:
+                self.notify_once("update:" + str(updates.get("job")), updates.get("reason", "CAC update was rolled back. Select Status and inspect the recovery journal; runtime data was preserved."))
         self._last_phase = self.state
+
+    def notify_once(self, key, body):
+        fingerprint = hashlib.sha256(key.encode()).hexdigest()
+        with self._guard:
+            if fingerprint in self._notices:
+                return
+            # Bound notice history without storing chat names or raw identifiers.
+            keys = sorted(self._notices)[-255:] + [fingerprint]
+            write_json(self.config_file.parent / "notifications.json", {"keys": keys})
+            self._notices = set(keys)
+        self.icon.notify(body, "CAC")
+        telemetry.emit("tray.notice", key=fingerprint)
+
+    def check_updates(self, *, automatic=False):
+        with self._guard:
+            if self._update_busy or self.done.is_set():
+                return
+            self._update_busy = True
+        def check():
+            try:
+                result = json.loads(self.command("update", "stage"))
+                telemetry.emit("update.checked", status=result["status"], version=result.get("version"))
+                if result["status"] == "staged" and not self.done.is_set():
+                    self.enqueue("update", "update", "install", result["job"])
+                elif not automatic and not self.done.is_set():
+                    self.icon.notify(f"Updates: {result['status']}. Select Status for details.", "CAC")
+            except Exception as exc:
+                telemetry.failure("update.check_failed", exc)
+                if not self.done.is_set():
+                    self.notify_once("update:" + str(exc), str(exc))
+            finally:
+                with self._guard:
+                    self._update_busy = False
+        threading.Thread(target=check, name="CAC-updates", daemon=True).start()
 
     def status_label(self):
         names = {"monitoring": "Monitoring", "waiting": "Waiting for usage", "paused": "No clients selected",
@@ -187,6 +256,20 @@ class TrayController:
                 f"Chats checked: {scan.get('scanned_threads', 0)}\nNew quota failures: {scan.get('detected', 0)}\n"
                 f"Continuations sent: {scan.get('dispatched', 0)}\nPending: {scan.get('pending', 0)}\n"
                 f"Telemetry: {'Detailed' if self.cfg.detailed_telemetry else 'Private'}, local only")
+        compatibility = self.snapshot.get("compatibility") or {}
+        body += (f"\n\nCompatibility: {compatibility.get('status', 'Not checked')} ({self.cfg.compatibility_policy})"
+                 f"\nCLI: {compatibility.get('cli_version', 'Unknown')}; daemon: {compatibility.get('app_server_version', 'Unknown')}"
+                 f"\nQueue writes: {'Allowed' if compatibility.get('dispatch_allowed') else 'Blocked/not checked'}"
+                 f"\n{compatibility.get('reason', '')}")
+        for warning in self.snapshot.get("warnings", []):
+            body += "\n\n" + warning["message"]
+        try:
+            updates = update_status(self.config_file)
+            body += f"\n\nUpdates: {updates.get('status', 'Not checked')} ({'automatic' if self.cfg.auto_update else 'manual'})"
+            if updates.get("reason"):
+                body += "\n" + updates["reason"]
+        except AutoContinuerError as exc:
+            body += "\n\nUpdates: " + str(exc)
         if self.problem:
             body += f"\n\nIssue: {self.problem}"
         self.dialogs.show("status", body, title=f"CAC {__version__} status")
@@ -217,6 +300,9 @@ class TrayController:
     def watch(self):
         while not self.done.wait(1):
             self.refresh()
+            if self.cfg.auto_update and not self.busy and (not self._last_update_check or time.monotonic() - self._last_update_check > self.cfg.update_check_hours * 3600):
+                self._last_update_check = time.monotonic()
+                self.check_updates(automatic=True)
 
     def menu(self):
         from pystray import Menu, MenuItem as Item
@@ -245,6 +331,7 @@ class TrayController:
                 Item("Detailed", lambda icon, item: self.privacy("detailed"), checked=lambda item: self.cfg.detailed_telemetry, radio=True),
                 Item("Private", lambda icon, item: self.privacy("private"), checked=lambda item: not self.cfg.detailed_telemetry, radio=True))),
             Item("Restore Defaults", lambda icon, item: self.restore_defaults()),
+            Item("Check For Updates", lambda icon, item: self.check_updates(), enabled=lambda item: not self._update_busy),
             Menu.SEPARATOR,
             Item(f"About CAC {__version__}", lambda icon, item: self.about()),
             Item("Exit CAC", action("quit")),
@@ -264,6 +351,7 @@ def run_tray(config_file: Path) -> int:
             def ready(icon):
                 icon.visible = True
                 telemetry.emit("tray.ready", menuItems=[item.text for item in icon.menu.items])
+                write_json(config_file.parent / "tray-ready.json", {"version": __version__, "pid": os.getpid(), "config": str(config_file.resolve())})
                 threading.Thread(target=controller.worker, name="CAC-controls", daemon=True).start()
                 threading.Thread(target=controller.watch, name="CAC-status", daemon=True).start()
                 controller.refresh()

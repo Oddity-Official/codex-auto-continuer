@@ -2,11 +2,11 @@
 
 ## Runtime and controls
 
-The supervisor is a per-user Python 3.13 process. Its recovery engine uses the standard library; TOMLKit handles comment-preserving settings. The Windows tray uses pystray and Pillow. PyInstaller packages GUI and console EXEs sharing an adjacent `_internal` folder.
+The supervisor is a per-user Python 3.13 process. Its recovery engine uses the standard library; TOMLKit preserves settings comments. Cryptography verifies Ed25519 release signatures. The Windows tray uses pystray and Pillow. PyInstaller packages GUI and console EXEs sharing an adjacent `_internal` folder.
 
 The GUI entry point defaults to `tray`. A tray instance starts a hidden supervisor, polls a small local status snapshot every second, and sends serialized state-changing commands through the companion console EXE. Commands have 90-second bounds, or 120 seconds for one-cycle controls. Timed-out process trees are stopped. The tray does not poll Codex independently for its icon status. File actions run directly on separate threads, bypassing both subprocess startup and the control queue.
 
-The tray exposes local status, start/stop, independent client choices, Windows login, prompt, settings, data folder, privacy, restore defaults, About and exit. Diagnostic scan/once/restart/init commands remain in the CLI. Scan requesters use an OS lock, an atomic request ID and a matching completion acknowledgement, rather than a fire-and-forget request.
+The tray exposes local status, start/stop, independent client choices, Windows login, prompt, settings, data folder, privacy, defaults, updates, About and exit. Release downloads use a separate background thread, so they do not block monitoring controls or file actions. Installation joins the serialized control path after verification. [Updates](UPDATES.md) owns download and replacement details. Diagnostic scan/once/restart/init commands remain in the CLI. Scan requesters use an OS lock, an atomic request ID and a matching completion acknowledgement.
 
 Settings are annotated TOML overrides in `settings.toml`. Missing settings use built-in defaults; opening settings creates a comment-only template. TOMLKit preserves existing comments on tray edits. Unique temporary writes flush, sync and atomically replace the file. Valid saved settings and prompts are checked before each cycle; sleep watches file signatures every second. Invalid settings or prompts close the connection and pause dispatch while preserving state, then recover automatically after repair. Empty client selection does not connect when there is no outstanding state; existing obligations still reconcile and delete only our stale queued work.
 
@@ -32,7 +32,7 @@ The Win32 tray adapter builds the native menu on the UI thread immediately befor
 
 No UI automation or model-switching path exists. Each RPC has a total deadline that notifications, pings and fragmented frames cannot extend.
 
-Each fresh connection verifies the CLI, daemon lifecycle response, connected server's user-agent version and managed binary. The managed binary generates the experimental schema. CAC checks its consumer-specific contract and the packaged exact-version/build certificate before permitting writes. Schema results cache only in memory by binary SHA-256 and full version; file identity changes invalidate them. Rechecks before resume, queue addition and deletion catch daemon updates during a cycle. [Compatibility](COMPATIBILITY.md) owns certification, blocked-state behavior and identity limits.
+Each fresh connection verifies the CLI, daemon lifecycle response, connected server's user-agent version and managed binary. The managed binary generates the experimental schema. CAC checks its consumer-specific contract and looks for an exact-version/build certificate. Balanced mode also permits matching unknown stable builds; Strict requires certification. Schema results cache only in memory by binary SHA-256 and full version; file identity changes invalidate them. Rechecks before resume, queue addition and deletion catch daemon updates during a cycle. [Compatibility](COMPATIBILITY.md) owns policy and identity limits.
 
 ## Thread scope
 
@@ -51,9 +51,9 @@ pending -> dispatching -> submitted
                  \-> uncertain
 ```
 
-`dispatching` is synced before the queue RPC. A lost response makes the send uncertain. Restart reconciliation looks for an advanced turn or the exact client message ID in the queue. It never assumes that a client message ID makes queue addition idempotent. An unresolved ambiguous send stops after the recovery interval.
+`dispatching` is synced before the queue RPC. A lost response makes the send uncertain. Restart reconciliation looks for an advanced turn or the exact client message ID in the queue. It never assumes that a client message ID makes queue addition idempotent. After the recovery interval, unresolved ambiguity isolates that chat without retrying. Other safe chats continue. Status, local telemetry and one non-modal notice explain the isolation. Later observable progress can resolve it automatically.
 
-Submitted deliveries also create durable observations. These survive removal of a stale obligation and process restart, allowing later metadata to record a subsequent completed, failed or interrupted turn. Live active status takes precedence over an apparently terminal persisted history entry.
+Submitted deliveries also create durable observations. These survive removal of a stale obligation and process restart, allowing later metadata to record a subsequent completed, failed or interrupted turn. Live active status takes precedence over persisted history. A terminal status without a finite completion timestamp is incomplete evidence, especially for a separate writer; it does not end observation.
 
 A subsequent turn is not proof that our message caused it: a user can advance the chat concurrently. Telemetry labels it `delivery.subsequent_turn`, not guaranteed delivery success. Missing or archived chats end observations.
 
@@ -81,7 +81,7 @@ A description-owned native Startup shortcut targets the GUI EXE, or pythonw for 
 
 ## Local telemetry
 
-The supervisor writes `telemetry.jsonl`; the tray writes `tray.jsonl`. Separate streams prevent multiprocess log rotation races. Schema 1 events carry UTC timestamp, PID, application version, privacy mode, event name and structured metadata.
+The supervisor writes `telemetry.jsonl`; the tray writes `tray.jsonl`; update checks/replacement write `updates.jsonl`. The installer waits for its requesting CLI to exit before taking over that update stream. Separate streams prevent multiprocess rotation races. Schema 1 events carry UTC timestamp, PID, version, privacy mode, event name and metadata.
 
 RPC summaries are allowlisted, never raw payload dumps. Errors retain classes, numeric RPC codes, timings and stack module/function/line locations. Detailed mode enables actual identifiers, names and paths, not arbitrary exception text or conversation content.
 

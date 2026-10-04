@@ -30,7 +30,11 @@ class Config:
     rpc_timeout_seconds: float = setting(12.0, "Total deadline in seconds for each local Codex request.")
     codex_command_timeout_seconds: float = setting(20.0, "Seconds allowed for Codex version and daemon commands.")
     reconnect_backoff_seconds: float = setting(5.0, "Seconds before retrying a lost local Codex connection.")
-    dispatch_recovery_seconds: float = setting(15.0, "Seconds to reconcile an uncertain submission before stopping; never blindly resend.")
+    dispatch_recovery_seconds: float = setting(15.0, "Seconds to reconcile an uncertain send before isolating that chat; never blindly resend.")
+    compatibility_policy: str = setting("balanced", "balanced permits schema-verified stable Codex builds; strict requires exact-build certification.")
+    auto_update: bool = setting(True, "Automatically install signed stable CAC releases in portable builds; never updates Codex.")
+    update_use_github_cli_auth: bool = setting(False, "Use your existing gh login for private releases; token stays in memory and is never logged or bundled.")
+    update_check_hours: float = setting(6.0, "Hours between GitHub release checks; checks do not upload local diagnostics.")
     clients: tuple[str, ...] = setting(ALL_CLIENTS, "Any combination of vscode, cli and desktop; [] pauses client monitoring.")
     desktop_custom_sources: tuple[str, ...] = setting(("chatgpt", "atlas"), "Codex custom source labels recognized as Desktop.")
     desktop_originators: tuple[str, ...] = setting(("Codex Desktop",), "Distinguish Desktop from the VS Code extension when both use the vscode source.")
@@ -155,6 +159,7 @@ def validate_config(cfg: Config) -> Config:
         "codex_command_timeout_seconds": cfg.codex_command_timeout_seconds,
         "reconnect_backoff_seconds": cfg.reconnect_backoff_seconds,
         "dispatch_recovery_seconds": cfg.dispatch_recovery_seconds,
+        "update_check_hours": cfg.update_check_hours,
     }
     for name, value in numeric.items():
         if (
@@ -170,6 +175,14 @@ def validate_config(cfg: Config) -> Config:
         raise ConfigurationError("rpc_timeout_seconds must be at least 1 second.")
     if cfg.codex_command_timeout_seconds < 1:
         raise ConfigurationError("codex_command_timeout_seconds must be at least 1 second.")
+    if not isinstance(cfg.compatibility_policy, str) or cfg.compatibility_policy not in {"balanced", "strict"}:
+        raise ConfigurationError("compatibility_policy must be balanced or strict.")
+    if type(cfg.auto_update) is not bool:
+        raise ConfigurationError("auto_update must be true or false.")
+    if type(cfg.update_use_github_cli_auth) is not bool:
+        raise ConfigurationError("update_use_github_cli_auth must be true or false.")
+    if not 1 <= cfg.update_check_hours <= 168:
+        raise ConfigurationError("update_check_hours must be from 1 to 168.")
     if (not isinstance(cfg.clients, tuple) or any(not isinstance(x, str) or x not in ALL_CLIENTS for x in cfg.clients)
             or len(set(cfg.clients)) != len(cfg.clients)):
         raise ConfigurationError("clients must contain unique choices from vscode, cli and desktop, or [].")

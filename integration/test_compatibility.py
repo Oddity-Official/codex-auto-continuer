@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from dataclasses import replace
+import pytest
 
 from codex_auto_continuer import codex, compatibility
 from codex_auto_continuer.compatibility import Compatibility, CompatibilityGate
@@ -23,7 +25,8 @@ def test_native_schema_and_connected_build(codex_binary, native):
     print(json.dumps(report.report(), sort_keys=True))
 
 
-def test_managed_daemon_restart_reconnect_and_unknown_tuple_preserve_pending(codex_binary, monkeypatch, request):
+@pytest.mark.parametrize("policy", ["strict", "balanced"])
+def test_managed_daemon_restart_reconnect_and_unknown_tuple_preserve_pending(codex_binary, monkeypatch, request, policy):
     original_run = codex._run
     daemon_binary = request.config.getoption("--daemon-executable") or codex_binary
     expected = {"cli_version": codex.codex_version(codex_binary, 10),
@@ -38,7 +41,7 @@ def test_managed_daemon_restart_reconnect_and_unknown_tuple_preserve_pending(cod
         monkeypatch.setattr(compatibility, "_run", isolated_run)
         tid, failed = native.start_thread()
         native.assert_quota_failure(failed)
-        supervisor = Supervisor(Config(codex_executable=codex_binary, dispatch_spacing_seconds=0), native.data / "state.json")
+        supervisor = Supervisor(Config(codex_executable=codex_binary, dispatch_spacing_seconds=0, compatibility_policy="strict"), native.data / "state.json")
         native.supervisors.append(supervisor)
         def connect_candidate():
             supervisor.connect()
@@ -64,7 +67,16 @@ def test_managed_daemon_restart_reconnect_and_unknown_tuple_preserve_pending(cod
         assert result.dispatched == 0 and result.pending == 1
         assert supervisor.state_file.read_bytes() == saved
         assert native.service.inference_count == 1
+        supervisor.config = replace(supervisor.config, compatibility_policy=policy)
+        supervisor.close(); connect_candidate()
+        assert supervisor.compatibility.policy == policy
+        if policy == "balanced":
+            assert supervisor.compatibility.status == "untested" and supervisor.compatibility.dispatch_allowed
+        else:
+            assert not supervisor.compatibility.dispatch_allowed
         supervisor.compatibility_gate = CompatibilityGate(native.data)
+        if policy == "balanced":
+            supervisor.compatibility_gate.record["certificates"] = []
         supervisor.close(); connect_candidate()
         if not supervisor.compatibility.dispatch_allowed:
             # Candidate evidence is established inside the isolated test, never granted to a user daemon.

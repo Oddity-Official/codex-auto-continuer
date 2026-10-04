@@ -1,10 +1,10 @@
 # Codex compatibility
 
-CAC permits queue writes only for a reviewed, behavior-tested Codex CLI/daemon combination. A minimum version or matching JSON schema is not enough.
+CAC defaults to Balanced mode: unknown stable Codex builds may continue after identity, schema and runtime checks pass. Strict mode requires an exact behavior-tested certificate too. Matching schemas are useful evidence, not a behavioral guarantee.
 
 ## What is certified
 
-The packaged `src/codex_auto_continuer/compatibility.json` records the CAC version, Windows architecture, full CLI/daemon versions, both executable SHA-256 hashes, consumer-contract hash, suite identity and dated evidence. CAC 0.4.0 certifies the official Windows x86_64 Codex 0.160.0 executable as both CLI and managed daemon. [Current verification](VALIDATION.md#compatibility-certification) owns test results.
+The packaged `src/codex_auto_continuer/compatibility.json` records the CAC version, Windows architecture, full CLI/daemon versions, both executable SHA-256 hashes, consumer-contract hash, suite identity and dated evidence. CAC 0.5.0 certifies the official Windows x86_64 Codex 0.160.0 executable as both CLI and managed daemon. [Current verification](VALIDATION.md) owns test results.
 
 This is compatibility evidence, not a security attestation. CAC's own EXEs are unsigned. A user who modifies installed code or its certificate file can modify the application.
 
@@ -18,7 +18,17 @@ The generated contract covers initialization, thread list/read/turns, account pe
 
 Schemas and binary hashes cache in memory only. Cache keys include full version and binary file identity/hash. Generated schema files are removed after inspection. CAC does not contact a certification service, download Codex or change updater settings.
 
-An untested tuple or queue-contract change blocks new submissions, ownership resume and queue deletion. CAC preserves existing obligations, including uncertain/submitted work. It continues read-only failure discovery and delivery observation when the read contract matches. A read-contract change pauses scanning too. Red tray `Status` explains the reason, and `status --live` reports versions and hashes. The monitor rechecks automatically; a compatible repair does not require deleting state. Diagnostic `scan`/`once` return exit code 2 when compatibility blocks recovery.
+| Evidence | Balanced (default) | Strict |
+| --- | --- | --- |
+| Exact certificate, identity and schema match | Recovery allowed | Recovery allowed |
+| Unknown stable build, identity and schema match | Recovery allowed; untested notice | Queue writes blocked |
+| Unknown prerelease, mismatched identity or unverifiable schema | Queue writes blocked | Queue writes blocked |
+| Queue contract changed; read contract matches | Read-only discovery | Read-only discovery |
+| Read contract changed | Scanning and writes blocked | Scanning and writes blocked |
+
+Set `compatibility_policy = "strict"` in settings, or run `compatibility strict`. `compatibility balanced` restores the default. Runtime quota, exact-thread, ownership and queue-response guards apply in both modes. Neither mode blindly retries an uncertain send.
+
+Status shows the policy, evidence level, CLI/daemon versions and reason. An unknown build gets one non-modal notice per binary tuple, persisted across restarts. Working Balanced mode stays green; a real compatibility block is red. `status --live` includes binary and schema hashes. Blocks preserve pending, submitted and uncertain work. The monitor rechecks automatically; repair never requires deleting state. Diagnostic `scan`/`once` return exit code 2 when compatibility blocks recovery.
 
 ## Daily upstream probe
 
@@ -34,7 +44,7 @@ Jobs create a short `C:/cac-probe` Git worktree before testing. This avoids Code
 
 `scripts/download-probe-codex.py` fetches complete official GitHub release packages into ignored test staging. It requires GitHub's asset SHA-256 and exact size before extraction/execution. Paths, links, duplicates and extracted-size limits are validated. It never installs into a developer's Codex home. Downloads have 180-second deadlines; the outer runner bounds download/extraction at 240 seconds.
 
-The probe runs schema comparison and ten native scenarios. These use synthetic authentication and loopback model/account services, not an OpenAI login or real allowance. Managed lifecycle tests disable updater/remote control in their disposable home, exercise production discovery/reconnect, deliberately remove certification, prove pending-state preservation, then test one continuation and no duplicates. Candidate builds receive test-only access inside that isolated fixture, never a production override.
+The probe runs schema comparison and 11 native scenarios. These use synthetic authentication and loopback model/account services, not an OpenAI login or real allowance. Managed lifecycle tests disable Codex updater/remote control in their disposable home, exercise production discovery/reconnect, deliberately remove certification, prove Strict pending-state preservation and Balanced recovery, then verify one continuation and no duplicates. Candidate builds receive test-only access inside isolated behavioral fixtures; CI never changes production certificates automatically.
 
 Reports contain versions, checksums, schema differences and synthetic-test results. Jobs fail if either schema or behavior fails. Artifacts expire after 14 days. No CI job edits certificates or publishes a release. GitHub schedules start only after the repository is uploaded and Actions is enabled; hosted execution is not claimed from a local pass.
 

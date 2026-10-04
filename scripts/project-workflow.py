@@ -108,7 +108,7 @@ def excluded(name, config):
         return True
     if lowered[-1].startswith(".env."):
         return True
-    if len(parts) == 1 and lowered[-1].startswith(("telemetry.jsonl", "tray.jsonl")):
+    if len(parts) == 1 and lowered[-1].startswith(("telemetry.jsonl", "tray.jsonl", "updates.jsonl")):
         return True
     if lowered[-1] == f"{config['name']}-codex-handoff.zip".casefold():
         return True

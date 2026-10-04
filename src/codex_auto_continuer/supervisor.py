@@ -4,7 +4,7 @@ import logging
 import math
 import time
 import hashlib
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -19,6 +19,10 @@ from .telemetry import emit, failure, changed, begin_cycle, thread_summary, turn
 LOG = logging.getLogger(__name__)
 _ALLOWED_ACTIVE_FLAGS = {"waitingOnApproval", "waitingOnUserInput"}
 _ALLOWED_THREAD_STATUS = {"notLoaded", "idle", "systemError", "active"}
+
+
+class SubmissionUncertain(ProtocolError):
+    """Chat-local ambiguity: retain its intent while other chats can proceed."""
 
 
 @dataclass(frozen=True)
@@ -37,6 +41,7 @@ class CycleResult:
     ordinary_usage_allowed: bool | None = None
     next_reset_at: float | None = None
     compatibility: dict | None = None
+    warnings: list[dict] = field(default_factory=list)
 
 
 class Supervisor:
@@ -73,7 +78,7 @@ class Supervisor:
         self.codex_bin = codex_bin
         self._cli_version = cli_version
         self.client = client
-        self.compatibility = self.compatibility_gate.recheck(codex_bin, client.user_agent, self.config.codex_command_timeout_seconds)
+        self.compatibility = self.compatibility_gate.recheck(codex_bin, client.user_agent, self.config.codex_command_timeout_seconds, self.config.compatibility_policy)
         changed("compatibility.checked", "compatibility", **self.compatibility.report())
         LOG.info("Connected to Codex %s app-server %s", cli_version, client.user_agent)
         changed("codex.connected", "connection", cliVersion=cli_version, daemonVersion=daemon.app_server_version,
@@ -84,7 +89,7 @@ class Supervisor:
     def _check_dispatch_compatibility(self) -> None:
         if self.codex_bin is not None:
             self.compatibility = self.compatibility_gate.recheck(
-                self.codex_bin, self._require_client().user_agent, self.config.codex_command_timeout_seconds)
+                self.codex_bin, self._require_client().user_agent, self.config.codex_command_timeout_seconds, self.config.compatibility_policy)
             changed("compatibility.checked", "compatibility", **self.compatibility.report())
         if not self.compatibility.dispatch_allowed:
             raise CompatibilityBlocked(self.compatibility.reason)
@@ -245,7 +250,17 @@ class Supervisor:
 
         if limits.ordinary_usage_allowed is True and self.compatibility.dispatch_allowed:
             for obligation in sorted(list(self.state.obligations), key=lambda item: item.detected_at):
-                if self._dispatch_if_still_valid(obligation, now):
+                try:
+                    dispatched = self._dispatch_if_still_valid(obligation, now)
+                except SubmissionUncertain:
+                    warning = {"key": hashlib.sha256(obligation.client_user_message_id.encode()).hexdigest(),
+                               "code": "submission_uncertain",
+                               "message": "A chat has an unresolved send. It is isolated without a retry; other chats continue. Inspect local telemetry and the chat before making manual progress."}
+                    result.warnings.append(warning)
+                    changed("dispatch.quarantined", obligation.client_user_message_id,
+                            threadId=obligation.thread_id, failedTurnId=obligation.failed_turn_id, phase=obligation.phase)
+                    dispatched = False
+                if dispatched:
                     result.dispatched += 1
                     if self.config.dispatch_spacing_seconds > 0:
                         self.sleep(self.config.dispatch_spacing_seconds)
@@ -273,13 +288,17 @@ class Supervisor:
                 continue
             turn = client.latest_turn(observation.thread_id)
             if turn is None or turn.get("id") == observation.failed_turn_id:
-                emit("delivery.waiting_for_next_turn", threadId=observation.thread_id,
+                changed("delivery.waiting_for_next_turn", observation.client_user_message_id, threadId=observation.thread_id,
                      queuedSubmissionId=observation.queued_submission_id)
                 continue
-            emit("delivery.subsequent_turn", threadId=observation.thread_id,
+            changed("delivery.subsequent_turn", observation.client_user_message_id, threadId=observation.thread_id,
                  failedTurnId=observation.failed_turn_id, queuedSubmissionId=observation.queued_submission_id,
                  runtimeStatus=_thread_status(thread)[0], **turn_summary(turn))
-            if _thread_status(thread)[0] != "active" and turn.get("status") in {"completed", "failed", "interrupted"}:
+            completed_at = turn.get("completedAt")
+            if completed_at is not None:
+                _required_timestamp(turn, "completedAt", "delivery thread/turns/list")
+            if (_thread_status(thread)[0] != "active" and completed_at is not None
+                    and turn.get("status") in {"completed", "failed", "interrupted"}):
                 self.state.observations.remove(observation)
                 save_state(self.state_file, self.state)
 
@@ -523,8 +542,8 @@ class Supervisor:
         if now - obligation.phase_changed_at < self.config.dispatch_recovery_seconds:
             return
         # There is no verified idempotency contract for clientUserMessageId. Once a send is
-        # ambiguous, retrying can duplicate a continuation. Fail loud instead.
-        raise ProtocolError(
+        # ambiguous, retrying can duplicate a continuation. Isolate only this chat.
+        raise SubmissionUncertain(
             f"Dispatch for thread {obligation.thread_id} is {obligation.phase!r} but no queued item or "
             "advanced turn can be verified. Refusing an automatic retry because Codex does not expose a "
             "verified idempotency contract for this submission. Inspect the thread and state file manually."

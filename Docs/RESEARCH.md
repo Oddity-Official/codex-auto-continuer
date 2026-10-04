@@ -71,7 +71,7 @@ Structured targeting is not unique to this project. Our chosen fit is portable n
 
 ## Observational limits
 
-The earlier installed supervisor detected a real quota failure, waited through 9 unavailable-usage scans, then cancelled after the user manually resumed. No automatic continuation was dispatched. That is detection, waiting and stale-cancellation evidence, not a natural quota-reset delivery demonstration.
+On 4 October 2026, the installed supervisor recorded a real quota failure, waited for ordinary usage, submitted one Continue and observed the subsequent turn. The session completion event confirms that turn finished without an error. This is natural recovery evidence for one Desktop chat, not proof for every client or future Codex build. The dated [natural recovery record](History/2026-10-04-natural-recovery.md) separates queue evidence from causal limits.
 
 Two simultaneous real quota failures were not available. Regression fixtures cover multi-chat permission rechecks. A fresh Windows login was not performed; shortcut launch can be tested separately.
 

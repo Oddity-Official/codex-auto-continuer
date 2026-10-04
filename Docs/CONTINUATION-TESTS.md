@@ -35,7 +35,7 @@ Two independent Codex app-server processes share one disposable home. The observ
 
 The eight recovery scenarios select isolated sockets directly and grant test-only dispatch access. This lets the suite establish behavioral evidence for candidate binaries before production certification. Recovery decisions, RPCs, queue writes, persistence and logging use application code. Engine reload is not an operating-system restart or a tray lifecycle test.
 
-Two compatibility scenarios extend the gate to ten cases. One generates the native binary's experimental contract and checks its connected identity. The other bootstraps a real managed daemon in a disposable home and uses production discovery/certification. It verifies daemon restart and reconnect, removes certification to prove no send or pending-state loss, then verifies one Continue/completed turn and no duplicates. Optional `--daemon-executable` on pytest selects a different complete package for mixed-version testing. No CAC process is registered in the user's control directory.
+Three compatibility cases extend the gate to 11 scenarios. One generates the native binary's contract and checks connected identity. Two managed-daemon cases use production discovery and restart/reconnect. Both remove certification to prove Strict preserves pending-state bytes; one then switches to Balanced and recovers the untested stable tuple. They verify one Continue/completed turn and no duplicates. Optional `--daemon-executable` selects another complete package for mixed-version testing. No CAC process is registered in the user's control directory.
 
 ## What is simulated
 

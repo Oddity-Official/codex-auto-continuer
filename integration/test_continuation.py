@@ -172,8 +172,8 @@ def test_native_uncertain_queue_never_blindly_resends(native, accepted):
     else:
         supervisor.config = replace(supervisor.config, dispatch_recovery_seconds=0)
         for _ in range(2):
-            with pytest.raises(ProtocolError, match="Refusing an automatic retry"):
-                supervisor.run_cycle()
+            result = supervisor.run_cycle()
+            assert result.dispatched == 0 and len(result.warnings) == 1
         assert native.owner.latest_turn(thread_id)["id"] == failed["id"]
         assert native.service.inference_count == 1
         assert load_state(supervisor.state_file).obligations[0].phase == "uncertain"

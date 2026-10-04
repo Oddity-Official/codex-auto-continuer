@@ -111,10 +111,13 @@ class Compatibility:
     schema_sha256: str | None = None
     schema_source: str | None = None
     read_allowed: bool = True
+    policy: str = "strict"
 
     @property
     def dispatch_allowed(self):
-        return self.status == "certified"
+        return self.status == "certified" or (self.status == "untested" and self.policy == "balanced"
+            and all(re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:\+[0-9A-Za-z.-]+)?", value or "")
+                    for value in (self.cli_version, self.app_server_version)))
 
     def report(self):
         return asdict(self) | {"dispatch_allowed": self.dispatch_allowed}
@@ -138,8 +141,10 @@ class CompatibilityGate:
                 del self._hashes[next(iter(self._hashes))]
         return self._hashes[key]
 
-    def inspect(self, cli: str, daemon: DaemonInfo, user_agent: str, timeout: float) -> Compatibility:
-        values = {"cli_version": codex_version(cli, timeout), "app_server_version": daemon.app_server_version}
+    def inspect(self, cli: str, daemon: DaemonInfo, user_agent: str, timeout: float, policy: str = "strict") -> Compatibility:
+        if policy not in {"balanced", "strict"}:
+            raise ValueError("Invalid compatibility policy.")
+        values = {"cli_version": codex_version(cli, timeout), "app_server_version": daemon.app_server_version, "policy": policy}
         check = "binary identity"
         try:
             values["cli_sha256"] = self.binary_hash(cli)
@@ -173,20 +178,25 @@ class CompatibilityGate:
             if different:
                 return Compatibility(status="schema_mismatch", reason="Codex contract changed: " + ", ".join(different) + ". Update CAC; pending work is preserved.", read_allowed=not bool(READ_METHODS & set(different)), **values)
             target = "windows-x86_64" if platform.system() == "Windows" and platform.machine().lower() in {"amd64", "x86_64"} else "unsupported"
+            if target == "unsupported":
+                return Compatibility(status="unsupported", reason="CAC supports native Windows x86_64 recovery only. Queue writes are blocked on this platform.", **values)
             for certificate in self.record["certificates"]:
                 if (certificate["cac_version"] == __version__ and certificate["platform"] == target and
                     all(certificate[field] == values[field] for field in ("cli_version", "app_server_version", "cli_sha256", "server_sha256", "schema_sha256"))):
                     return Compatibility(status="certified", reason="Exact Codex CLI/daemon build passed CAC's native recovery tests.", **values)
-            reason = f"Codex CLI {values['cli_version']} / daemon {daemon.app_server_version} passes schema checks but is not behavior-certified for CAC {__version__}. Update CAC. Monitoring continues; queue writes are blocked."
+            provisional = Compatibility(status="untested", **values)
+            action = ("Balanced mode permits recovery with runtime checks. Select Status for evidence."
+                      if provisional.dispatch_allowed else "Queue writes are blocked. Use a certified stable build or update CAC.")
+            reason = f"Codex CLI {values['cli_version']} / daemon {daemon.app_server_version} passes schema checks but is not behavior-certified for CAC {__version__}. " + action
             return Compatibility(status="untested", reason=reason, **values)
         except (OSError, CodexCommandError, ProtocolError) as exc:
             failure("compatibility.verification_failed", exc, check=check, cliVersion=values["cli_version"],
                 daemonVersion=daemon.app_server_version, errorCode=getattr(exc, "errno", None))
             return Compatibility(status="unverified", reason=f"Cannot verify Codex {check}. Scanning and queue writes are blocked. Check daemon health, file permissions and local telemetry; update CAC if the interface changed.", read_allowed=False, **values)
 
-    def recheck(self, cli: str, user_agent: str, timeout: float) -> Compatibility:
+    def recheck(self, cli: str, user_agent: str, timeout: float, policy: str = "strict") -> Compatibility:
         try:
-            return self.inspect(cli, daemon_version(cli, timeout), user_agent, timeout)
+            return self.inspect(cli, daemon_version(cli, timeout), user_agent, timeout, policy)
         except (CodexCommandError, ProtocolError) as exc:
             failure("compatibility.identity_unavailable", exc)
-            return Compatibility(reason="Codex daemon identity is unavailable or unsupported. Scanning and queue writes are blocked; CAC will recheck. Inspect daemon health and local telemetry.", read_allowed=False)
+            return Compatibility(reason="Codex daemon identity is unavailable or unsupported. Scanning and queue writes are blocked; CAC will recheck. Inspect daemon health and local telemetry.", read_allowed=False, policy=policy)

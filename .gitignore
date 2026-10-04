@@ -6,6 +6,7 @@
 /Docs/Audits/.audit.lock
 /.data/
 /App/
+/.cac-updates/
 /data/
 /settings.toml
 /continue-prompt.md
@@ -13,6 +14,10 @@
 /runtime-status.json
 /telemetry.jsonl*
 /tray.jsonl*
+/updates.jsonl*
+/update-status.json
+/notifications.json
+/tray-ready.json
 /telemetry.key
 /owner.json
 .env

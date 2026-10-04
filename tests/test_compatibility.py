@@ -82,6 +82,14 @@ def test_exact_tuple_requires_behavioral_certificate_not_just_matching_schema(tm
     gate.record["certificates"] = []
     result = gate.inspect(str(binary), daemon, "cac/0.160.0 (Windows)", 1)
     assert result.status == "untested" and result.read_allowed and not result.dispatch_allowed
+    balanced = gate.inspect(str(binary), daemon, "cac/0.160.0 (Windows)", 1, "balanced")
+    assert balanced.dispatch_allowed and balanced.status == "untested" and balanced.policy == "balanced"
+
+
+def test_balanced_does_not_allow_prereleases_or_invalid_identity():
+    for version in ("0.173.0-beta.1", "", "0.173"):
+        assert not Compatibility(status="untested", policy="balanced", cli_version=version,
+                                 app_server_version=version).dispatch_allowed
 
 
 def test_standalone_server_never_borrows_a_matching_cli_schema_or_certificate(tmp_path, monkeypatch):

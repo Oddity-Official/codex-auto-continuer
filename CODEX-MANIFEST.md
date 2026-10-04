@@ -8,6 +8,14 @@ Updated: 2026-10-04
 
 All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba04` preserves v001 and its original checksum manifest. ChatGPT's manifest is unchanged. The stale imported checksum file is not retained as a current-source checksum; each new transport owns its generated manifest.
 
+## CAC 0.5.0 implementation
+
+- Balanced defaults permit schema-verified stable Codex builds; Strict retains exact-build certification. Status explains evidence and unknown builds get deduplicated non-modal notices.
+- Unresolved ambiguous submissions isolate only their chat without retrying. Delivery observations require terminal completion evidence, preserving separate-writer incomplete history across restart.
+- Signed stable CAC updates pin a publisher key, verify archive/file checksums, keep downloads off monitoring controls, finish cycles before replacement and preserve current runtime state through code-only rollback. The publisher key is encrypted locally and excluded from source; CI receives it through a GitHub Actions secret.
+- The authorized publisher repository is private `Oddity-Official/codex-auto-continuer`. Native recovery passed 11 scenarios in 88.45 seconds; final expanded tests and release/update verification remain in progress. Current results are owned by Docs/VALIDATION.md.
+- The existing installed 0.4.0 App and user data are unchanged at this implementation checkpoint. The prior validation is preserved in dated history; ChatGPT's manifest remains unchanged.
+
 ## Local product changes since the base
 
 - Native Windows socket transport, exact-thread separate-writer queue handling, quota-only authority, 24-hour discovery, durable obligations, stale cancellation and conservative ambiguous-send recovery.

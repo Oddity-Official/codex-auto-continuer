@@ -6,14 +6,14 @@ This is an independent tool, not an OpenAI product. It uses experimental local C
 
 ## Launch and use
 
-1. Extract `codex-auto-continuer-0.4.0-windows-x86_64.zip` into a writable folder. Keep both EXEs and `_internal` together.
+1. Extract the [latest stable release](https://github.com/Oddity-Official/codex-auto-continuer/releases/latest) into a writable folder. Keep both EXEs and `_internal` together.
 2. Launch `CodexAutoContinuer.exe`. Monitoring starts automatically. Look in Windows' hidden tray icons if needed.
 3. Right-click the tray icon. Select `Start With Windows` to enable per-user login launch.
 4. Select `Modify Prompt` to open `data/continue-prompt.md` in your default Markdown editor. The default is simply `Continue`. Save as UTF-8; the next continuation reads the saved file.
 
 You need Windows 11 x86_64 and a signed-in native Codex installation. The release bundles Python and tray dependencies; users do not need Python, PowerShell 7, WSL or administrator rights. Startup management can use Windows' built-in PowerShell.
 
-The official Windows Codex 0.160.0 CLI/daemon build is certified for CAC 0.4.0. Untested versions or custom builds can still record failures when their read contract matches, but cannot submit or delete queued work. Red `Status` explains the block; `status --live` reports exact versions, binary hashes and schema results. [Compatibility](Docs/COMPATIBILITY.md) explains certification and daily upstream probes.
+CAC 0.5.0 certifies the official Windows Codex 0.160.0 CLI/daemon build. Default Balanced mode also permits unknown stable builds after identity, schema and runtime checks, with an untested notice. Strict mode requires an exact recovery certificate. Status explains the evidence; real contract/identity failures block writes and preserve pending work. [Compatibility](Docs/COMPATIBILITY.md) owns policy and daily upstream probes.
 
 CAC finds a native `codex.exe` on `PATH`, in the standard Desktop installation, or behind the npm launcher. Set `codex_executable` in settings for another absolute native EXE path. CAC never updates, pins or downgrades your Codex installation.
 
@@ -63,7 +63,7 @@ The queue has no verified atomic turn precondition or idempotent-send guarantee.
 
 ## Local telemetry and privacy
 
-There is no remote analytics, upload endpoint or automatic updater. Codex's own network traffic and telemetry are separate.
+There is no remote analytics or diagnostic upload. The [signed updater](Docs/UPDATES.md) requests GitHub releases every 6 hours without sending chat data. Set `auto_update = false` for manual updates. The repository is private during testing; public sharing will not require a GitHub login. Codex's own network traffic and telemetry are separate.
 
 Beside the EXEs, `data/` holds settings, prompt, pending state, local status and compact JSONL logs. Logs retain quota failures, recovery decisions, dispatch results, subsequent-turn observations and RPC timings so a later investigation can follow an entire recovery.
 
@@ -93,7 +93,7 @@ Our preference is about fit: native Windows, existing interactive chats, exact-t
 
 ## Development and repository layout
 
-[Contributing](CONTRIBUTING.md) covers the isolated Python setup, Windows verification, source launch and release build. Windows CI runs the tests and produces a clean portable ZIP and wheel; it does not publish releases automatically.
+[Contributing](CONTRIBUTING.md) covers isolated Python setup, Windows verification, source launch and release build. Verification CI builds clean candidates. The separate signed-release workflow publishes tested stable releases from tags or manual dispatch.
 
 [Native continuation tests](Docs/CONTINUATION-TESTS.md) exercise the installed Codex executable and CAC recovery engine against local quota and response fixtures. No real login, account exhaustion or user-chat continuation is needed. This proves the controlled native recovery chain, not a natural service reset or every client UI.
 

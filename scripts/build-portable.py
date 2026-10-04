@@ -53,7 +53,7 @@ def main():
         shutil.copy2(ROOT / "Licenses/Codex-LICENSE.txt", notices / "Codex-LICENSE.txt")
         shutil.copy2(ROOT / "Licenses/Codex-NOTICE.txt", notices / "Codex-NOTICE.txt")
         shutil.copy2(Path(sys.base_prefix) / "LICENSE.txt", notices / "Python-LICENSE.txt")
-        for package in ("pystray", "Pillow", "six", "tomlkit", "PyInstaller"):
+        for package in ("pystray", "Pillow", "six", "tomlkit", "cryptography", "cffi", "pycparser", "PyInstaller"):
             dist = importlib.metadata.distribution(package)
             for item in dist.files or []:
                 if "license" in str(item).lower() or Path(item).name.lower().startswith("copying"):
@@ -71,7 +71,7 @@ def main():
         files = sorted(p for p in bundle.rglob("*") if p.is_file())
         manifest = {"version": __version__, "platform": "windows-x86_64",
                     "python": sys.version.split()[0], "dependencies": {
-                        name: importlib.metadata.version(name) for name in ("pystray", "Pillow", "six", "tomlkit", "PyInstaller")
+                        name: importlib.metadata.version(name) for name in ("pystray", "Pillow", "six", "tomlkit", "cryptography", "cffi", "pycparser", "PyInstaller")
                     }, "files": {
             p.relative_to(bundle).as_posix(): {"bytes": p.stat().st_size, "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
             for p in files}}

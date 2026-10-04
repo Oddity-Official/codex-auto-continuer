@@ -5,7 +5,8 @@ root = Path(SPECPATH).parent
 icon = os.environ["CAC_BUILD_ICON"]
 common = dict(pathex=[str(root / "src")], hiddenimports=["pystray._win32"],
               datas=[(str(root / "src/codex_auto_continuer/assets"), "codex_auto_continuer/assets"),
-                     (str(root / "src/codex_auto_continuer/compatibility.json"), "codex_auto_continuer")],
+                     (str(root / "src/codex_auto_continuer/compatibility.json"), "codex_auto_continuer"),
+                     (str(root / "src/codex_auto_continuer/updates.json"), "codex_auto_continuer")],
               excludes=["tkinter", "pytest", "numpy", "matplotlib", "torch", "resvg_py"], noarchive=True)
 gui = Analysis([str(root / "scripts/gui-entry.py")], **common)
 cli = Analysis([str(root / "scripts/cli-entry.py")], **common)

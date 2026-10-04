@@ -1,6 +1,6 @@
 # Security and safe reporting
 
-CAC is an independent local tool using experimental Codex interfaces. It has no remote analytics, log upload or automatic updater. It does not collect credentials, conversation bodies or prompt text. Codex's own network behavior is separate.
+CAC is an independent local tool using experimental Codex interfaces. It has no remote analytics or log upload. The [signed updater](Docs/UPDATES.md) requests GitHub releases without sending chat data. Optional private-repository authentication uses an existing GitHub CLI token only in memory, never in logs or release assets. Codex credentials, conversation bodies and prompt text are not collected. Codex's network behavior is separate.
 
 ## Share diagnostics safely
 

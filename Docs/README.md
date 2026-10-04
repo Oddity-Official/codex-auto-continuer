@@ -11,7 +11,8 @@
 
 - [Product contract](PRODUCT.md): goals, required behavior and non-goals
 - [Architecture](ARCHITECTURE.md): runtime, app-server integration, state machine and safety behavior
-- [Compatibility](COMPATIBILITY.md): exact Codex certification, blocked-state policy and scheduled upstream checks
+- [Compatibility](COMPATIBILITY.md): Balanced and Strict policies, exact certificates and scheduled upstream checks
+- [Updates](UPDATES.md): signed stable CAC releases, private-repository authentication and code-only rollback
 - [Research and provenance](RESEARCH.md): verified facts, inferences and remaining native questions
 - [Native continuation tests](CONTINUATION-TESTS.md): repeatable isolated recovery scenarios without real account usage
 - [Third-party components](THIRD-PARTY.md): bundled dependency notices and replacement/source locations
@@ -25,6 +26,9 @@ These sanitized records are public and Git-tracked, but excluded from binary rel
 - [ChatGPT manifest](../CHAT-MANIFEST.md) and [Codex manifest](../CODEX-MANIFEST.md): checkpoint ownership and local verification provenance
 
 ## Historical records
+
+- [Natural Desktop recovery, 4 October 2026](History/2026-10-04-natural-recovery.md)
+- [Native 0.4.0 verification, 4 October 2026](History/2026-10-04-native-0.4.0-validation.md)
 
 - [ChatGPT v001 verification, 3 October 2026](History/2026-10-03-chatgpt-v001-validation.md)
 - [Native 0.3.0 extension and icon verification, 4 October 2026](History/2026-10-04-native-0.3.0-validation.md)
