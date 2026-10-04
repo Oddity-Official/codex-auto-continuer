@@ -51,7 +51,7 @@ Local interactive CLI, VS Code extension and Desktop sessions are selected by de
 
 Shared internals do not guarantee shared chats: clients may use different homes, accounts or app-server processes. CAC checks the exact active writer and uses Codex's shared queue without stealing ownership. [Native research](Docs/RESEARCH.md) records the tested recovery path and source-filter rules.
 
-Remote, cloud, WSL, different Windows users, different `CODEX_HOME` directories and different accounts are not automatically covered. Real CLI queue delivery and Desktop-owned server delivery have native evidence. The installed VS Code extension's native owner also passed isolated filtering and quota-recovery tests. Visual chat rendering and a natural account reset remain unobserved.
+Remote, cloud, WSL, different Windows users, different `CODEX_HOME` directories and different accounts are not automatically covered. Real CLI queue delivery and Desktop-owned server delivery have native evidence. An installed VS Code extension's native owner also passed isolated filtering and quota-recovery tests. [One natural Desktop recovery](Docs/History/2026-10-04-natural-recovery.md) was observed; visual chat rendering and universal client coverage are not established by those checks.
 
 ## Recovery policy
 

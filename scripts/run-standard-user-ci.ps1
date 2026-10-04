@@ -25,6 +25,7 @@ $registered = $false
 try {
     $user = New-LocalUser -Name $identity -Password $password -AccountNeverExpires -PasswordNeverExpires
     Add-LocalGroupMember -SID 'S-1-5-32-545' -Member $user
+    & (Join-Path $PSScriptRoot 'run-project-command.ps1') -FileName 'wevtutil.exe' -Arguments @('sl', 'Microsoft-Windows-TaskScheduler/Operational', '/e:true') -TimeoutSeconds 15
     & (Join-Path $PSScriptRoot 'run-project-command.ps1') -FileName (Get-Command icacls.exe).Source -Arguments @(
         $root, '/grant', "$($env:COMPUTERNAME)\${identity}:(OI)(CI)M"
     ) -TimeoutSeconds 30
@@ -39,18 +40,21 @@ try {
     $registered = $true
     Start-ScheduledTask -TaskName $identity
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds + 30)
+    $startupDeadline = [DateTime]::UtcNow.AddSeconds(30)
     $resultPath = Join-Path $directory 'result.json'
+    $logPath = Join-Path $directory 'output.txt'
     while (-not (Test-Path -LiteralPath $resultPath) -and [DateTime]::UtcNow -lt $deadline) {
         Start-Sleep -Milliseconds 500
         $task = Get-ScheduledTask -TaskName $identity
         $info = Get-ScheduledTaskInfo -TaskName $identity
         if ($task.State -eq 'Ready' -and $info.LastRunTime -gt [DateTime]::Now.AddMinutes(-10)) { break }
+        if (-not (Test-Path -LiteralPath $logPath) -and [DateTime]::UtcNow -gt $startupDeadline) { break }
     }
     $logPath = Join-Path $directory 'output.txt'
     if (Test-Path -LiteralPath $logPath) { Get-Content -LiteralPath $logPath -Raw | Write-Host }
     if (-not (Test-Path -LiteralPath $resultPath)) {
         $task = Get-ScheduledTask -TaskName $identity
-        Write-Host ($task | Select-Object State, Principal, Settings | ConvertTo-Json -Depth 5)
+        Write-Host (Export-ScheduledTask -TaskName $identity)
         Get-WinEvent -FilterHashtable @{ LogName = 'Microsoft-Windows-TaskScheduler/Operational'; StartTime = [DateTime]::Now.AddMinutes(-10) } -ErrorAction SilentlyContinue |
             Where-Object { $_.Message -like "*$identity*" } | Select-Object -Last 10 -Property Id, Message | ConvertTo-Json | Write-Host
         Stop-ScheduledTask -TaskName $identity
