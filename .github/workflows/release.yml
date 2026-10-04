@@ -42,7 +42,7 @@ jobs:
           & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('scripts/download-probe-codex.py','--version','0.160.0','--destination','.data/codex') -TimeoutSeconds 240
           $download = Get-Content -LiteralPath '.data/codex/download.json' -Raw | ConvertFrom-Json
           $binary = Join-Path "$PWD/.data/codex" $download.binary
-          ./scripts/verify-continuation.ps1 -CodexPath $binary
+          & ./scripts/run-standard-user-ci.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m','pytest','integration/test_continuation.py','integration/test_compatibility.py','-q','-s','--tb=short','--codex-executable',$binary) -TimeoutSeconds 300
       - name: Build portable ZIP and wheel
         run: |
           ./scripts/build-portable.ps1

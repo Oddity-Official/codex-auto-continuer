@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from codex_auto_continuer.updates import TRUST, parse_json, verify_zip, write_json
+from codex_auto_continuer.state import STATE_VERSION
 
 KEY = ROOT / ".data/release-signing.dpapi"
 REPOSITORY = "Oddity-Official/codex-auto-continuer"
@@ -83,7 +84,7 @@ def main():
     with zipfile.ZipFile(args.archive) as archive:
         manifest = parse_json(archive.read("CodexAutoContinuer/RELEASE-MANIFEST.json"))
     record = {"format": 1, "repository": trust["repository"], "version": manifest["version"],
-              "platform": "windows-x86_64", "asset": args.archive.name, "state_schema": 2,
+              "platform": "windows-x86_64", "asset": args.archive.name, "state_schema": STATE_VERSION,
               "bytes": args.archive.stat().st_size, "sha256": hashlib.sha256(args.archive.read_bytes()).hexdigest()}
     verify_zip(args.archive, record)
     payload = (json.dumps(record, sort_keys=True, indent=2) + "\n").encode()

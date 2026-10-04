@@ -46,7 +46,8 @@ def _parser() -> argparse.ArgumentParser:
     init.add_argument("--force", action="store_true")
     sub.add_parser("install-startup", help="Install per-user Windows Startup launcher.")
     sub.add_parser("uninstall-startup", help="Remove the managed Windows Startup launcher.")
-    sub.add_parser("tray", help="Open the system tray tool and start monitoring.")
+    tray = sub.add_parser("tray", help="Open the system tray tool and start monitoring.")
+    tray.add_argument("--no-monitor", action="store_true", help=argparse.SUPPRESS)
     sub.add_parser("modify-prompt", help="Open the Markdown continuation prompt with its associated editor.")
     sub.add_parser("open-config", help="Create annotated TOML settings if missing and open the editor.")
     sub.add_parser("open-logs", help="Open the local telemetry folder.")
@@ -288,7 +289,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if command == "tray":
             from .tray import run_tray
-            return run_tray(args.config)
+            return run_tray(args.config, start_monitor=not args.no_monitor)
         if command in {"modify-prompt", "open-config", "open-logs"}:
             open_local(command, args.config)
             return 0

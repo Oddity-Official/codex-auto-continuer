@@ -2,7 +2,7 @@
 
 Portable CAC checks stable GitHub Releases every 6 hours and installs newer verified releases automatically. Set `auto_update = false` for manual updates. `Check For Updates` checks and installs a newer release; console equivalents are `update check` and `update apply`. Source and pip installations stay managed by their developer or package manager.
 
-CAC updates itself, never Codex. Monitoring controls and editors stay responsive during downloads. Installation waits for the supervisor cycle to finish, then restarts CAC at the same path. Windows login shortcuts remain valid. Prompts, settings, pending obligations and telemetry are never replaced by release contents.
+CAC updates itself, never Codex. Monitoring controls and editors stay responsive during downloads. Installation waits for the supervisor cycle, then restarts CAC at the same path while preserving stopped/monitoring intent. Turning off automatic updates during a download prevents automatic installation. Windows login shortcuts remain valid. Prompts, settings, pending obligations and telemetry are never replaced by release contents.
 
 ## Publisher and authentication
 

@@ -56,6 +56,7 @@ class TrayController:
         self._log_settings = self.log_settings(self.cfg)
         self._last_update_check = 0
         self._update_busy = False
+        self._installing = False
         self._notices = set()
         notice_file = config_file.parent / "notifications.json"
         if notice_file.exists():
@@ -95,6 +96,9 @@ class TrayController:
     def enqueue(self, label: str, *arguments: str) -> None:
         if self.done.is_set():
             return
+        if label == "quit" and self._installing:
+            self.icon.notify("CAC is finishing a verified update. Exit will be available after restart or rollback.", "CAC")
+            return
         with self._guard:
             self._pending += 1
             self.busy = True
@@ -114,6 +118,8 @@ class TrayController:
                     self.icon.stop()
                     return
                 telemetry.emit("tray.action", action=label)
+                if label == "update":
+                    self._installing = True
                 output = self.command(*arguments)
                 if label in {"update", "auto-update"}:
                     result = json.loads(output)
@@ -124,6 +130,8 @@ class TrayController:
                 if label == "reset":
                     self.icon.notify("Default settings restored. Your prompt, pending work, logs and login shortcut were preserved.", "CAC")
             except Exception as exc:
+                if label == "update":
+                    self._installing = False
                 try:
                     telemetry.failure("tray.action_failed", exc, action=label)
                 except OSError:
@@ -201,6 +209,7 @@ class TrayController:
             except (OSError, AutoContinuerError):
                 updates = {"status": "failed", "reason": "Update status is unreadable. Inspect update-status.json; monitoring continues."}
             if updates.get("status") in {"failed", "rolled_back"}:
+                self._installing = False
                 self.notify_once("update:" + str(updates.get("job")), updates.get("reason", "CAC update was rolled back. Select Status and inspect the recovery journal; runtime data was preserved."))
         self._last_phase = self.state
 
@@ -225,7 +234,7 @@ class TrayController:
             try:
                 result = json.loads(self.command("update", "stage"))
                 telemetry.emit("update.checked", status=result["status"], version=result.get("version"))
-                if result["status"] == "staged" and not self.done.is_set():
+                if result["status"] == "staged" and not self.done.is_set() and (not automatic or self.cfg.auto_update):
                     self.enqueue("update", "update", "install", result["job"])
                 elif not automatic and not self.done.is_set():
                     self.icon.notify(f"Updates: {result['status']}. Select Status for details.", "CAC")
@@ -308,7 +317,7 @@ class TrayController:
         from pystray import Menu, MenuItem as Item
         def action(label, *arguments):
             return lambda icon, item: self.enqueue(label, *arguments)
-        available = lambda item: not self.busy
+        available = lambda item: not self.busy and not self._installing
         def client_action(value):
             return lambda icon, item: self.select_clients(value)
         client_items = [Item(label, client_action(value),
@@ -317,8 +326,8 @@ class TrayController:
         return Menu(
             Item(lambda item: f"Status: {self.status_label()}", lambda icon, item: self.show_status(), default=True),
             Menu.SEPARATOR,
-            Item("Start Monitoring", action("start", "start"), enabled=lambda item: not self.busy and bool(self.cfg.clients) and not self.running),
-            Item("Stop Monitoring", action("stop", "stop"), enabled=lambda item: not self.busy and self.running),
+            Item("Start Monitoring", action("start", "start"), enabled=lambda item: available(item) and bool(self.cfg.clients) and not self.running),
+            Item("Stop Monitoring", action("stop", "stop"), enabled=lambda item: available(item) and self.running),
             Item("Clients To Monitor", Menu(*client_items, Item("All", lambda icon, item: self.select_clients("all"),
                  checked=lambda item: set(self.cfg.clients) == set(ALL_CLIENTS), enabled=available))),
             Item("Start With Windows", lambda icon, item: self.enqueue("startup", "uninstall-startup" if startup_path().exists() else "install-startup"),
@@ -334,11 +343,11 @@ class TrayController:
             Item("Check For Updates", lambda icon, item: self.check_updates(), enabled=lambda item: not self._update_busy),
             Menu.SEPARATOR,
             Item(f"About CAC {__version__}", lambda icon, item: self.about()),
-            Item("Exit CAC", action("quit")),
+            Item("Exit CAC", action("quit"), enabled=lambda item: not self._installing),
         )
 
 
-def run_tray(config_file: Path) -> int:
+def run_tray(config_file: Path, *, start_monitor=True) -> int:
     if os.name != "nt":
         raise AutoContinuerError("The system tray application currently supports Windows only.")
     from .windows_tray import TrayIcon
@@ -355,7 +364,7 @@ def run_tray(config_file: Path) -> int:
                 threading.Thread(target=controller.worker, name="CAC-controls", daemon=True).start()
                 threading.Thread(target=controller.watch, name="CAC-status", daemon=True).start()
                 controller.refresh()
-                if not controller.problem:
+                if start_monitor and not controller.problem:
                     controller.enqueue("start", "start")
             try:
                 controller.icon.run(setup=ready)

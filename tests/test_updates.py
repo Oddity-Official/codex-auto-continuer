@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import shutil
+import time
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -249,14 +250,37 @@ def test_health_failure_automatically_rolls_back_code_and_restarts_previous_buil
     order = []
     monkeypatch.setattr(update_install, "stop_monitor", lambda *_: order.append("cycle_finished"))
     monkeypatch.setattr(update_install, "stop_tray", lambda *_: order.append("tray_stopped"))
-    def health(app_root, settings, expected):
+    def health(app_root, settings, expected, *, start_monitor):
+        assert start_monitor is False
         order.append(expected)
         if expected == "0.6.0":
             (app_root / "data/state.json").write_bytes(b"newer state, never restore an older copy")
             raise UpdateError("Injected startup failure")
     monkeypatch.setattr(update_install, "start_and_check", health)
+    monkeypatch.setattr(update_install, "owns_monitor", lambda _: False)
     assert update_install.run_worker(job) == 1
     assert order == ["cycle_finished", "tray_stopped", "0.6.0", "0.5.0"]
     assert (app / "CodexAutoContinuer.exe").read_bytes() == b"old GUI"
     assert (app / "data/state.json").read_bytes() == b"newer state, never restore an older copy"
     assert updates.parse_json(job.read_bytes())["status"] == "rolled_back"
+
+
+def test_disabling_auto_update_during_download_prevents_installation(tmp_path, monkeypatch):
+    import threading
+    from dataclasses import replace
+    from codex_auto_continuer import tray
+    controller = tray.TrayController(tmp_path / "settings.toml")
+    started, release = threading.Event(), threading.Event()
+    def download(*_):
+        started.set()
+        assert release.wait(2)
+        return json.dumps({"status": "staged", "job": "fixture-job"})
+    monkeypatch.setattr(controller, "command", download)
+    controller.check_updates(automatic=True)
+    assert started.wait(1)
+    controller.cfg = replace(controller.cfg, auto_update=False)
+    release.set()
+    deadline = time.monotonic() + 2
+    while controller._update_busy and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert not controller._update_busy and controller.actions.empty()

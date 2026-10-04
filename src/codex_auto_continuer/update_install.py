@@ -97,10 +97,13 @@ def stop_monitor(app: Path, config: Path) -> None:
         raise UpdateError("CAC could not finish its current cycle within the update stop deadline. Pending work and code remain unchanged.")
 
 
-def start_and_check(app: Path, config: Path, expected: str) -> None:
+def start_and_check(app: Path, config: Path, expected: str, *, start_monitor=True) -> None:
     ready = config.parent / "tray-ready.json"
     ready.unlink(missing_ok=True)
-    process = subprocess.Popen([str(app / "CodexAutoContinuer.exe"), "--config", str(config), "tray"],
+    arguments = [str(app / "CodexAutoContinuer.exe"), "--config", str(config), "tray"]
+    if not start_monitor and version(expected) >= (0, 5, 0):
+        arguments.append("--no-monitor")
+    process = subprocess.Popen(arguments,
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         creationflags=subprocess.CREATE_NO_WINDOW)
     deadline = time.monotonic() + 30
@@ -229,24 +232,27 @@ def run_worker(job: Path, *, recover=False) -> int:
                     if time.monotonic() > deadline:
                         raise UpdateError("The requesting CAC command did not exit; code was not replaced.")
                     time.sleep(0.1)
+            if "restart_monitor" not in request:
+                request["restart_monitor"] = owns_monitor(config)
+                write_json(job, request)
             stop_monitor(app, config)
             stop_tray(request.get("tray_pid"), app)
             setup(config.parent / "updates.jsonl", load_config(config))
             emit("update.cycle_finished", oldVersion=request["old_version"], newVersion=request["version"])
             if recover:
                 replacement.restore()
-                start_and_check(app, config, request["old_version"])
+                start_and_check(app, config, request["old_version"], start_monitor=request["restart_monitor"])
             else:
                 try:
                     replacement.apply()
                     verify_bundle_code(app, manifest)
-                    start_and_check(app, config, request["version"])
+                    start_and_check(app, config, request["version"], start_monitor=request["restart_monitor"])
                     request["status"] = "completed"
                     replacement.save()
                 except Exception:
                     if request.get("status") in {"applying", "health_check"}:
                         replacement.restore()
-                        start_and_check(app, config, request["old_version"])
+                        start_and_check(app, config, request["old_version"], start_monitor=request["restart_monitor"])
                     raise
             write_json(config.parent / "update-status.json", {"status": request["status"], "version": request["version"] if request["status"] == "completed" else request["old_version"],
                 "checkedAt": time.time(), "job": str(job), "recovery": str(replacement.recovery)})
