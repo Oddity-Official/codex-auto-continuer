@@ -20,7 +20,7 @@ The guarded minimum version is 0.160.0. Only that installation has current nativ
 
 Windows Python does not export socket.AF_UNIX, but Winsock supports Unix-domain sockets. The Python-owned socket plus ctypes address bridge passed native tests and real daemon connections.
 
-A live Desktop sample contained 74 vscode-source chats with Codex Desktop originator. Source alone cannot distinguish Desktop from the extension. Desktop-only mode checks both; default allInteractive includes both kinds and CLI.
+A live Desktop sample contained 74 vscode-source chats with Codex Desktop originator. Source alone cannot distinguish Desktop from the extension. Independent client selection uses both; the default selects Desktop, VS Code and CLI.
 
 A separately owned server reported notLoaded through the daemon. Resume returned -32600 with the exact thread's active-writer error. Shared-queue submission reached the original owner and completed. Unrelated resume errors remain fatal.
 
@@ -61,7 +61,7 @@ Structured targeting is not unique to this project. Our chosen fit is portable n
 
 ## Packaging choices
 
-[pystray's public API](https://pystray.readthedocs.io/en/latest/usage.html) supplies native Windows menus and notifications. Pillow generates our own icon; no OpenAI artwork is reused. We do not implement a second tray framework.
+[pystray's public API](https://pystray.readthedocs.io/en/latest/usage.html) supplies native Windows menus and notifications. A project-owned SVG master generates state PNGs and the EXE icon at build time; Pillow loads and resizes them at runtime. No OpenAI artwork is reused. We do not implement a second tray framework.
 
 [PyInstaller's folder mode](https://pyinstaller.org/en/stable/operating-mode.html) avoids repeated self-extraction and lets the bundled LGPL tray library remain replaceable. Matching tray source and original notices travel with releases. Builds happen in a virtual environment, not by changing unrelated globally installed dependencies.
 

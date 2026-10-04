@@ -7,13 +7,15 @@ import sys
 import os
 import subprocess
 import time
+import uuid
+import tempfile
 from dataclasses import asdict, replace
 from pathlib import Path
 
 from . import __version__
 from .codex import codex_version, ensure_daemon, find_codex
 from .config import (default_config_path, load_config, lock_path, log_path, state_path, stop_path,
-                     write_config, initialize_files, prompt_path, read_prompt, save_config, scan_path, owner_path)
+                     Config, ALL_CLIENTS, write_config, initialize_files, prompt_path, read_prompt, save_config, scan_path, owner_path)
 from .errors import AutoContinuerError
 from .instance_lock import SingleInstanceLock, is_running
 from .state import load_state
@@ -21,12 +23,14 @@ from .startup import launch_command, install_startup, uninstall_startup, startup
 from .supervisor import Supervisor, _parse_rate_limits, observed_interactive_sources
 from .appserver import AppServerClient
 from . import telemetry
+from .actions import open_local
+from .status import read_runtime, owns_monitor, phase
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="codex-auto-continuer")
     parser.add_argument("--version", action="version", version=__version__)
-    parser.add_argument("--config", type=Path, default=None, help="Config JSON path; state, prompt and logs use its directory.")
+    parser.add_argument("--config", type=Path, default=None, help="TOML settings path; state, prompt and logs use its directory.")
     sub = parser.add_subparsers(dest="command")
     run = sub.add_parser("run", help="Run continuously.")
     run.add_argument("--background", action="store_true", help=argparse.SUPPRESS)
@@ -34,7 +38,8 @@ def _parser() -> argparse.ArgumentParser:
     sub.add_parser("start", help="Start one hidden background supervisor on Windows.")
     sub.add_parser("stop", help="Stop the supervisor after its current cycle; keep pending obligations.")
     sub.add_parser("restart", help="Restart monitoring with saved settings.")
-    sub.add_parser("status", help="Read current Codex quota/source state and pending obligations.")
+    status = sub.add_parser("status", help="Read local monitoring status and pending obligations.")
+    status.add_argument("--live", action="store_true", help="Also request fresh quota/source information from Codex.")
     sub.add_parser("config-path", help="Print the effective config path.")
     init = sub.add_parser("init", help="Write a default config file.")
     init.add_argument("--force", action="store_true")
@@ -42,13 +47,15 @@ def _parser() -> argparse.ArgumentParser:
     sub.add_parser("uninstall-startup", help="Remove the managed Windows Startup launcher.")
     sub.add_parser("tray", help="Open the system tray tool and start monitoring.")
     sub.add_parser("modify-prompt", help="Open the Markdown continuation prompt with its associated editor.")
-    sub.add_parser("open-config", help="Open settings with the associated JSON editor.")
+    sub.add_parser("open-config", help="Create annotated TOML settings if missing and open the editor.")
     sub.add_parser("open-logs", help="Open the local telemetry folder.")
     sub.add_parser("scan", help="Wake the running supervisor for a scan, or run one cycle if stopped.")
-    scope = sub.add_parser("scope", help="Select clients and restart the running supervisor.")
-    scope.add_argument("value", choices=["allInteractive", "desktop"])
-    privacy = sub.add_parser("logging", help="Select local telemetry privacy and restart the running supervisor.")
+    clients = sub.add_parser("clients", help="Select any client combination, all, or no clients to pause.")
+    clients.add_argument("values", nargs="*", choices=[*ALL_CLIENTS, "all"])
+    privacy = sub.add_parser("logging", help="Select local telemetry privacy for subsequent events.")
     privacy.add_argument("value", choices=["private", "detailed"])
+    reset = sub.add_parser("restore-defaults", help="Restore settings, preserving the prompt, pending work, logs and startup shortcut.")
+    reset.add_argument("--prompt-file", help=argparse.SUPPRESS)
     return parser
 
 
@@ -62,24 +69,15 @@ def _setup_logging(background: bool = False) -> None:
     )
 
 
-def _status(config_path: Path | None) -> int:
+def _status(config_path: Path, live: bool = False) -> int:
     cfg = load_config(config_path)
-    codex_bin = find_codex(cfg.codex_executable)
-    cli_version = codex_version(codex_bin, cfg.codex_command_timeout_seconds)
-    daemon = ensure_daemon(codex_bin, cfg.codex_command_timeout_seconds, cfg.auto_start_daemon)
-    client = AppServerClient.connect(daemon.socket_path, cfg.rpc_timeout_seconds)
-    try:
-        limits = _parse_rate_limits(client.rate_limits())
-        sources = observed_interactive_sources(client)
-    finally:
-        client.close()
+    snapshot = read_runtime(config_path)
     state = load_state(state_path(config_path))
     output = {
-        "cliVersion": cli_version,
-        "appServerUserAgent": client.user_agent,
-        "ordinaryUsageAllowed": limits.ordinary_usage_allowed,
-        "nextResetAt": limits.next_reset_at,
-        "observedInteractiveSources": sources,
+        "version": __version__, "phase": phase(config_path, snapshot),
+        "ordinaryUsageAllowed": snapshot.get("ordinary_usage_allowed"),
+        "nextResetAt": snapshot.get("next_reset_at"),
+        "lastScanAt": snapshot.get("lastScanAt"), "lastScan": snapshot.get("lastScan"),
         "pendingObligations": [
             {
                 "threadId": x.thread_id,
@@ -93,13 +91,24 @@ def _status(config_path: Path | None) -> int:
         "statePath": str(state_path(config_path)),
         "logPath": str(log_path(config_path)),
         "lockPath": str(lock_path()),
-        "supervisorRunning": is_running(lock_path()),
-        "threadScope": cfg.thread_scope,
+        "supervisorRunning": owns_monitor(config_path),
+        "clients": list(cfg.clients),
         "detailedTelemetry": cfg.detailed_telemetry,
         "promptPath": str(prompt_path(cfg, config_path)),
         "startupInstalled": startup_path().exists() if os.name == "nt" else False,
         "deliveryObservations": len(state.observations),
     }
+    if live:
+        codex_bin = find_codex(cfg.codex_executable)
+        output["cliVersion"] = codex_version(codex_bin, cfg.codex_command_timeout_seconds)
+        daemon = ensure_daemon(codex_bin, cfg.codex_command_timeout_seconds, cfg.auto_start_daemon)
+        client = AppServerClient.connect(daemon.socket_path, cfg.rpc_timeout_seconds)
+        try:
+            limits = _parse_rate_limits(client.rate_limits())
+            output.update(ordinaryUsageAllowed=limits.ordinary_usage_allowed, nextResetAt=limits.next_reset_at,
+                          observedInteractiveSources=observed_interactive_sources(client), appServerUserAgent=client.user_agent)
+        finally:
+            client.close()
     print(json.dumps(output, indent=2))
     return 0
 
@@ -113,6 +122,7 @@ def _start(config_file: Path | None) -> int:
         _check_owner(config_file)
         print("The supervisor is already running.")
         return 0
+    initialize_files(config_file)
     process = subprocess.Popen(
         launch_command(config_file, "run", "--background"),
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -151,12 +161,9 @@ def _update_setting(config_file: Path, **changes) -> int:
     running = is_running(lock_path())
     if running:
         _check_owner(config_file)
-        _stop()
     cfg = load_config(config_file)
     save_config(config_file, replace(cfg, **changes))
-    if running:
-        return _start(config_file)
-    print("Settings saved.")
+    print("Settings saved; monitoring applies valid changes automatically." if running else "Settings saved.")
     return 0
 
 
@@ -174,6 +181,32 @@ def _stop() -> int:
     raise AutoContinuerError(f"Stop requested, but the current cycle is still finishing after 60s. Check {log_path()}.")
 
 
+def _request_scan(config_file: Path) -> int:
+    # Serialize requesters, not the monitor, so no caller's acknowledgement is overwritten.
+    with SingleInstanceLock(scan_path().with_suffix(".lock")):
+        _check_owner(config_file)
+        request_id = uuid.uuid4().hex
+        with tempfile.NamedTemporaryFile(mode="w", encoding="ascii", dir=scan_path().parent,
+                                         prefix=".scan-", delete=False) as handle:
+            temporary = Path(handle.name)
+            handle.write(request_id)
+        try:
+            os.replace(temporary, scan_path())
+        finally:
+            temporary.unlink(missing_ok=True)
+        print("Scan requested; waiting for completion.", flush=True)
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            snapshot = read_runtime(config_file)
+            if snapshot.get("scanRequestId") == request_id:
+                print(json.dumps(snapshot.get("lastScan", {}), indent=2))
+                return 0
+            if not owns_monitor(config_file) or snapshot.get("phase") == "failed":
+                raise AutoContinuerError("The scan could not complete because monitoring stopped or settings need repair. Open settings and telemetry.")
+            time.sleep(0.1)
+        raise AutoContinuerError("Scan was requested but completion was not observed within 60 seconds. Read status and telemetry; do not assume it completed.")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     command = args.command or "run"
@@ -185,8 +218,8 @@ def main(argv: list[str] | None = None) -> int:
             print(args.config or default_config_path())
             return 0
         if command == "init":
-            if args.force:
-                write_config(args.config, force=True)
+            if args.force or not args.config.exists():
+                write_config(args.config, force=args.force)
             initialize_files(args.config)
             print(args.config)
             return 0
@@ -200,12 +233,7 @@ def main(argv: list[str] | None = None) -> int:
             from .tray import run_tray
             return run_tray(args.config)
         if command in {"modify-prompt", "open-config", "open-logs"}:
-            cfg = initialize_files(args.config)
-            path = {"modify-prompt": prompt_path(cfg, args.config), "open-config": args.config,
-                    "open-logs": args.config.parent}[command]
-            if os.name != "nt":
-                raise AutoContinuerError("Associated-editor actions require Windows.")
-            os.startfile(path)
+            open_local(command, args.config)
             return 0
 
         _setup_logging(background)
@@ -219,18 +247,25 @@ def main(argv: list[str] | None = None) -> int:
                 _stop()
             return _start(args.config)
         if command == "status":
-            return _status(args.config)
-        if command == "scope":
-            return _update_setting(args.config, thread_scope=args.value)
+            return _status(args.config, args.live)
+        if command == "clients":
+            if "all" in args.values and len(args.values) != 1:
+                raise AutoContinuerError("Use clients all alone, or a combination of vscode, cli and desktop.")
+            return _update_setting(args.config, clients=ALL_CLIENTS if args.values == ["all"] else tuple(args.values))
         if command == "logging":
             return _update_setting(args.config, detailed_telemetry=args.value == "detailed")
-        if command == "scan" and is_running(lock_path()):
-            _check_owner(args.config)
-            scan_path().write_text("scan\n", encoding="ascii")
-            print("Scan requested.")
+        if command == "restore-defaults":
+            if is_running(lock_path()):
+                _check_owner(args.config)
+            selected_prompt = args.prompt_file or load_config(args.config).prompt_file
+            write_config(args.config, force=True)
+            save_config(args.config, replace(Config(), prompt_file=selected_prompt))
+            print("Default settings restored. Prompt, pending work, logs and login shortcut are unchanged.")
             return 0
+        if command == "scan" and is_running(lock_path()):
+            return _request_scan(args.config)
 
-        cfg = initialize_files(args.config) if not args.config.exists() else load_config(args.config)
+        cfg = initialize_files(args.config)
         read_prompt(prompt_path(cfg, args.config))
         with SingleInstanceLock(lock_path()):
             owns_runtime = True
@@ -239,14 +274,60 @@ def main(argv: list[str] | None = None) -> int:
             owner_path().write_text(json.dumps({"pid": os.getpid(), "configPath": str(args.config)}), encoding="utf-8")
             telemetry.setup(log_path(args.config), cfg)
             telemetry.emit("monitor.settings", **asdict(cfg), configPath=str(args.config))
+            last_result = {}
+            last_scan_at = None
+            completed_scan = None
+            requested_scan = None
             def on_cycle(result):
-                _snapshot(args.config, phase="monitoring", **result.__dict__)
+                nonlocal last_result, last_scan_at, completed_scan, requested_scan
+                last_result = result.__dict__
+                last_scan_at = time.time()
+                completed_scan = requested_scan or completed_scan
+                requested_scan = None
+                current_phase = "paused" if not supervisor.config.clients else "waiting" if result.pending else "monitoring"
+                _snapshot(args.config, phase=current_phase, **last_result, lastScan=dict(last_result),
+                          lastScanAt=last_scan_at, scanRequestId=completed_scan)
+            def settings_stamp():
+                paths = (args.config, prompt_path(cfg, args.config))
+                signatures = []
+                for path in paths:
+                    try:
+                        stat = path.stat()
+                        signatures.append((stat.st_mtime_ns, stat.st_size))
+                    except FileNotFoundError:
+                        signatures.append(None)
+                return tuple(signatures)
+            stamp = settings_stamp()
             def wake_requested():
+                nonlocal stamp, requested_scan
                 if scan_path().exists():
+                    requested_scan = scan_path().read_text(encoding="ascii").strip()
                     scan_path().unlink(missing_ok=True)
                     telemetry.emit("monitor.scan_requested")
                     return True
+                current_stamp = settings_stamp()
+                if current_stamp != stamp:
+                    stamp = current_stamp
+                    return True
                 return False
+            def reload_settings():
+                nonlocal cfg
+                updated = load_config(args.config)
+                read_prompt(prompt_path(updated, args.config))
+                if updated != cfg:
+                    log_settings = (updated.detailed_telemetry, updated.diagnostic_trace, updated.log_max_mb, updated.log_backups)
+                    previous = (cfg.detailed_telemetry, cfg.diagnostic_trace, cfg.log_max_mb, cfg.log_backups)
+                    if log_settings != previous:
+                        telemetry.setup(log_path(args.config), updated)
+                    cfg = updated
+                    telemetry.emit("monitor.settings_changed", **asdict(cfg))
+                return updated
+            def on_pause():
+                _snapshot(args.config, phase="failed", errorType="ConfigurationError", lastScan=last_result,
+                          lastScanAt=last_scan_at, reason="Settings or prompt need repair. Modify Settings or Modify Prompt, then save.")
+            def on_phase(value):
+                _snapshot(args.config, phase=value, lastScan=last_result, lastScanAt=last_scan_at,
+                          scanRequestId=completed_scan)
             supervisor = Supervisor(cfg, state_path(args.config), prompt_file=prompt_path(cfg, args.config), on_cycle=on_cycle)
             try:
                 _snapshot(args.config, phase="starting")
@@ -255,18 +336,28 @@ def main(argv: list[str] | None = None) -> int:
                     result = supervisor.run_cycle()
                     print(json.dumps(result.__dict__, indent=2))
                     return 0
-                supervisor.run_forever(stop_path().exists, wake_requested)
+                supervisor.run_forever(stop_path().exists, wake_requested, reload_settings, on_pause, on_phase)
                 return 0
             finally:
                 supervisor.close()
-                telemetry.emit("monitor.stopped")
-                _snapshot(args.config, phase="stopped")
+                try:
+                    telemetry.emit("monitor.stopped")
+                finally:
+                    _snapshot(args.config, phase="stopped", lastScan=last_result, lastScanAt=last_scan_at,
+                              scanRequestId=completed_scan)
     except KeyboardInterrupt:
         return 130
     except Exception as exc:
-        telemetry.failure("command.failed", exc, command=command)
+        try:
+            telemetry.failure("command.failed", exc, command=command)
+        except OSError:
+            pass  # The independent runtime snapshot and stderr report logging failures too.
         if owns_runtime:
-            _snapshot(args.config, phase="failed", errorType=type(exc).__name__)
+            try:
+                _snapshot(args.config, phase="failed", errorType=type(exc).__name__,
+                          reason="Monitoring stopped. Check settings, free space, permissions and local telemetry, then start after repair.")
+            except OSError:
+                pass  # Do not hide the original failure if the entire data folder is unwritable.
         logging.getLogger(__name__).error("%s", exc)
         if command == "tray" and os.name == "nt":
             from .tray import message

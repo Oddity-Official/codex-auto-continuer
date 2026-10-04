@@ -7,7 +7,7 @@ import pytest
 
 from codex_auto_continuer.config import Config, DEFAULT_CONTINUE_PROMPT
 from codex_auto_continuer.appserver import RpcError
-from codex_auto_continuer.errors import ProtocolError, TransportError
+from codex_auto_continuer.errors import ConfigurationError, ProtocolError, TransportError
 from codex_auto_continuer.state import Obligation, State, load_state, save_state
 from codex_auto_continuer.supervisor import (
     Supervisor,
@@ -79,6 +79,50 @@ def supervisor(tmp_path: Path, client: FakeClient, *, cfg=None, clock=lambda:100
     s=Supervisor(cfg or Config(dispatch_spacing_seconds=0), tmp_path/"state.json", clock=clock, sleep=lambda _:None)
     s.client=client
     return s
+
+
+@pytest.mark.parametrize("clients", [(), ("cli",), ("vscode",), ("desktop",), ("cli", "vscode"),
+                                     ("cli", "desktop"), ("vscode", "desktop"), ("vscode", "cli", "desktop")])
+def test_client_selection_uses_source_and_originator_without_executor_leakage(tmp_path, clients):
+    s = supervisor(tmp_path, FakeClient(), cfg=Config(clients=clients))
+    examples = [
+        ("cli", "Codex Desktop", "cli"), ("vscode", "VS Code extension", "vscode"),
+        ("vscode", "Codex Desktop", "desktop"), ({"custom": "chatgpt"}, None, "desktop"),
+        ("exec", "Codex Desktop", None), ({"subAgent": {}}, None, None), ("appServer", None, None),
+    ]
+    for source, originator, expected in examples:
+        metadata = thread(source=source)
+        metadata["originator"] = originator
+        assert s._scope_accepts(metadata) == (expected in clients if expected else False)
+
+
+def test_invalid_saved_settings_pause_without_losing_pending_work_then_recover(tmp_path):
+    client = FakeClient([thread()], {"t": failed_turn()}, allowed=False)
+    s = supervisor(tmp_path, client)
+    s.run_cycle()
+    original = s.state_file.read_bytes()
+    cycles, pauses, reloads = [], [], []
+    def reload_settings():
+        reloads.append(True)
+        if len(reloads) < 3:
+            assert s.state_file.read_bytes() == original
+            raise ConfigurationError("Incomplete editor save")
+        return Config(poll_seconds=1, dispatch_spacing_seconds=0)
+    s.connect = lambda: setattr(s, "client", client)
+    s.on_cycle = cycles.append
+    s.run_forever(lambda: bool(cycles), reload_settings=reload_settings, on_pause=lambda: pauses.append(True))
+    assert len(pauses) == 1 and len(reloads) == 3 and len(cycles) == 1
+    assert cycles[0].pending == 1 and not client.added
+
+
+def test_no_selected_clients_does_not_connect_when_no_pending_state(tmp_path):
+    s = supervisor(tmp_path, FakeClient(), cfg=Config(clients=()))
+    s.close()
+    s.connect = lambda: pytest.fail("Disabled client monitoring must not connect")
+    cycles = []
+    s.on_cycle = cycles.append
+    s.run_forever(lambda: bool(cycles))
+    assert cycles[0].scanned_threads == 0 and cycles[0].ordinary_usage_allowed is None
 
 
 def test_usage_limit_is_exact():
@@ -196,13 +240,13 @@ def test_desktop_scope_only_desktop_custom_sources(tmp_path: Path):
         thread("cli",source="cli"),
         thread("app",source="appServer"),
     ], {x:failed_turn(x) for x in ["chat","atlas","cli","app"]}, allowed=False)
-    s=supervisor(tmp_path,c,cfg=Config(thread_scope="desktop")); r=s.run_cycle()
+    s=supervisor(tmp_path,c,cfg=Config(clients=("desktop",))); r=s.run_cycle()
     assert r.detected==2
     assert {o.thread_id for o in s.state.obligations}=={"chat","atlas"}
 
 
 def test_all_interactive_includes_cli_vscode_custom_not_exec(tmp_path: Path):
-    cfg=Config(dispatch_spacing_seconds=0,thread_scope="allInteractive")
+    cfg=Config(dispatch_spacing_seconds=0)
     c=FakeClient([
         thread("cli",source="cli"),thread("vs",source="vscode"),thread("x",source={"custom":"chatgpt"}),thread("exec",source="exec")
     ], {x:failed_turn(x) for x in ["cli","vs","x","exec"]}, allowed=False)
@@ -265,7 +309,7 @@ def test_scope_change_cancels_existing_out_of_scope_obligation(tmp_path: Path):
     ob=Obligation.create("cli","turn-1",900,None)
     save_state(tmp_path/"state.json",State(obligations=[ob]))
     c=FakeClient([thread("cli",source="cli")], {"cli":failed_turn()}, allowed=False)
-    s=supervisor(tmp_path,c,cfg=Config(thread_scope="desktop"))
+    s=supervisor(tmp_path,c,cfg=Config(clients=("desktop",)))
     r=s.run_cycle()
     assert r.cancelled==1 and not s.state.obligations
 
@@ -279,7 +323,7 @@ def test_desktop_originator_is_not_confused_with_vscode_extension(tmp_path):
     desktop = thread("desktop", source="vscode") | {"originator": "Codex Desktop"}
     extension = thread("extension", source="vscode") | {"originator": "codex_vscode"}
     c = FakeClient([desktop, extension], {x: failed_turn(x) for x in ("desktop", "extension")})
-    s = supervisor(tmp_path, c, cfg=Config(thread_scope="desktop"))
+    s = supervisor(tmp_path, c, cfg=Config(clients=("desktop",)))
     assert s.run_cycle().detected == 1
     assert s.state.obligations[0].thread_id == "desktop"
 

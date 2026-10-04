@@ -9,7 +9,7 @@ from typing import Any
 from .errors import ProtocolError
 from .ws_unix import UnixWebSocket
 from . import __version__
-from .telemetry import emit, failure, rpc_summary, rpc_request_fields, notification_summary
+from .telemetry import emit, failure, rpc_completed, rpc_request_fields, notification_summary
 
 
 class RpcError(ProtocolError):
@@ -97,8 +97,7 @@ class AppServerClient:
                     durationMs=round((time.monotonic() - started) * 1000, 2),
                     errorCode=code if type(code) is int else None)
             raise
-        emit("rpc.response", method=method, requestId=request_id,
-             durationMs=round((time.monotonic() - started) * 1000, 2), **rpc_summary(method, result))
+        rpc_completed(method, request_id, round((time.monotonic() - started) * 1000, 2), params, result)
         return result
 
     def _request(self, method: str, params: dict[str, Any] | None = None) -> Any:

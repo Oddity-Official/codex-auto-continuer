@@ -25,6 +25,9 @@ def main():
     stage_parent.mkdir(parents=True, exist_ok=True)
     output = ROOT / "dist"
     output.mkdir(exist_ok=True)
+    # Rebuild all runtime states from the lossless master before freezing.
+    import runpy
+    runpy.run_path(str(ROOT / "scripts/render-icons.py"), run_name="__main__")
     with tempfile.TemporaryDirectory(prefix="release-", dir=stage_parent) as directory:
         stage = Path(directory)
         icon = stage / "continuer.ico"
@@ -42,17 +45,13 @@ def main():
             process.wait(timeout=5)
             raise SystemExit("Build exceeded 300s; its process tree was stopped. The prior release was preserved.")
         bundle = stage / "dist/CodexAutoContinuer"
-        shutil.copy2(ROOT / "README.md", bundle / "README.md")
+        shutil.copy2(ROOT / "Docs/USER-GUIDE.md", bundle / "README.md")
         shutil.copy2(ROOT / "LICENSE", bundle / "LICENSE")
-        for source in (ROOT / "Docs").rglob("*.md"):
-            target = bundle / source.relative_to(ROOT)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
         # Include original dependency notices, not just links to changing websites.
         notices = bundle / "Licenses"
         notices.mkdir()
         shutil.copy2(Path(sys.base_prefix) / "LICENSE.txt", notices / "Python-LICENSE.txt")
-        for package in ("pystray", "Pillow", "six", "PyInstaller"):
+        for package in ("pystray", "Pillow", "six", "tomlkit", "PyInstaller"):
             dist = importlib.metadata.distribution(package)
             for item in dist.files or []:
                 if "license" in str(item).lower() or Path(item).name.lower().startswith("copying"):
@@ -70,7 +69,7 @@ def main():
         files = sorted(p for p in bundle.rglob("*") if p.is_file())
         manifest = {"version": __version__, "platform": "windows-x86_64",
                     "python": sys.version.split()[0], "dependencies": {
-                        name: importlib.metadata.version(name) for name in ("pystray", "Pillow", "six", "PyInstaller")
+                        name: importlib.metadata.version(name) for name in ("pystray", "Pillow", "six", "tomlkit", "PyInstaller")
                     }, "files": {
             p.relative_to(bundle).as_posix(): {"bytes": p.stat().st_size, "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
             for p in files}}
@@ -88,7 +87,8 @@ def main():
                     payload = archive.read("CodexAutoContinuer/" + name)
                     if len(payload) != entry["bytes"] or hashlib.sha256(payload).hexdigest() != entry["sha256"]:
                         raise SystemExit("Portable ZIP checksum mismatch; prior release preserved.")
-                if any("/data/" in name or name.endswith((".key", ".jsonl")) for name in archive.namelist()):
+                if any("/data/" in name or "/Docs/" in name or "/resvg_py/" in name
+                       or name.endswith((".key", ".jsonl")) for name in archive.namelist()):
                     raise SystemExit("Refusing runtime data in a shareable release.")
             target = output / f"codex-auto-continuer-{__version__}-windows-x86_64.zip"
             os.replace(temporary, target)

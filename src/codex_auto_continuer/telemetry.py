@@ -7,6 +7,10 @@ import logging
 import os
 import platform
 import traceback
+import gzip
+import shutil
+import threading
+from collections import OrderedDict
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -27,6 +31,26 @@ _ERROR_TAGS = {
 }
 _logger = logging.getLogger("codex_auto_continuer.events")
 _logger.propagate = False
+_trace = False
+_seen: OrderedDict[tuple[str, str], str] = OrderedDict()
+_rpc_totals: dict[str, dict] = {}
+_guard = threading.RLock()
+
+
+class CompressedLogHandler(RotatingFileHandler):
+    def rotation_filename(self, default_name):
+        return default_name + ".gz"
+
+    def rotate(self, source, dest):
+        temporary = dest + ".tmp"
+        try:
+            with open(source, "rb") as incoming, gzip.open(temporary, "wb") as outgoing:
+                shutil.copyfileobj(incoming, outgoing)
+            os.replace(temporary, dest)
+            os.remove(source)
+        finally:
+            if os.path.exists(temporary):
+                os.remove(temporary)
 
 
 class EventFormatter(logging.Formatter):
@@ -58,6 +82,7 @@ class EventFormatter(logging.Formatter):
 
 
 def setup(path: Path, cfg: Config) -> None:
+    global _trace
     path.parent.mkdir(parents=True, exist_ok=True)
     key_file = path.parent / "telemetry.key"
     if not key_file.exists():
@@ -72,7 +97,7 @@ def setup(path: Path, cfg: Config) -> None:
     for handler in _logger.handlers[:]:
         handler.close()
         _logger.removeHandler(handler)
-    handler = RotatingFileHandler(path, maxBytes=cfg.log_max_mb * 1024 * 1024, backupCount=cfg.log_backups, encoding="utf-8")
+    handler = CompressedLogHandler(path, maxBytes=cfg.log_max_mb * 1024 * 1024, backupCount=cfg.log_backups, encoding="utf-8")
     handler.setFormatter(EventFormatter(cfg.detailed_telemetry, key))
     _logger.addHandler(handler)
     _logger.setLevel(logging.INFO)
@@ -81,12 +106,59 @@ def setup(path: Path, cfg: Config) -> None:
     def fail(record):
         raise OSError("Cannot write local telemetry. Check free space and permissions before restarting.")
     handler.handleError = fail
+    _trace = cfg.diagnostic_trace
+    with _guard:
+        _seen.clear()
     emit("process.started", python=platform.python_version(), os=platform.system(), osRelease=platform.release(),
          architecture=platform.machine(), executable=os.path.realpath(os.sys.executable))
 
 
 def emit(event: str, **fields: Any) -> None:
+    if event == "rpc.request" and not _trace:
+        return
+    if event == "rpc.connection_closed" and not _trace and not fields.get("subscriptions"):
+        return
+    if event == "rpc.notification" and not _trace:
+        changed(event, str(fields.get("method")) + ":" + str(fields.get("threadId")), **fields)
+        return
+    if event == "cycle.completed":
+        with _guard:
+            fields["rpc"] = {name: dict(value) for name, value in _rpc_totals.items()}
     _logger.info(event, extra={"fields": fields})
+
+
+def changed(event: str, key: str, **fields: Any) -> None:
+    digest = hashlib.sha256(json.dumps(fields, sort_keys=True, allow_nan=False).encode()).hexdigest()
+    identity = (event, key)
+    with _guard:
+        previous = _seen.pop(identity, None)
+        _seen[identity] = digest
+        if len(_seen) > 4096:
+            _seen.popitem(last=False)
+        if previous == digest and not _trace:
+            return
+    _logger.info(event, extra={"fields": fields})
+
+
+def begin_cycle() -> None:
+    with _guard:
+        _rpc_totals.clear()
+
+
+def rpc_completed(method: str, request_id: int, duration_ms: float, params: dict | None, result: Any) -> None:
+    with _guard:
+        total = _rpc_totals.setdefault(method, {"calls": 0, "durationMs": 0.0, "maxMs": 0.0})
+        total["calls"] += 1
+        total["durationMs"] = round(total["durationMs"] + duration_ms, 2)
+        total["maxMs"] = max(total["maxMs"], duration_ms)
+    if _trace or method in {"thread/queue/add", "thread/queue/delete", "thread/resume"}:
+        emit("rpc.response", method=method, requestId=request_id, durationMs=duration_ms, **rpc_summary(method, result))
+    elif method == "account/rateLimits/read":
+        changed("quota.changed", "quota", **rpc_summary(method, result))
+    elif method != "thread/list":
+        params = params or {}
+        changed("rpc.metadata_changed", method + ":" + str(params.get("threadId")),
+                method=method, **rpc_request_fields(params), **rpc_summary(method, result))
 
 
 def failure(event: str, exc: BaseException, **fields: Any) -> None:
@@ -98,8 +170,18 @@ def failure(event: str, exc: BaseException, **fields: Any) -> None:
 
 def thread_summary(thread: dict) -> dict:
     status = thread.get("status")
+    source = thread.get("source")
+    if isinstance(source, dict):
+        # Sub-agent provenance can nest real IDs and user-defined role text.
+        # It is excluded work, so retain only its source kind, never that payload.
+        source = ({"type": "subAgent"} if "subAgent" in source else
+                  {"type": "custom", "name": source["custom"]} if isinstance(source.get("custom"), str) else
+                  "unrecognized")
+    elif source not in {"cli", "vscode", "exec", "appServer", "unknown", None}:
+        source = "unrecognized"
     return {key: thread.get(key) for key in
-            ("source", "originator", "name", "cwd", "createdAt", "updatedAt", "archived", "modelProvider")} | {
+            ("originator", "name", "cwd", "createdAt", "updatedAt", "archived", "modelProvider")} | {
+        "source": source,
         "threadId": thread.get("id"),
         "status": {key: status.get(key) for key in ("type", "activeFlags")} if isinstance(status, dict) else None,
     }

@@ -4,7 +4,8 @@ from pathlib import Path
 root = Path(SPECPATH).parent
 icon = os.environ["CAC_BUILD_ICON"]
 common = dict(pathex=[str(root / "src")], hiddenimports=["pystray._win32"],
-              excludes=["tkinter", "pytest", "numpy", "matplotlib", "torch"], noarchive=True)
+              datas=[(str(root / "src/codex_auto_continuer/assets"), "codex_auto_continuer/assets")],
+              excludes=["tkinter", "pytest", "numpy", "matplotlib", "torch", "resvg_py"], noarchive=True)
 gui = Analysis([str(root / "scripts/gui-entry.py")], **common)
 cli = Analysis([str(root / "scripts/cli-entry.py")], **common)
 gui_pyz = PYZ(gui.pure)

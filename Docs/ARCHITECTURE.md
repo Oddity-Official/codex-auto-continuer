@@ -2,11 +2,17 @@
 
 ## Runtime and controls
 
-The supervisor is a per-user Python 3.13 process. Its recovery engine uses the standard library. The Windows tray uses pystray and Pillow. PyInstaller packages GUI and console EXEs sharing an adjacent `_internal` folder.
+The supervisor is a per-user Python 3.13 process. Its recovery engine uses the standard library; TOMLKit handles comment-preserving settings. The Windows tray uses pystray and Pillow. PyInstaller packages GUI and console EXEs sharing an adjacent `_internal` folder.
 
-The GUI entry point defaults to `tray`. A tray instance starts a hidden supervisor, polls a small local status snapshot every 2 seconds, and sends serialized control commands through the companion console EXE. Commands have 90-second bounds, or 120 seconds for one-cycle controls. Timed-out process trees are stopped. The tray does not poll Codex independently for its icon status.
+The GUI entry point defaults to `tray`. A tray instance starts a hidden supervisor, polls a small local status snapshot every second, and sends serialized state-changing commands through the companion console EXE. Commands have 90-second bounds, or 120 seconds for one-cycle controls. Timed-out process trees are stopped. The tray does not poll Codex independently for its icon status. File actions run directly on separate threads, bypassing both subprocess startup and the control queue.
 
-Both interfaces call the same CLI implementation. The menu has start, stop, restart, scan, one cycle, settings, Markdown prompt, logs, initialization, scope, privacy and login controls. Prompt edits apply at the next send. Other manual settings edits require restart.
+The tray exposes local status, start/stop, independent client choices, Windows login, prompt, settings, data folder, privacy, restore defaults, About and exit. Diagnostic scan/once/restart/init commands remain in the CLI. Scan requesters use an OS lock, an atomic request ID and a matching completion acknowledgement, rather than a fire-and-forget request.
+
+Settings are annotated TOML overrides in `settings.toml`. Missing settings use built-in defaults; opening settings creates a comment-only template. TOMLKit preserves existing comments on tray edits. Unique temporary writes flush, sync and atomically replace the file. Valid saved settings and prompts are checked before each cycle; sleep watches file signatures every second. Invalid settings or prompts close the connection and pause dispatch while preserving state, then recover automatically after repair. Empty client selection does not connect when there is no outstanding state; existing obligations still reconcile and delete only our stale queued work.
+
+About, status and confirmation dialogs use a dedicated native UI thread and a hidden Windows STATIC owner, not the tray notification window. Menu callbacks enqueue dialogs and return before modal interaction. Duplicate dialogs are suppressed. Exit dismisses only dialogs owned by that thread. The native OK button, X and Escape are regression tested.
+
+The SVG master renders green, yellow and red runtime PNGs at build time; Pillow loads these without an SVG renderer dependency. Green includes waiting for quota; yellow covers stopped, starting, paused and reconnecting; red means a blocking error.
 
 The Win32 tray adapter builds the native menu on the UI thread immediately before each right-click popup. Labels, checks and enabled states are snapshots for that opening. Background updates and selected-item callbacks never replace a tracked menu; changes appear on the next opening. This preserves Windows' native hover highlighting and selection. The adapter uses the pinned pystray 0.19.5 backend without modifying its bundled sources.
 
@@ -28,7 +34,7 @@ No UI automation or model-switching path exists. Each RPC has a total deadline t
 
 ## Thread scope
 
-Default `allInteractive` accepts CLI and VS Code sources plus configured Desktop custom sources, initially chatgpt and atlas. It excludes exec, appServer, unknown and subAgent sources. Desktop-only mode accepts vscode only with a configured Desktop originator, initially Codex Desktop, or those configured custom sources.
+Default `clients = ["vscode", "cli", "desktop"]` accepts all three interactive clients. CLI source wins over originator. Desktop accepts vscode with a configured Desktop originator, initially Codex Desktop, or configured custom sources, initially chatgpt and atlas. Other vscode sources are extension sessions. Any combination, including [], is valid. Exec, appServer, unknown and subAgent sources remain excluded.
 
 All visible sessions must share the same native Codex home and account. This is not a cross-host or cloud monitor.
 
@@ -63,7 +69,7 @@ The supervisor never answers approvals, security prompts, tool elicitations or u
 
 ## Data location and single instance
 
-Portable EXEs use adjacent `data`; source checkouts use `.data/runtime`. Explicit config paths put state, prompt and logs beside that config. Pip installations default to the per-user directory, or attach to the last registered app's absolute config path. A moved/missing registered config fails clearly instead of guessing.
+Portable EXEs use adjacent `data`; source checkouts use `.data/runtime`. Explicit settings paths put state, prompt and logs beside those settings. Pip installations default to the per-user directory, or attach to the last registered app's absolute settings path. Missing settings are valid; a moved/missing registered data folder fails clearly instead of guessing.
 
 Small global control files remain under the per-user state directory: supervisor/tray OS locks, stop and scan requests, and the owner record. Locks prevent concurrent copies from dispatching or creating duplicate tray icons. They are not stale PID assertions.
 
@@ -79,6 +85,8 @@ RPC summaries are allowlisted, never raw payload dumps. Errors retain classes, n
 
 Private mode omits personal metadata and uses HMAC-SHA256 keyed pseudonyms for thread, turn and queue IDs. The key persists locally for correlation. State still needs real identifiers; privacy applies to telemetry, not the whole data folder. Files are not encrypted.
 
-Rotation defaults to 16 MiB and 8 backups per stream. A privacy change reconfigures the tray stream and restarts the supervisor; old logs remain unchanged. I/O failures stop rather than silently discard diagnostics.
+Routine RPC requests are suppressed unless `diagnostic_trace` is enabled. Responses contribute per-method counts, total and maximum duration to each cycle summary. Relevant discovery, quota and metadata events log only changes, with a bounded 4096-entry cache. Queue add/delete/resume, dispatch and error events remain explicit. Trace increases detail, not personal-data access; Private/Detailed remains a separate formatter policy.
+
+Rotation defaults to 8 MiB and three gzip backups per stream. Compression completes and atomically installs the backup before removing the original. Privacy changes reconfigure each stream on validated reload without restarting the supervisor; old logs remain unchanged. Telemetry I/O failure stops dispatch and reports a blocking local snapshot when writable. Repair dialogs and exit remain usable if their own logging destination fails.
 
 Runtime status records phase, PID, cycle counts, quota permission, update time and error class. It supports the tray without storing conversation bodies. Build and handoff tools exclude runtime files, secrets, caches and the deployed App directory.

@@ -6,10 +6,12 @@ This is an independent tool, not an OpenAI product. It uses experimental local C
 
 ## Launch and use
 
-1. Extract `codex-auto-continuer-0.2.1-windows-x86_64.zip` into a writable folder. Keep both EXEs and `_internal` together.
+1. Extract `codex-auto-continuer-0.3.0-windows-x86_64.zip` into a writable folder. Keep both EXEs and `_internal` together.
 2. Launch `CodexAutoContinuer.exe`. Monitoring starts automatically. Look in Windows' hidden tray icons if needed.
-3. Right-click the tray icon. Select `Start with Windows` to enable per-user login launch.
-4. Select `Modify prompt` to open `data/continue-prompt.md` in your default Markdown editor. Save as UTF-8. The next continuation reads the saved file; no restart is needed.
+3. Right-click the tray icon. Select `Start With Windows` to enable per-user login launch.
+4. Select `Modify Prompt` to open `data/continue-prompt.md` in your default Markdown editor. The default is simply `Continue`. Save as UTF-8; the next continuation reads the saved file.
+
+The downloadable folder includes a [short user guide](Docs/USER-GUIDE.md), runtime, licenses and checksums. Developer documentation and audit history stay in this repository and the source handoff.
 
 The portable release needs Windows 11 x86_64 and a signed-in native Codex installation. It bundles Python and the tray dependencies. Recipients do not need Python, PowerShell 7, WSL or administrator privileges. Startup management can use Windows' built-in PowerShell.
 
@@ -19,41 +21,51 @@ The EXEs are unsigned. Windows may display a reputation warning. Verify your dow
 
 ## Tray and terminal controls
 
-Double-click the icon for status. Green means monitoring, amber means pending recovery, grey means stopped and red means an error. Error notifications point you to settings and telemetry. `Quit (stop monitoring)` stops the supervisor before closing the tray.
+Double-click the icon or select `Status` for local status and last scan counts. Green means monitoring, including waiting for quota. Yellow means stopped, starting, paused or reconnecting. Red means continuation is blocked by an error. `Exit CAC` stops the supervisor before closing the tray.
 
 The companion terminal program is `CodexAutoContinuer-CLI.exe`. The menu and CLI control the same supervisor and saved settings:
 
 | Tray action | Terminal command |
 | --- | --- |
 | Status | `status` |
-| Start, stop or restart monitoring | `start`, `stop`, `restart` |
-| Scan now | `scan` |
-| Run one cycle while stopped | `once` |
+| Start or stop monitoring | `start`, `stop` |
 | Modify prompt | `modify-prompt` |
 | Open settings or telemetry folder | `open-config`, `open-logs` |
-| Show config location | `config-path` |
-| Initialize missing files | `init` |
-| Restore default settings, preserving prompt files and state | `init --force` |
-| CLI, VS Code and Desktop; Desktop only | `scope allInteractive`, `scope desktop` |
-| Detailed local telemetry toggle | `logging detailed`, `logging private` |
+| Restore defaults, preserving the selected prompt, state, logs and login shortcut | `restore-defaults` |
+| Independently select VS Code, CLI and Desktop; select all; pause | `clients vscode cli desktop`, `clients all`, `clients` |
+| Detailed or Private telemetry, with a confirmation in the tray | `logging detailed`, `logging private` |
 | Start with Windows toggle | `install-startup`, `uninstall-startup` |
 | Open tray; show version | `tray`, `--version` |
 
-`run` provides foreground monitoring for terminal diagnostics. It is the same monitoring engine, not a separate tray feature.
+The terminal also offers `run` for foreground diagnostics, `restart`, `scan`, `once`, `status --live`, `config-path` and explicit `init`. These diagnostic commands stay out of the everyday tray menu. `--help` lists the full interface.
 
 For example, from the extracted folder:
 
 ```powershell
 .\CodexAutoContinuer-CLI.exe status
 .\CodexAutoContinuer-CLI.exe scan
-.\CodexAutoContinuer-CLI.exe --config 'D:\My settings\config.json' status
+.\CodexAutoContinuer-CLI.exe --config 'D:\My settings\settings.toml' status
 ```
 
-`scan` wakes a running supervisor; while stopped it performs one cycle. `stop` finishes the current cycle and preserves pending obligations. Scope and privacy commands restart a running supervisor. After manually editing other JSON settings, use `Restart monitoring`. An empty, invalid or unreadable prompt stops dispatch rather than substituting different text.
+`scan` acknowledges its request, waits for that scan to complete and prints the actual counts. While stopped, it performs one cycle. Both can send an eligible continuation: neither is a preview. `stop` finishes the current cycle and preserves pending obligations.
+
+## Editable settings
+
+`data/settings.toml` contains annotated overrides. If it is missing, built-in defaults apply without writing a settings file. `Modify Settings` creates a commented template on demand. Uncomment only the values you want to override:
+
+```toml
+clients = ["cli", "desktop"]  # Monitor these clients; [] pauses client monitoring.
+poll_seconds = 30.0  # Seconds between scans.
+detailed_telemetry = true  # Retain real metadata locally, never conversation bodies.
+```
+
+Tray changes preserve comments. Valid saved changes apply automatically at safe cycle boundaries without restarting the supervisor. Invalid settings or an empty, invalid or unreadable prompt pause continuation until repaired; pending work is preserved. File-opening actions bypass the monitor control queue. If Windows has no file association, the file opens in Notepad; other launch errors are reported.
+
+`Restore Defaults` preserves the selected prompt and its content, pending state, existing logs and Windows login shortcut, while future logging returns to Private. It does not delete your files.
 
 ## Which Codex clients are covered
 
-The default scope includes local interactive CLI, VS Code extension and Desktop sessions visible to the same native Codex home and account. It excludes `codex exec`, sub-agents, arbitrary app-server sessions and unknown sources. Desktop-only mode checks the verified `vscode` plus `Codex Desktop` originator pair, or configured Desktop custom sources.
+The default selection includes local interactive CLI, VS Code extension and Desktop sessions visible to the same native Codex home and account. Each client can be enabled independently. CLI selection uses its source even if its originator says Desktop. Desktop selection checks the verified `vscode` plus `Codex Desktop` originator pair, or configured Desktop custom sources. It always excludes `codex exec`, sub-agents, arbitrary app-server sessions and unknown sources.
 
 Shared Codex internals are not enough by themselves. Clients can own separate app-server processes. We verify the exact active-writer condition and use Codex's shared queue without stealing ownership. [Official app-server documentation](https://learn.chatgpt.com/docs/app-server) describes the shared integration layer; [our native probes](Docs/RESEARCH.md) establish the recovery path on the tested installation.
 
@@ -71,11 +83,11 @@ The queue has no verified atomic turn precondition or idempotent-send guarantee.
 
 There is no remote analytics, upload endpoint or automatic updater. This tool writes local JSONL telemetry: one JSON event per line. Codex's own network traffic and telemetry are separate.
 
-Beside the EXEs, `data/` holds settings, Markdown prompt, durable state, runtime status, `telemetry.jsonl`, `tray.jsonl` and a private identifier-correlation key. Events capture process/version information, settings, RPC methods and duration, quota snapshots, discovery decisions, failed-turn metadata, revalidation, queue ownership, dispatch intent and result, cancellation, reconnection, errors and subsequent turn outcomes. Error diagnostics contain exception types and stack locations, not arbitrary server error text.
+Beside the EXEs, `data/` holds settings, Markdown prompt, durable state, runtime status, `telemetry.jsonl`, `tray.jsonl` and a private identifier-correlation key. Compact events capture process/version information, changed settings and quota, relevant chat metadata changes, per-cycle RPC timing aggregates, failed-turn metadata, revalidation, queue ownership, every dispatch intent and result, cancellation, reconnection, errors and subsequent turn outcomes. Error diagnostics contain exception types and stack locations, not arbitrary server error text.
 
 The default private mode omits chat names and filesystem paths from telemetry. Thread, turn and queue identifiers become stable keyed pseudonyms, so events remain traceable within one installation. Detailed mode retains real identifiers, chat names and paths. Neither mode records conversation bodies, prompt contents, authentication tokens, credentials, raw RPC payloads or exception locals. A prompt hash and length identify which saved prompt was used. Numeric token-usage notifications are retained when available.
 
-Default retention is 16 MiB per stream plus 8 rotated backups: up to about 144 MiB each. `log_max_mb` and `log_backups` are configurable. Switching to private mode affects future events; it does not scrub older detailed logs. These files are not encrypted.
+Default retention is 8 MiB per stream plus 3 gzip-compressed backups. Unchanged routine RPC summaries are suppressed; each cycle retains counts and timing totals. `diagnostic_trace = true` adds allowlisted per-request summaries when needed, independently of Private/Detailed privacy. `log_max_mb` and `log_backups` are configurable. Switching to Private affects future events; it does not scrub older detailed logs. Files are not encrypted.
 
 Private telemetry is not an anonymized installation: `state.json` needs real IDs to target chats, and settings and the prompt are user-authored. Do not share the whole used `data/` folder without inspecting it. Share the clean release ZIP instead. Builds exclude all runtime data.
 
@@ -117,4 +129,6 @@ The native gate uses the configured `py -3.13` interpreter; install `.[dev]` the
 
 The portable builder creates a clean folder release, dependency notices and source, a per-file SHA-256 manifest and a verified ZIP. It never copies deployed runtime data. One-folder packaging avoids a self-extracting runtime on every launch and keeps tray libraries replaceable. [PyInstaller operating modes](https://pyinstaller.org/en/stable/operating-mode.html) explain this tradeoff.
 
-The wheel is `dist/codex_auto_continuer-0.2.1-py3-none-any.whl`. The stable source handoff is `codex-auto-continuer-codex-handoff.zip`, produced by `scripts/pack-codex-handoff.ps1`. Our code uses the [MIT license](LICENSE). See [dependency notices](Docs/THIRD-PARTY.md) and [the documentation index](Docs/README.md).
+The lossless icon master is [cac.svg](src/codex_auto_continuer/assets/cac.svg). Build-only `resvg-py` renders its three runtime PNG states and the multi-size EXE icon; it is not shipped as a runtime dependency. TOMLKit preserves settings comments.
+
+The wheel is `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`. The stable source handoff is `codex-auto-continuer-codex-handoff.zip`, produced by `scripts/pack-codex-handoff.ps1`. Our code uses the [MIT license](LICENSE). See [dependency notices](Docs/THIRD-PARTY.md) and [the documentation index](Docs/README.md).

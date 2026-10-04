@@ -35,6 +35,13 @@ def test_rpc_telemetry_is_allowlisted_even_in_detailed_mode():
     turn = telemetry.turn_summary({"error": {"message": secret,
                                  "codexErrorInfo": {"httpConnectionFailed": {"httpStatusCode": 503, "body": secret}}}})
     assert turn["httpStatusCode"] == 503 and secret not in json.dumps(turn)
+    provenance = telemetry.thread_summary({"source": {"subAgent": {"thread_spawn": {
+        "parent_thread_id": "private-parent", "agent_nickname": "Private agent", "agent_role": secret}}}})
+    assert provenance["source"] == {"type": "subAgent"}
+    assert secret not in json.dumps(provenance) and "private-parent" not in json.dumps(provenance)
+    custom = telemetry.thread_summary({"source": {"custom": "Private custom client"}})
+    assert "Private custom client" not in json.dumps(format_event(custom)["fields"])
+    assert format_event(custom, detailed=True)["fields"]["source"]["name"] == "Private custom client"
 
 
 def test_private_ids_correlate_without_recording_raw_ids():
@@ -46,7 +53,7 @@ def test_private_ids_correlate_without_recording_raw_ids():
 def test_portable_config_state_are_local_but_instance_control_is_shared(tmp_path, monkeypatch):
     monkeypatch.setattr(config.sys, "frozen", True, raising=False)
     monkeypatch.setattr(config.sys, "executable", str(tmp_path / "CodexAutoContinuer.exe"))
-    assert config.default_config_path() == tmp_path / "data/config.json"
+    assert config.default_config_path() == tmp_path / "data/settings.toml"
     assert config.state_path() == tmp_path / "data/state.json"
     assert config.lock_path().parent == config.control_dir()
     assert config.lock_path().parent != tmp_path / "data"
@@ -69,7 +76,7 @@ def test_packaged_launch_uses_correct_exe_and_absolute_config(tmp_path, monkeypa
 def test_modify_prompt_opens_exact_markdown_file(tmp_path, monkeypatch):
     opened = []
     monkeypatch.setattr(cli.os, "startfile", lambda path: opened.append(path))
-    path = tmp_path / "config.json"
+    path = tmp_path / "settings.toml"
     assert cli.main(["--config", str(path), "modify-prompt"]) == 0
     assert opened == [tmp_path / "continue-prompt.md"]
     assert config.read_prompt(opened[0]).strip() == config.DEFAULT_CONTINUE_PROMPT
@@ -78,28 +85,33 @@ def test_modify_prompt_opens_exact_markdown_file(tmp_path, monkeypatch):
 @pytest.mark.skipif(os.name != "nt", reason="Windows tray dependency and menu")
 def test_tray_menu_actions_match_cli_controls(tmp_path, monkeypatch):
     from codex_auto_continuer.tray import TrayController
-    controller = TrayController(tmp_path / "config.json")
+    controller = TrayController(tmp_path / "settings.toml")
     actions = []
     monkeypatch.setattr(controller, "enqueue", lambda label, *args: actions.append(args))
     items = {item.text: item for item in controller.menu().items}
-    expected = {"Status": ("status",), "Start monitoring": ("start",), "Stop monitoring": ("stop",), "Restart monitoring": ("restart",),
-                "Scan now": ("scan",), "Run one cycle": ("once",), "Modify prompt": ("modify-prompt",),
-                "Open settings": ("open-config",), "Open telemetry folder": ("open-logs",),
-                "Show config location": ("config-path",), "Initialize missing files": ("init",)}
+    expected = {"Start Monitoring": ("start",), "Stop Monitoring": ("stop",), "Exit CAC": ()}
     for label, command in expected.items():
         items[label](None)
         assert actions[-1] == command
+    opened = []
+    monkeypatch.setattr(controller, "open", opened.append)
+    for label, command in (("Modify Prompt", "modify-prompt"), ("Modify Settings", "open-config"), ("Open Data Folder", "open-logs")):
+        items[label](None)
+        assert opened[-1] == command
+    assert not {"Scan now", "Run one cycle", "Initialize missing files", "Restart monitoring"} & set(items)
 
 
 def test_installed_cli_uses_registered_app_config_and_never_guesses_after_move(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "app_data_dir", lambda: tmp_path)
     monkeypatch.setattr(config, "control_dir", lambda: tmp_path)
-    registered = tmp_path / "App/data/config.json"
+    registered = tmp_path / "App/data/settings.toml"
     registered.parent.mkdir(parents=True)
-    registered.write_text("{}")
+    registered.write_text("")
     (tmp_path / "owner.json").write_text(json.dumps({"configPath": str(registered)}))
     assert config.default_config_path() == registered
     registered.unlink()
+    assert config.default_config_path() == registered
+    registered.parent.rmdir()
     with pytest.raises(ConfigurationError, match="cannot be located"):
         config.default_config_path()
 
@@ -108,7 +120,7 @@ def test_installed_cli_uses_registered_app_config_and_never_guesses_after_move(t
 def test_tray_privacy_change_reconfigures_its_own_log_stream(tmp_path, monkeypatch):
     from dataclasses import replace
     from codex_auto_continuer.tray import TrayController
-    controller = TrayController(tmp_path / "config.json")
+    controller = TrayController(tmp_path / "settings.toml")
     settings = []
     monkeypatch.setattr(telemetry, "setup", lambda path, cfg: settings.append((path, cfg.detailed_telemetry)))
     config.save_config(controller.config_file, replace(controller.cfg, detailed_telemetry=True))

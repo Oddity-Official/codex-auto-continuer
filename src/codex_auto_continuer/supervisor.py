@@ -11,9 +11,9 @@ from typing import Any, Callable
 from .appserver import AppServerClient, RpcError
 from .codex import codex_version, ensure_daemon, find_codex
 from .config import Config, read_prompt
-from .errors import ProtocolError, TransportError
+from .errors import ConfigurationError, ProtocolError, TransportError
 from .state import Obligation, State, load_state, save_state
-from .telemetry import emit, failure, thread_summary, turn_summary
+from .telemetry import emit, failure, changed, begin_cycle, thread_summary, turn_summary
 
 LOG = logging.getLogger(__name__)
 _ALLOWED_ACTIVE_FLAGS = {"waitingOnApproval", "waitingOnUserInput"}
@@ -70,7 +70,7 @@ class Supervisor:
         self._cli_version = cli_version
         self.client = client
         LOG.info("Connected to Codex %s app-server %s", cli_version, client.user_agent)
-        emit("codex.connected", cliVersion=cli_version, daemonVersion=daemon.app_server_version,
+        changed("codex.connected", "connection", cliVersion=cli_version, daemonVersion=daemon.app_server_version,
              socketPath=str(daemon.socket_path), userAgent=client.user_agent)
         self._probe_required_methods()
 
@@ -97,7 +97,10 @@ class Supervisor:
         _parse_rate_limits(limits)
 
     def run_forever(self, stop_requested: Callable[[], bool] = lambda: False,
-                    wake_requested: Callable[[], bool] = lambda: False) -> None:
+                    wake_requested: Callable[[], bool] = lambda: False,
+                    reload_settings: Callable[[], Config] | None = None,
+                    on_pause: Callable[[], None] | None = None,
+                    on_phase: Callable[[str], None] | None = None) -> None:
         def wait(seconds: float) -> None:
             remaining = seconds
             while remaining > 0 and not stop_requested():
@@ -107,10 +110,38 @@ class Supervisor:
                 self.sleep(step)
                 remaining -= step
 
+        settings_failed = False
         while not stop_requested():
             try:
-                self.connect()
-                result = self.run_cycle()
+                if reload_settings:
+                    try:
+                        updated = reload_settings()
+                        if updated.codex_executable != self.config.codex_executable:
+                            self.codex_bin = self._cli_version = None
+                        self.config = updated
+                    except ConfigurationError as exc:
+                        if not settings_failed:
+                            failure("settings.invalid", exc)
+                            if on_pause:
+                                on_pause()
+                        settings_failed = True
+                        self.close()
+                        wait(1)
+                        continue
+                    if settings_failed:
+                        emit("settings.recovered")
+                        settings_failed = False
+                if reload_settings:
+                    self.prompt_file = self.state_file.parent / self.config.prompt_file
+                if not self.config.clients and not self.state.obligations and not self.state.observations:
+                    result = CycleResult()
+                    begin_cycle()
+                    emit("cycle.completed", **result.__dict__, observations=0)
+                else:
+                    if on_phase:
+                        on_phase("scanning")
+                    self.connect()
+                    result = self.run_cycle()
                 if self.on_cycle:
                     self.on_cycle(result)
                 LOG.info(
@@ -128,12 +159,15 @@ class Supervisor:
                 self.close()
                 wait(delay)
             except TransportError as exc:
+                if on_phase:
+                    on_phase("reconnecting")
                 failure("transport.reconnecting", exc, delaySeconds=self.config.reconnect_backoff_seconds)
                 LOG.warning("Codex transport lost: %s; reconnecting in %.1fs", exc, self.config.reconnect_backoff_seconds)
                 self.close()
                 wait(max(1.0, self.config.reconnect_backoff_seconds))
 
     def run_cycle(self) -> CycleResult:
+        begin_cycle()
         client = self._require_client()
         now = self.clock()
         limits = _parse_rate_limits(client.rate_limits())
@@ -141,8 +175,6 @@ class Supervisor:
             ordinary_usage_allowed=limits.ordinary_usage_allowed,
             next_reset_at=limits.next_reset_at,
         )
-        emit("cycle.started", scope=self.config.thread_scope, lookbackHours=self.config.scan_lookback_hours,
-             ordinaryUsageAllowed=limits.ordinary_usage_allowed, nextResetAt=limits.next_reset_at)
         self._observe_deliveries()
 
         threads = self._recent_threads(now)
@@ -229,6 +261,8 @@ class Supervisor:
             self.state.observations.append(replace(obligation))
 
     def _recent_threads(self, now: float) -> list[dict[str, Any]]:
+        if not self.config.clients:
+            return []
         client = self._require_client()
         cutoff = now - self.config.scan_lookback_hours * 3600
         cursor: str | None = None
@@ -250,9 +284,9 @@ class Supervisor:
                     break
                 if self._scope_accepts(thread):
                     out.append(thread)
-                    emit("discovery.thread", **thread_summary(thread), decision="in_scope")
+                    changed("discovery.thread", thread["id"], **thread_summary(thread), decision="in_scope")
                 else:
-                    emit("discovery.thread", **thread_summary(thread), decision="out_of_scope")
+                    changed("discovery.thread", thread["id"], **thread_summary(thread), decision="out_of_scope")
             if stop:
                 return out
             next_cursor = page.get("nextCursor")
@@ -268,9 +302,11 @@ class Supervisor:
     def _scope_accepts(self, thread: dict[str, Any]) -> bool:
         label = _session_source_label(thread.get("source"))
         custom = label in {f"custom:{x}" for x in self.config.desktop_custom_sources}
-        if self.config.thread_scope == "desktop":
-            return custom or (label == "vscode" and thread.get("originator") in self.config.desktop_originators)
-        return label in {"cli", "vscode"} or custom
+        if label == "cli":
+            return "cli" in self.config.clients
+        if custom or (label == "vscode" and thread.get("originator") in self.config.desktop_originators):
+            return "desktop" in self.config.clients
+        return label == "vscode" and "vscode" in self.config.clients
 
     def _find_thread_by_id(self, thread_id: str) -> dict[str, Any] | None:
         return self._require_client().thread_read(thread_id)

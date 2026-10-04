@@ -1,40 +1,64 @@
 from __future__ import annotations
 
-import ctypes
-import json
 import os
 import queue
 import subprocess
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 
 from . import __version__, telemetry
-from .config import Config, control_dir, initialize_files, load_config, lock_path
+from .actions import open_local
+from .config import ALL_CLIENTS, Config, control_dir, initialize_files, load_config
+from .dialogs import Dialogs, message
 from .errors import AutoContinuerError, AlreadyRunningError
 from .icon import tray_image
-from .instance_lock import SingleInstanceLock, is_running
+from .instance_lock import SingleInstanceLock
 from .startup import launch_command, startup_path
+from .status import read_runtime, owns_monitor, phase
 
-
-def message(text: str, *, error: bool = False, confirm: bool = False) -> bool:
-    api = ctypes.WinDLL("user32", use_last_error=True)
-    api.MessageBoxW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint]
-    flags = 0x24 if confirm else 0x10 if error else 0x40
-    return api.MessageBoxW(None, text, "Codex Auto Continuer", flags) == 6
+PRIVACY_TEXT = {
+    "detailed": "Detailed local telemetry keeps real chat IDs, names and filesystem paths. This helps trace failures to the exact chat.\n\n",
+    "private": "Private local telemetry replaces chat IDs with stable keyed identifiers and omits chat names and filesystem paths. This supports diagnostics without those personal details.\n\n",
+}
+PRIVACY_FOOTER = (
+    "Both modes record scan summaries, changes, timings, continuations and errors. Neither records conversation bodies, prompt text, credentials or raw RPC payloads. Nothing is uploaded.\n\n"
+    "Existing logs are not scrubbed or deleted. Apply this mode to future events?"
+)
 
 
 class TrayController:
     def __init__(self, config_file: Path):
         self.config_file = config_file
-        self.cfg = initialize_files(config_file)
-        self.busy = False
+        self.problem = ""
+        try:
+            self.cfg = initialize_files(config_file)
+        except Exception as exc:
+            # Defaults here are for rendering repair controls, never for dispatch.
+            self.cfg = Config()
+            self.problem = str(exc)
         self.done = threading.Event()
         self.actions: queue.Queue[tuple[str, tuple[str, ...]]] = queue.Queue()
-        self.state = "stopped"
+        self._guard = threading.Lock()
+        self._pending = 0
+        self._opening: set[str] = set()
+        self.busy = False
+        self.state = "failed" if self.problem else "stopped"
+        self.snapshot: dict = {}
+        self.running = False
         self.icon = None
+        self.dialogs = Dialogs(on_error=self.dialog_failed)
         self._last_phase = None
-        self._log_settings = (self.cfg.detailed_telemetry, self.cfg.log_max_mb, self.cfg.log_backups)
+        self._log_settings = self.log_settings(self.cfg)
+
+    @staticmethod
+    def log_settings(cfg):
+        return (cfg.detailed_telemetry, cfg.diagnostic_trace, cfg.log_max_mb, cfg.log_backups)
+
+    def dialog_failed(self, exc):
+        if self.icon:
+            self.icon.notify(f"A dialog could not open: {exc}. Open Data Folder for diagnostics.", "CAC")
 
     def command(self, *arguments: str) -> str:
         process = subprocess.Popen(launch_command(self.config_file, *arguments, console=True),
@@ -53,15 +77,16 @@ class TrayController:
             raise AutoContinuerError("Control command timed out; its process tree was stopped. Check local telemetry before retrying.") from exc
         telemetry.emit("tray.command_completed", command=arguments[0], exitCode=process.returncode)
         if process.returncode:
-            raise AutoContinuerError((stderr or stdout).strip() or "Control command failed. Open the telemetry folder for details.")
+            raise AutoContinuerError((stderr or stdout).strip() or "Control command failed. Open the data folder for telemetry.")
         return stdout.strip()
 
     def enqueue(self, label: str, *arguments: str) -> None:
-        if not self.busy:
+        if self.done.is_set():
+            return
+        with self._guard:
+            self._pending += 1
             self.busy = True
             self.actions.put((label, arguments))
-            if self.icon:
-                self.icon.update_menu()
 
     def worker(self) -> None:
         while not self.done.is_set():
@@ -69,70 +94,128 @@ class TrayController:
                 label, arguments = self.actions.get(timeout=0.5)
             except queue.Empty:
                 continue
-            telemetry.emit("tray.action", action=label)
             try:
                 if label == "quit":
                     self.command("stop")
                     self.done.set()
+                    self.dialogs.close()
                     self.icon.stop()
                     return
-                if label == "reset" and not message("Restore default settings? Your Markdown prompt and pending obligations will be preserved.", confirm=True):
-                    continue
-                output = self.command(*arguments)
-                if label in {"status", "locations", "once", "init", "reset"}:
-                    if label == "status":
-                        value = json.loads(output)
-                        output = (f"Monitoring: {'running' if value['supervisorRunning'] else 'stopped'}\n"
-                                  f"Ordinary usage allowed: {value['ordinaryUsageAllowed']}\n"
-                                  f"Pending continuations: {len(value['pendingObligations'])}\n"
-                                  f"Scope: {value['threadScope']}\n"
-                                  f"Detailed local telemetry: {value['detailedTelemetry']}\n\n"
-                                  f"Prompt: {value['promptPath']}\nTelemetry: {value['logPath']}\n\n"
-                                  "Full status is available through the companion CLI EXE.")
-                    message(output)
-                self.cfg = load_config(self.config_file)
+                telemetry.emit("tray.action", action=label)
+                self.command(*arguments)
+                if label == "reset":
+                    self.icon.notify("Default settings restored. Your prompt, pending work, logs and login shortcut were preserved.", "CAC")
             except Exception as exc:
-                telemetry.failure("tray.action_failed", exc, action=label)
-                message(str(exc), error=True)
+                try:
+                    telemetry.failure("tray.action_failed", exc, action=label)
+                except OSError:
+                    pass  # Repair dialogs must still work when the log destination is broken.
+                self.dialogs.show("action-error", str(exc), error=True)
             finally:
-                self.busy = False
-                if self.icon and not self.done.is_set():
+                with self._guard:
+                    self._pending -= 1
+                    self.busy = self._pending > 0
+                if not self.done.is_set():
                     self.refresh()
 
+    def open(self, command: str) -> None:
+        with self._guard:
+            if command in self._opening or self.done.is_set():
+                return
+            self._opening.add(command)
+        def launch():
+            started = time.monotonic()
+            try:
+                open_local(command, self.config_file)
+                telemetry.emit("tray.file_opened", command=command, durationMs=round((time.monotonic() - started) * 1000, 2))
+            except Exception as exc:
+                try:
+                    telemetry.failure("tray.file_open_failed", exc, command=command)
+                except OSError:
+                    pass
+                self.dialogs.show("file-error", str(exc), error=True)
+            finally:
+                with self._guard:
+                    self._opening.discard(command)
+        threading.Thread(target=launch, name="CAC-editor", daemon=True).start()
+
     def refresh(self) -> None:
-        phase = "stopped"
-        waiting = 0
+        previous_state = self.state
+        self.problem = ""
         try:
+            self.running = owns_monitor(self.config_file)
             self.cfg = load_config(self.config_file)
-            log_settings = (self.cfg.detailed_telemetry, self.cfg.log_max_mb, self.cfg.log_backups)
+            log_settings = self.log_settings(self.cfg)
             if log_settings != self._log_settings:
                 telemetry.setup(self.config_file.parent / "tray.jsonl", self.cfg)
                 self._log_settings = log_settings
-            snapshot_path = self.config_file.parent / "runtime-status.json"
-            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8")) if snapshot_path.exists() else {}
-            if is_running(lock_path()):
-                phase = "monitoring"
-                waiting = snapshot.get("pending", 0)
-                if waiting:
-                    phase = "waiting"
-            elif snapshot.get("phase") == "failed":
-                phase = "failed"
+            self.snapshot = read_runtime(self.config_file)
+            self.state = phase(self.config_file, self.snapshot, running=self.running)
+            if self.state == "failed":
+                self.problem = self.snapshot.get("reason", "Monitoring stopped with an error. Open the data folder for telemetry, then start monitoring after repair.")
         except Exception as exc:
-            phase = "failed"
-            if self._last_phase != phase:
-                telemetry.failure("tray.status_failed", exc)
-        previous_state = self.state
-        self.state = phase
+            self.state = "failed"
+            self.problem = str(exc)
+            if self._last_phase != "failed":
+                try:
+                    telemetry.failure("tray.status_failed", exc)
+                except OSError:
+                    pass
         if self.icon:
-            self.icon.title = f"Codex Auto Continuer {__version__}: {phase}; {waiting} pending"
-            if phase != previous_state:
-                self.icon.icon = tray_image(phase)
-            if phase == "failed" and self._last_phase != "failed":
-                self.icon.notify("Monitoring stopped or settings could not be read. Open telemetry and settings, then restart monitoring.")
-        self._last_phase = phase
+            self.icon.title = f"CAC {__version__}: {self.status_label()}"
+            if self.state != previous_state:
+                self.icon.icon = tray_image(self.state)
+            if self.state == "failed" and self._last_phase != "failed":
+                self.icon.notify("Continuation is blocked. Select Status for the issue, or Modify Settings to repair it.", "CAC")
+        self._last_phase = self.state
 
-    def watch(self) -> None:
-        while not self.done.wait(2):
+    def status_label(self):
+        names = {"monitoring": "Monitoring", "waiting": "Waiting for usage", "paused": "No clients selected",
+                 "stopped": "Stopped", "starting": "Starting", "scanning": "Scanning",
+                 "reconnecting": "Reconnecting", "failed": "Needs attention"}
+        label = names[self.state]
+        waiting = self.snapshot.get("pending", 0)
+        return f"{label} · {waiting} waiting" if self.state in {"monitoring", "waiting"} else label
+
+    def show_status(self):
+        self.refresh()
+        scan = self.snapshot.get("lastScan", {})
+        scanned_at = self.snapshot.get("lastScanAt")
+        when = datetime.fromtimestamp(scanned_at).astimezone().strftime("%H:%M:%S %Z") if scanned_at else "Not scanned yet"
+        body = (f"Status: {self.status_label()}\nClients: {', '.join(self.cfg.clients) or 'None'}\n"
+                f"Last scan: {when}\n"
+                f"Chats checked: {scan.get('scanned_threads', 0)}\nNew quota failures: {scan.get('detected', 0)}\n"
+                f"Continuations sent: {scan.get('dispatched', 0)}\nPending: {scan.get('pending', 0)}\n"
+                f"Telemetry: {'Detailed' if self.cfg.detailed_telemetry else 'Private'}, local only")
+        if self.problem:
+            body += f"\n\nIssue: {self.problem}"
+        self.dialogs.show("status", body, title=f"CAC {__version__} status")
+
+    def select_clients(self, name: str):
+        selected = set(self.cfg.clients)
+        if name == "all":
+            selected = set(ALL_CLIENTS)
+        elif name in selected:
+            selected.remove(name)
+        else:
+            selected.add(name)
+        self.enqueue("clients", "clients", *(value for value in ALL_CLIENTS if value in selected))
+
+    def privacy(self, mode: str):
+        self.dialogs.show("privacy", PRIVACY_TEXT[mode] + PRIVACY_FOOTER,
+                          title=f"CAC telemetry: {mode.title()}", confirm=True,
+                          then=lambda: self.enqueue("privacy", "logging", mode))
+
+    def restore_defaults(self):
+        self.dialogs.show("reset", "Restore default settings?\n\nThe selected prompt, pending continuations, logs and Windows login shortcut stay unchanged. Future logging returns to Private mode.",
+                          confirm=True, then=lambda: self.enqueue("reset", "restore-defaults", "--prompt-file", self.cfg.prompt_file))
+
+    def about(self):
+        self.dialogs.show("about", f"Codex Auto Continuer {__version__}\n\nContinues exact local Codex chats after usage recovers.\nLocal diagnostics only; no analytics uploads or credential collection.\n\nIndependent tool, not an OpenAI product. MIT license.",
+                          title=f"About CAC {__version__}")
+
+    def watch(self):
+        while not self.done.wait(1):
             self.refresh()
 
     def menu(self):
@@ -140,34 +223,31 @@ class TrayController:
         def action(label, *arguments):
             return lambda icon, item: self.enqueue(label, *arguments)
         available = lambda item: not self.busy
+        def client_action(value):
+            return lambda icon, item: self.select_clients(value)
+        client_items = [Item(label, client_action(value),
+                             checked=lambda item, value=value: value in self.cfg.clients, enabled=available)
+                        for value, label in (("vscode", "VS Code"), ("cli", "CLI"), ("desktop", "Desktop"))]
         return Menu(
-            Item(lambda item: f"Monitoring: {self.state}", None, enabled=False),
-            Item("Status", action("status", "status"), default=True, enabled=available),
+            Item(lambda item: f"Status: {self.status_label()}", lambda icon, item: self.show_status(), default=True),
             Menu.SEPARATOR,
-            Item("Start monitoring", action("start", "start"), enabled=lambda item: not self.busy and not is_running(lock_path())),
-            Item("Stop monitoring", action("stop", "stop"), enabled=lambda item: not self.busy and is_running(lock_path())),
-            Item("Restart monitoring", action("restart", "restart"), enabled=available),
-            Item("Scan now", action("scan", "scan"), enabled=available),
-            Item("Run one cycle", action("once", "once"), enabled=lambda item: not self.busy and not is_running(lock_path())),
-            Menu.SEPARATOR,
-            Item("Modify prompt", action("prompt", "modify-prompt"), enabled=available),
-            Item("Open settings", action("settings", "open-config"), enabled=available),
-            Item("Open telemetry folder", action("logs", "open-logs"), enabled=available),
-            Item("Show config location", action("locations", "config-path"), enabled=available),
-            Item("Initialize missing files", action("init", "init"), enabled=available),
-            Item("Restore default settings", action("reset", "init", "--force"), enabled=lambda item: not self.busy and not is_running(lock_path())),
-            Item("Monitor clients", Menu(
-                Item("CLI, VS Code and Desktop", action("scope", "scope", "allInteractive"), radio=True,
-                     checked=lambda item: self.cfg.thread_scope == "allInteractive", enabled=available),
-                Item("Desktop only", action("scope", "scope", "desktop"), radio=True,
-                     checked=lambda item: self.cfg.thread_scope == "desktop", enabled=available))),
-            Item("Detailed local telemetry", lambda icon, item: self.enqueue("privacy", "logging", "private" if self.cfg.detailed_telemetry else "detailed"),
-                 checked=lambda item: self.cfg.detailed_telemetry, enabled=available),
-            Item("Start with Windows", lambda icon, item: self.enqueue("startup", "uninstall-startup" if startup_path().exists() else "install-startup"),
+            Item("Start Monitoring", action("start", "start"), enabled=lambda item: not self.busy and bool(self.cfg.clients) and not self.running),
+            Item("Stop Monitoring", action("stop", "stop"), enabled=lambda item: not self.busy and self.running),
+            Item("Clients To Monitor", Menu(*client_items, Item("All", lambda icon, item: self.select_clients("all"),
+                 checked=lambda item: set(self.cfg.clients) == set(ALL_CLIENTS), enabled=available))),
+            Item("Start With Windows", lambda icon, item: self.enqueue("startup", "uninstall-startup" if startup_path().exists() else "install-startup"),
                  checked=lambda item: startup_path().exists(), enabled=available),
             Menu.SEPARATOR,
-            Item(f"About {__version__}", lambda icon, item: message("Codex Auto Continuer\nLocal quota-recovery supervisor.\nNo remote telemetry or credential collection.")),
-            Item("Quit (stop monitoring)", action("quit"), enabled=available),
+            Item("Modify Prompt", lambda icon, item: self.open("modify-prompt")),
+            Item("Modify Settings", lambda icon, item: self.open("open-config")),
+            Item("Open Data Folder", lambda icon, item: self.open("open-logs")),
+            Item("Telemetry", Menu(
+                Item("Detailed", lambda icon, item: self.privacy("detailed"), checked=lambda item: self.cfg.detailed_telemetry, radio=True),
+                Item("Private", lambda icon, item: self.privacy("private"), checked=lambda item: not self.cfg.detailed_telemetry, radio=True))),
+            Item("Restore Defaults", lambda icon, item: self.restore_defaults()),
+            Menu.SEPARATOR,
+            Item(f"About CAC {__version__}", lambda icon, item: self.about()),
+            Item("Exit CAC", action("quit")),
         )
 
 
@@ -180,19 +260,22 @@ def run_tray(config_file: Path) -> int:
             controller = TrayController(config_file)
             telemetry.setup(config_file.parent / "tray.jsonl", controller.cfg)
             telemetry.emit("tray.started", configPath=str(config_file))
-            controller.icon = TrayIcon("CodexAutoContinuer", tray_image("stopped"), "Codex Auto Continuer", menu=controller.menu())
+            controller.icon = TrayIcon("CodexAutoContinuer", tray_image(controller.state), "CAC", menu=controller.menu())
             def ready(icon):
                 icon.visible = True
                 telemetry.emit("tray.ready", menuItems=[item.text for item in icon.menu.items])
-                threading.Thread(target=controller.worker, name="tray-controls", daemon=True).start()
-                threading.Thread(target=controller.watch, name="tray-status", daemon=True).start()
-                controller.enqueue("start", "start")
+                threading.Thread(target=controller.worker, name="CAC-controls", daemon=True).start()
+                threading.Thread(target=controller.watch, name="CAC-status", daemon=True).start()
+                controller.refresh()
+                if not controller.problem:
+                    controller.enqueue("start", "start")
             try:
                 controller.icon.run(setup=ready)
             finally:
                 controller.done.set()
+                controller.dialogs.close()
                 telemetry.emit("tray.closed")
             return 0
     except AlreadyRunningError:
-        message("Codex Auto Continuer is already in the system tray. Look in Windows' hidden tray icons if it is not visible.")
+        message("CAC is already in the system tray. Look in Windows' hidden tray icons if needed.")
         return 0

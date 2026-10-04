@@ -4,23 +4,26 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codex-auto-continuer"
-version = "0.2.1"
+version = "0.3.0"
 description = "Windows-native supervisor that resumes Codex threads after verified usage-limit recovery"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.13"
-dependencies = ["pystray==0.19.5; sys_platform == 'win32'", "Pillow>=10,<13; sys_platform == 'win32'"]
+dependencies = ["tomlkit>=0.13,<1", "pystray==0.19.5; sys_platform == 'win32'", "Pillow>=10,<13; sys_platform == 'win32'"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
-build = ["PyInstaller>=6.20,<7"]
+build = ["PyInstaller>=6.20,<7", "resvg-py==0.5.0"]
 
 [project.scripts]
 codex-auto-continuer = "codex_auto_continuer.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+codex_auto_continuer = ["assets/*.svg", "assets/*.png"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "scripts/tests"]

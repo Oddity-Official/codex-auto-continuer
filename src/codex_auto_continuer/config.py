@@ -4,37 +4,42 @@ import json
 import math
 import os
 import sys
-from dataclasses import asdict, dataclass, fields
+import tempfile
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
 from .errors import ConfigurationError
+import tomlkit
 
 
-DEFAULT_CONTINUE_PROMPT = (
-    "Continue the current task from where you left off. Re-read the current thread state "
-    "and keep working toward the existing task; do not restart work that is already complete."
-)
+DEFAULT_CONTINUE_PROMPT = "Continue"
+ALL_CLIENTS = ("vscode", "cli", "desktop")
+
+
+def setting(default, explanation):
+    return field(default=default, metadata={"help": explanation})
 
 
 @dataclass(frozen=True)
 class Config:
-    prompt_file: str = "continue-prompt.md"
-    poll_seconds: float = 30.0
-    scan_lookback_hours: float = 24.0
-    dispatch_spacing_seconds: float = 2.0
-    rpc_timeout_seconds: float = 12.0
-    codex_command_timeout_seconds: float = 20.0
-    reconnect_backoff_seconds: float = 5.0
-    dispatch_recovery_seconds: float = 15.0
-    thread_scope: str = "allInteractive"
-    desktop_custom_sources: tuple[str, ...] = ("chatgpt", "atlas")
-    desktop_originators: tuple[str, ...] = ("Codex Desktop",)
-    auto_start_daemon: bool = True
-    codex_executable: str | None = None
-    detailed_telemetry: bool = False
-    log_max_mb: int = 16
-    log_backups: int = 8
+    prompt_file: str = setting("continue-prompt.md", "Markdown prompt path, relative to this folder unless absolute.")
+    poll_seconds: float = setting(30.0, "Seconds between scans; settings saves wake the next cycle.")
+    scan_lookback_hours: float = setting(24.0, "Discover quota failures completed within this many hours; recorded work stays pending.")
+    dispatch_spacing_seconds: float = setting(2.0, "Seconds between continuations when several chats become eligible.")
+    rpc_timeout_seconds: float = setting(12.0, "Total deadline in seconds for each local Codex request.")
+    codex_command_timeout_seconds: float = setting(20.0, "Seconds allowed for Codex version and daemon commands.")
+    reconnect_backoff_seconds: float = setting(5.0, "Seconds before retrying a lost local Codex connection.")
+    dispatch_recovery_seconds: float = setting(15.0, "Seconds to reconcile an uncertain submission before stopping; never blindly resend.")
+    clients: tuple[str, ...] = setting(ALL_CLIENTS, "Any combination of vscode, cli and desktop; [] pauses client monitoring.")
+    desktop_custom_sources: tuple[str, ...] = setting(("chatgpt", "atlas"), "Codex custom source labels recognized as Desktop.")
+    desktop_originators: tuple[str, ...] = setting(("Codex Desktop",), "Distinguish Desktop from the VS Code extension when both use the vscode source.")
+    auto_start_daemon: bool = setting(True, "Start the local Codex daemon if absent; this does not launch CAC at login.")
+    codex_executable: str | None = setting(None, "Optional absolute codex.exe path; omit to auto-detect.")
+    detailed_telemetry: bool = setting(False, "Keep real IDs, chat names and paths in local logs; never bodies or credentials.")
+    diagnostic_trace: bool = setting(False, "Record every allowlisted RPC summary for troubleshooting; increases log size.")
+    log_max_mb: int = setting(8, "Maximum MiB per active log stream before rotation.")
+    log_backups: int = setting(3, "Number of compressed backups retained per stream; older backups expire.")
 
 
 def app_data_dir() -> Path:
@@ -67,12 +72,12 @@ def default_config_path() -> Path:
         try:
             raw = json.loads(owner.read_text(encoding="utf-8"))
             path = Path(raw["configPath"])
-            if not path.is_absolute() or not path.is_file():
-                raise ValueError("Owner config is missing or not absolute.")
+            if not path.is_absolute() or not path.parent.is_dir():
+                raise ValueError("Owner data folder is missing or not absolute.")
             return path
         except (OSError, ValueError, TypeError, KeyError) as exc:
             raise ConfigurationError("The last app copy's config cannot be located. Launch the portable app from its new folder, or pass --config explicitly.") from exc
-    return directory / "config.json"
+    return directory / "settings.toml"
 
 
 def state_path(config_file: Path | None = None) -> Path:
@@ -126,7 +131,7 @@ def _coerce(data: dict[str, Any]) -> Config:
     if unknown:
         raise ConfigurationError(f"Unknown config field(s): {', '.join(unknown)}")
     data = dict(data)
-    for name in ("desktop_custom_sources", "desktop_originators"):
+    for name in ("clients", "desktop_custom_sources", "desktop_originators"):
         if name in data:
             value = data[name]
             if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
@@ -165,8 +170,9 @@ def validate_config(cfg: Config) -> Config:
         raise ConfigurationError("rpc_timeout_seconds must be at least 1 second.")
     if cfg.codex_command_timeout_seconds < 1:
         raise ConfigurationError("codex_command_timeout_seconds must be at least 1 second.")
-    if not isinstance(cfg.thread_scope, str) or cfg.thread_scope not in {"desktop", "allInteractive"}:
-        raise ConfigurationError("thread_scope must be 'desktop' or 'allInteractive'.")
+    if (not isinstance(cfg.clients, tuple) or any(not isinstance(x, str) or x not in ALL_CLIENTS for x in cfg.clients)
+            or len(set(cfg.clients)) != len(cfg.clients)):
+        raise ConfigurationError("clients must contain unique choices from vscode, cli and desktop, or [].")
     for name in ("desktop_custom_sources", "desktop_originators"):
         values = getattr(cfg, name)
         if not isinstance(values, tuple) or not values or any(not isinstance(x, str) or not x.strip() for x in values):
@@ -174,9 +180,11 @@ def validate_config(cfg: Config) -> Config:
     if not isinstance(cfg.auto_start_daemon, bool):
         raise ConfigurationError("auto_start_daemon must be true or false.")
     if cfg.codex_executable is not None and (not isinstance(cfg.codex_executable, str) or not Path(cfg.codex_executable).is_absolute()):
-        raise ConfigurationError("codex_executable must be an absolute native executable path or null.")
+        raise ConfigurationError("codex_executable must be an absolute native executable path, or omitted.")
     if type(cfg.detailed_telemetry) is not bool:
         raise ConfigurationError("detailed_telemetry must be true or false.")
+    if type(cfg.diagnostic_trace) is not bool:
+        raise ConfigurationError("diagnostic_trace must be true or false.")
     if type(cfg.log_max_mb) is not int or not 1 <= cfg.log_max_mb <= 256:
         raise ConfigurationError("log_max_mb must be an integer from 1 to 256.")
     if type(cfg.log_backups) is not int or not 1 <= cfg.log_backups <= 64:
@@ -189,11 +197,11 @@ def load_config(path: Path | None = None) -> Config:
     if not path.exists():
         return Config()
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raw = _read_document(path).unwrap()
+    except (OSError, UnicodeError, tomlkit.exceptions.ParseError) as exc:
         raise ConfigurationError(f"Cannot read config {path}: {exc}") from exc
     if not isinstance(raw, dict):
-        raise ConfigurationError(f"Config {path} must contain a JSON object.")
+        raise ConfigurationError(f"Settings {path} must contain TOML key/value settings.")
     return _coerce(raw)
 
 
@@ -201,28 +209,77 @@ def write_config(path: Path | None = None, *, force: bool = False) -> Path:
     path = path or default_config_path()
     if path.exists() and not force:
         raise ConfigurationError(f"Config already exists: {path}. Use --force to replace it.")
-    save_config(path, Config())
+    _write_document(path, settings_template())
     return path
 
 
 def save_config(path: Path, cfg: Config) -> None:
     validate_config(cfg)
+    try:
+        document = _read_document(path) if path.exists() else settings_template()
+    except (OSError, UnicodeError, tomlkit.exceptions.ParseError) as exc:
+        raise ConfigurationError(f"Cannot edit settings {path}: {exc}") from exc
+    defaults = Config()
+    for spec in fields(Config):
+        value = getattr(cfg, spec.name)
+        toml_value = list(value) if isinstance(value, tuple) else value
+        if value == getattr(defaults, spec.name):
+            if spec.name in document and document[spec.name] != toml_value:
+                document.pop(spec.name)
+        else:
+            if spec.name in document:
+                document[spec.name] = toml_value
+            else:
+                document.add(spec.name, tomlkit.item(list(value) if isinstance(value, tuple) else value).comment(spec.metadata["help"]))
+    _write_document(path, document)
+
+
+def _read_document(path: Path):
+    if path.stat().st_size > 65536:
+        raise ConfigurationError("Settings exceed 64 KiB. Keep only configuration and short comments in this file.")
+    return tomlkit.parse(path.read_text(encoding="utf-8-sig"))
+
+
+def settings_template():
+    document = tomlkit.document()
+    document.add(tomlkit.comment("CAC settings: uncomment a line to override the built-in default."))
+    document.add(tomlkit.comment("Saved changes apply automatically. Invalid settings pause continuation until repaired."))
+    document.add(tomlkit.nl())
+    defaults = Config()
+    for spec in fields(Config):
+        value = getattr(defaults, spec.name)
+        if value is None:
+            value = "C:/Path/To/codex.exe"
+        line = tomlkit.dumps({spec.name: list(value) if isinstance(value, tuple) else value}).strip()
+        document.add(tomlkit.comment(f"{line}  # {spec.metadata['help']}"))
+    return document
+
+
+def _write_document(path: Path, document) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = asdict(cfg)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with tmp.open("w", encoding="utf-8", newline="\n") as handle:
-        handle.write(json.dumps(payload, indent=2) + "\n")
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(tmp, path)
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n", dir=path.parent,
+                                     prefix=".settings-", suffix=".tmp", delete=False) as handle:
+        tmp = Path(handle.name)
+        try:
+            handle.write(tomlkit.dumps(document))
+            handle.flush()
+            os.fsync(handle.fileno())
+        except BaseException:
+            handle.close()
+            tmp.unlink(missing_ok=True)
+            raise
+    try:
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def initialize_files(path: Path) -> Config:
-    if not path.exists():
-        write_config(path)
     cfg = load_config(path)
     prompt = prompt_path(cfg, path)
     if not prompt.exists():
+        if cfg.prompt_file != Config().prompt_file:
+            raise ConfigurationError("The configured custom prompt is missing. Use Modify Prompt to create it, or repair its path in settings.")
         prompt.parent.mkdir(parents=True, exist_ok=True)
         with prompt.open("x", encoding="utf-8", newline="\n") as handle:
             handle.write(DEFAULT_CONTINUE_PROMPT + "\n")
