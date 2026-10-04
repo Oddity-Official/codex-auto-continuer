@@ -9,8 +9,9 @@ CAC 0.5.2, 4 October 2026. Native Windows 11 x86_64, PowerShell 7 and project CP
 | `scripts/verify-windows.ps1` | Application and workflow regressions, compileall, source version | 240 passed in 57.33 seconds; CAC 0.5.2 |
 | `scripts/verify-continuation.ps1` | Official native Codex, separate owners, queued failures, usage-service outage and managed lifecycle | 12 passed in 105.59 seconds |
 | `scripts/dev.ps1 -Tests tests/test_supervisor.py` | Focused recovery iteration without packaging | 55 passed in 0.91 seconds |
-| Shared policy helper | Safe block replacement and idempotence | 5 passed; all three registered copies current |
-| Local Markdown file links | Root and current/historical documentation | 96 checked, zero failures before final documentation update |
+| Shared setup and policy helpers | Safe installation, block replacement and idempotence | 7 passed in 0.31 seconds; all three registered policy copies current |
+| Centralized template export | Disposable independently installed helpers | 42 transport/retention tests passed in 33.33 seconds |
+| Local Markdown file links | Root and current/historical documentation | 100 checked, zero failures before release-result update |
 
 The certified CLI and daemon are official Codex 0.160.0, executable SHA-256 `fdda5fa3cf3fb3d000b876720742857676293e4315e4b045fae6f8bd7e866d1d`, consumer-schema SHA-256 `e738465218e57a4e519855347a7728e25813c148e4b09a5a4383cdf3b668dfeb`. The native suite explicitly verified the CAC 0.5.2 certificate. Full native settings and scope belong to [continuation tests](CONTINUATION-TESTS.md).
 
@@ -22,6 +23,17 @@ Documentation-only CI checks local links without installing/building the applica
 
 ## Release and environment limits
 
-Hosted 0.5.2 publication, frozen-artifact checks and installed replacement results are recorded only after they complete. Existing App monitoring was restored without changing its Continue prompt or logging/client preferences. No conversation-body storage or user-message replay was introduced. The dark menu/status redesign is not part of this recovery patch.
+The private [0.5.2 release](https://github.com/Oddity-Official/codex-auto-continuer/releases/tag/v0.5.2) was built from `08d74f34c673991242fabaede4a6ad6344b4f02a`. Hosted Windows, native compatibility, documentation and signed-release workflows passed. The stable Codex version equals the baseline, so tuple deduplication correctly ran one native tuple, not three differently named copies.
+
+The downloaded GitHub package passed the frozen UX probe: all 581 manifest file hashes, lean contents, spaces/percent paths, implicit defaults, hot reload, invalid-settings/prompt pause and repair, correlated scan feedback, exclusive single-cycle execution and graceful stop. It made zero Codex connections and dispatched zero user chats. This is a functional fixture probe, not manual tray inspection.
+
+The actual installed App upgraded from 0.5.1 through its signed updater. The durable job reached `completed`; all 581 installed file hashes match the release manifest. Settings, saved Continue prompt and durable state hashes were unchanged. The new tray and monitor report 0.5.2, monitoring, certified compatibility and zero pending work. The existing startup shortcut still targets the deployed tray with its settings path. Fresh Windows login was not simulated.
+
+| Published artifact | Bytes | SHA-256 |
+| --- | --- | --- |
+| Windows ZIP | 20,191,434 | `cff3e30e9d2087f88793837248ce3ead8fb96be2d6fe9da775fdb57d5774f24d` |
+| Source wheel | 102,057 | `49e5b0f269e293067b582b16135e043c228a3070b959a49e19ca707717f884bc` |
+
+No conversation-body storage or user-message replay was introduced. The dark menu/status redesign is not part of this recovery patch.
 
 Native computer-control APIs are disabled in this session's tool surface. This is separate from CAC's prohibition on UI automation as a continuation fallback; testing CAC's own UI is allowed. Fresh Windows login, different hardware and a fresh installed VS Code extension pass are not asserted. Experimental queue APIs still lack verified idempotency or an atomic quota/turn/add precondition. EXEs remain unsigned by Authenticode.
