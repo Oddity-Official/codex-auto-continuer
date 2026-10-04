@@ -25,6 +25,7 @@ from . import __version__
 from .config import Config, control_dir
 from .errors import AutoContinuerError
 from .telemetry import emit, setup
+from .atomic import replace_file
 
 TRUST = Path(__file__).with_name("updates.json")
 ROOT_ITEMS = {"CodexAutoContinuer.exe", "CodexAutoContinuer-CLI.exe", "_internal", "Licenses",
@@ -46,7 +47,7 @@ def write_json(path: Path, value: dict) -> None:
             json.dump(value, stream, indent=2)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        replace_file(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
 

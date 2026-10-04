@@ -40,12 +40,18 @@ try {
     Start-ScheduledTask -TaskName $identity
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds + 30)
     $resultPath = Join-Path $directory 'result.json'
-    while (-not (Test-Path -LiteralPath $resultPath) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 500 }
+    while (-not (Test-Path -LiteralPath $resultPath) -and [DateTime]::UtcNow -lt $deadline) {
+        Start-Sleep -Milliseconds 500
+        $task = Get-ScheduledTask -TaskName $identity
+        $info = Get-ScheduledTaskInfo -TaskName $identity
+        if ($task.State -eq 'Ready' -and $info.LastRunTime -gt [DateTime]::Now.AddMinutes(-10)) { break }
+    }
     $logPath = Join-Path $directory 'output.txt'
     if (Test-Path -LiteralPath $logPath) { Get-Content -LiteralPath $logPath -Raw | Write-Host }
     if (-not (Test-Path -LiteralPath $resultPath)) {
         Stop-ScheduledTask -TaskName $identity
-        throw 'The standard-user CI probe exceeded its scheduled deadline and was stopped.'
+        $info = Get-ScheduledTaskInfo -TaskName $identity
+        throw ('The native CI task did not report completion. Task Scheduler result: 0x{0:X8}. Inspect the entry log; the task was stopped.' -f $info.LastTaskResult)
     }
     $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
     if ($result.exitCode -ne 0) { throw "Standard-user CI probe failed with exit $($result.exitCode)." }

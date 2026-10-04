@@ -26,6 +26,7 @@ from . import telemetry
 from .actions import open_local
 from .status import read_runtime, owns_monitor, phase
 from .compatibility import CompatibilityGate
+from .atomic import replace_file
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -173,7 +174,7 @@ def _snapshot(config_file: Path, **fields) -> None:
     target = config_file.parent / "runtime-status.json"
     temporary = target.with_suffix(".tmp")
     temporary.write_text(json.dumps({"pid": os.getpid(), "updatedAt": time.time(), **fields}, indent=2), encoding="utf-8")
-    os.replace(temporary, target)
+    replace_file(temporary, target)
 
 
 def _update_setting(config_file: Path, **changes) -> int:

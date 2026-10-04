@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .errors import ConfigurationError
+from .atomic import replace_file
 import tomlkit
 
 
@@ -282,7 +283,7 @@ def _write_document(path: Path, document) -> None:
             tmp.unlink(missing_ok=True)
             raise
     try:
-        os.replace(tmp, path)
+        replace_file(tmp, path)
     finally:
         tmp.unlink(missing_ok=True)
 

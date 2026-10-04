@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .errors import ProtocolError
+from .atomic import replace_file
 
 STATE_VERSION = 2
 CLIENT_ID_NAMESPACE = uuid.UUID("64277943-c127-56b7-aaaf-bf6f761767b7")
@@ -140,7 +141,7 @@ def save_state(path: Path, state: State) -> None:
             stream.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(tmp, path)
+        replace_file(tmp, path)
     except OSError as exc:
         try:
             tmp.unlink(missing_ok=True)
