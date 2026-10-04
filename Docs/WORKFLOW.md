@@ -45,7 +45,7 @@ The importer resets the Codex record to the imported base and marks native verif
 
 ## Export boundaries
 
-Both builders exclude `.git`, local databases/telemetry in `.data/`, virtual environments, package installations, `node_modules`, build output, caches, temporary files, locks, `.env`, `Checkpoints/`, `Handoffs/` and prior transport metadata. Toolchain/vendor infrastructure under `Reference/` is excluded. Add project-specific secrets or runtime directories to configuration; do not assume every secret has a recognisable filename.
+Both builders exclude `.git`, local runtime data in `.data/`, portable `App/` and `data/`, root runtime settings/prompt/state/logs, virtual environments, package installations, `node_modules`, build output, caches, temporary files, locks, `.env` and `.env.*`, `Checkpoints/`, `Handoffs/` and prior transport metadata. Toolchain/vendor infrastructure under `Reference/` is excluded. Add custom secrets or runtime locations to configuration and Git ignore rules; do not assume every secret has a recognisable filename.
 
 Exports walk the relevant tree rather than relying on Git ignore rules. This intentionally includes ignored audit retention state and useful untracked evidence. Archive paths must work on both Windows and Linux. The source-only transport has a 128 MiB extracted-size limit and a 10,000-entry safety limit; imports also reject ZIPs larger than 256 MiB before opening their directory. If it exceeds those limits, remove duplicated/generated output before changing policy. Never silently drop requested evidence.
 

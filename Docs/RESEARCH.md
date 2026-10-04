@@ -2,7 +2,7 @@
 
 Reviewed on 3 October 2026 on native Windows 11, Python 3.13.7 and Codex CLI/app-server 0.160.0. The imported base was ChatGPT v001, with all 46 file hashes verified before local edits. Native 0.1.0 work is committed as `1ef490f`. Version 0.2.0 adds portable tray controls and metadata telemetry.
 
-Current results belong to [VALIDATION.md](VALIDATION.md). Current probe source is in [the tray-release audit](Audits/2026-10-03-02/AUDIT.md). Earlier native evidence is retained in [the 0.1.0 audit](Audits/History/2026-10-03/AUDIT.md).
+Current results belong to [VALIDATION.md](VALIDATION.md). Tray-release probes are retained in [the dated audit](Audits/History/2026-10-03-02/AUDIT.md). Earlier native evidence is retained in [the 0.1.0 audit](Audits/History/2026-10-03/AUDIT.md).
 
 ## Interface authority
 

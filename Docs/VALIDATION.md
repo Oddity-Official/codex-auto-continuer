@@ -1,102 +1,71 @@
 # Verification
 
-Current verification: 3 October 2026. Application: 0.3.0. Imported base: verified ChatGPT v001, bootstrap commit `643ba04`. Earlier results remain in [the historical records](README.md#historical-records); dated observations have not been rewritten as current results.
+Current checks completed on 4 October 2026. Application: 0.3.0. Reviewed baseline: `f8abd3c`; imported checkpoint: v001, verified bootstrap `643ba04`. Publication work changes documentation, workflow and tests, not application behavior. [Historical records](README.md#historical-records) retain earlier release, activation and telemetry measurements.
 
-## Environment and settings
+## Environment
 
 | Item | Exact value |
 | --- | --- |
-| Operating system | Windows 11 build 10.0.26300, x86_64 |
-| Shell | PowerShell 7.6.6 |
-| Python | CPython 3.13.7 |
-| Codex CLI and daemon | 0.160.0 |
-| Tray and settings dependencies | pystray 0.19.5; Pillow 12.3.0 and TOMLKit 0.15.1 in the build environment |
-| Source gate dependencies | Global Pillow 10.4.0 and TOMLKit 0.13.2; unrelated versions preserved |
-| Portable builder | PyInstaller 6.22.3, hooks 2026.8; folder-mode GUI and console EXEs |
-| SVG renderer | Build-only resvg-py 0.5.0; excluded from the runtime |
-| Discovery | 24 hours from failed-turn completion; durable recorded obligations survive lookback |
-| Clients | VS Code, CLI and Desktop selected; executor and sub-agent jobs always excluded |
-| Poll interval | 30 seconds |
-| RPC total deadline | 12 seconds |
-| Codex subprocess deadline | 20 seconds with process-tree cleanup |
-| Dispatch spacing | 2 seconds |
-| Reconnect backoff | 5 seconds |
-| Ambiguous-send recovery | 15 seconds; no blind retry |
-| Daemon autostart | Enabled |
-| Release telemetry | Private; compact summaries; trace disabled; 8 MiB per stream, three gzip backups |
-| User deployment telemetry | Detailed; compact summaries; trace disabled; 8 MiB per stream, three gzip backups |
-| Prompt | UTF-8 Markdown, default Continue; re-read before each send; maximum 64 KiB |
-| Settings | Annotated TOML overrides; maximum 64 KiB; validated cycle-boundary reload |
-| Tray controls | Serialized state-changing commands, 90s or 120s bounds; direct asynchronous file actions |
-| Status | Local snapshot, one-second refresh; no Codex RPC for ordinary status |
+| Native host | Windows 11 build 10.0.26300, x86_64; PowerShell 7.6.6 |
+| Python | CPython 3.13.7; isolated virtual environments |
+| Runtime dependencies | pystray 0.19.5; Pillow 12.3.0; TOMLKit 0.15.1; six 1.17.0 |
+| Test/build dependencies | pytest 9.1.1; PyInstaller 6.22.3; hooks 2026.8; setuptools 84.0.0; resvg-py 0.5.0 |
+| Native Codex baseline | CLI and daemon 0.160.0 |
+| Frozen-probe settings | No clients selected; poll 1s; isolated control directory; no Codex connections |
+| Normal release defaults | All three interactive clients; 24h discovery; poll 30s; prompt Continue; Private logging; trace off; 8 MiB/three gzip backups |
 
-## Native gate
+## Native and clean-source checks
 
 ```powershell
 pwsh -NoProfile -File scripts/verify-windows.ps1
+pwsh -NoProfile -File scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('Docs/Audits/2026-10-03-03/probe_clean_source.py') -TimeoutSeconds 600
 ```
 
-Final result: 161 passed, no skips, in 29.49 seconds. Bytecode compilation and version smoke passed, reporting 0.3.0. The gate bounds pytest at 180 seconds, compileall at 120 seconds and version import at 30 seconds, with process-tree termination on timeout.
+| Check | Observed result |
+| --- | --- |
+| Final native gate | 163 passed, no skips or warnings, 43.70s; compileall and version 0.3.0 passed; explicit interpreter selection exercised |
+| Fresh source export | 96 files copied through transport exclusions; no parent checkout, deployed app, data, Git metadata or pre-existing venv required |
+| Fresh dependency installation | `.[dev,build]` installed in a new venv without a second global installation |
+| Fresh native gate | 163 passed, no skips or warnings, 54.69s; compileall and version passed |
+| Fresh portable and wheel builds | Both passed; portable ZIP CRC and all 521 manifest file hashes verified |
+| Fresh frozen integration | Default settings/prompt, exclusive once, scan feedback, same-PID reload, invalid-settings/prompt pause and repair, graceful stop; zero Codex connections or user-chat dispatches |
+| Current artifacts and docs | Deployed 521 file hashes, wheel module/asset parity and repository Markdown file targets passed |
 
-The retained safety suite covers structured quota authority, completion-time recency, exact targeting, durable state, same-second manual progress, final resume/quota checks, separate writers, multi-chat permission rechecks, exact stale queue deletion, ambiguous sends, protocol deadlines, native sockets and locks, shortcut ownership and quoting, and body/credential canaries.
+The gate selects the local venv, or the configured launcher if no venv exists; `-PythonPath` is explicit. Version/import checks are bounded at 30s, pytest at 180s and compileall at 120s. The clean-source probe bounds environment creation at 60s, installation at 180s, gate at 300s, builder at 360s, wheel at 120s and frozen integration at 150s; each timeout stops its owned process tree.
 
-New UX checks cover commented implicit defaults, comment-preserving tray edits, all eight client combinations, paused dispatch on invalid settings with preserved pending work, recovery after repair, no connection when all clients are disabled and state is empty, local-only status, request-correlated scan results, default restoration preserving a custom prompt and state, and file actions independent of busy monitor controls. Invalid prompts are reported before hidden startup.
+Native socket tests initially failed under the venv when their listeners were created in this host's system temp directory, with Winsock 10022 and cleanup error 1920. Canonicalizing the path did not fix it. Short checkout-local socket fixtures pass under both global and venv interpreters; a venv connection to the real daemon also passes. The production transport was not changed. The exact host/Windows cause is not established.
 
-Telemetry checks cover compact change-only events, per-cycle RPC timing aggregates, explicit dispatch events, exact gzip preservation and both privacy modes. Nested sub-agent provenance is reduced to its source kind; parent IDs, role text and nicknames cannot leak through that nested payload. Custom-source names obey the same privacy rule as other names.
+The suite covers quota authority, exact targeting, durable obligations, manual-progress cancellation, ownership, ambiguous sends, protocol deadlines, native sockets and locks, settings/prompt safety, native About closure, popup highlights, startup ownership, telemetry privacy/rotation and destructive-path/transport boundaries. Two new regressions verify Git exclusions and source-export privacy with synthetic canaries, including environment-file variants and non-default backup counts.
 
-## Native menu and dialogs
-
-The Win32 popup-lifetime adapter remains in place. Real HMENU regressions preserve Windows' MFS_HILITE state during background and selected-item callbacks, prevent reentrant replacement, and refresh labels/checkmarks/enabled states on the next opening. Native tracking, foreground and cursor calls are intercepted; this is not a visual mouse-hover review.
-
-Three tests exercise actual owned Windows About dialogs with the real tray UI loop. About runs on a separate native thread; the popup callback has returned before interaction. The tests close the actual OK button, post X closure and post Escape. Each completes without leaving a pending dialog. Button delivery uses a one-second SendMessageTimeout bound and the whole focused check is bounded at 30 seconds. Only the tests' own windows are operated, never the user's installed app.
-
-The native single-OK dialog may expose its OK button as IDCANCEL rather than IDOK; the probe checks the actual button label instead of assuming its numeric ID. About and confirmation dialogs have dedicated Windows owners and do not occupy the monitor-control worker.
-
-The observed old About path invoked an unowned modal dialog directly inside the right-click callback. That structural blocking path has been removed. The user's exact physical old-window failure was not replayed by operating their active desktop.
-
-## Frozen release probe
+## Publication privacy
 
 ```powershell
-& './scripts/run-project-command.ps1' -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('Docs/History/2026-10-03-ux-release/probe_portable.py') -TimeoutSeconds 150
+pwsh -NoProfile -File scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('Docs/Audits/2026-10-03-03/probe_publication.py') -TimeoutSeconds 120
 ```
 
-The final 0.3.0 ZIP passed from an owned path containing spaces and a percent sign. Command bounds are 20 seconds, graceful stop 65 seconds, state waits 15 seconds, outer bound 150 seconds. The probe uses an isolated control directory and `clients = []`, with a one-second poll interval. It makes zero Codex connections and zero user-chat dispatches.
+The initial scan checked all five existing commits and 171 unique Git blobs. No credential-shaped values, real local profile/project paths, runtime data or private author emails were found. Authors use a GitHub no-reply address. The changed working tree is scanned separately before delivery.
 
-Verified: 521 manifest-listed release files, ZIP CRC and SHA-256 checks, original dependency notices and matching LGPL tray source, no developer Docs/runtime data/renderer in the release, short README parity, implicit default settings without creating a file, local portable data, default Continue prompt, exclusive-once protection, scan acknowledgement and completed counts, privacy hot reload with the same PID, invalid-settings pause/repair with the same PID, invalid-prompt pause/repair with the same PID, and graceful stop.
+The portable ZIP has 522 entries: 521 release files plus its manifest. Inspection covers both executable CArchives/PYZ archives, nested `base_library.zip`, 440 Python bytecode modules and embedded code filenames, not just compressed file bytes. No local profile/project paths or credential matches were found. The 30-entry wheel is also clean. These checks combine targeted scanning with manual review; they are not proof that an arbitrary secret can always be recognized.
 
-[The integration sources](History/2026-10-03-ux-release/RESULTS.md) retain the probe and exact measured results. Earlier real interactive CLI and Desktop-style separate-owner queue delivery remain evidence for unchanged recovery interfaces. They were not re-run merely to increase test counts. The actual VS Code extension UI remains unverified.
+One public Git repository retains sanitized audits and manifests. No history rewrite or GitHub upload was performed. Runtime folders, root runtime files, environment-file variants and log backups are excluded from Git and source export through separate rules. Custom data locations still require explicit exclusions.
 
-## Package integrity
+The Windows workflow uses read-only permissions and commit-pinned official actions, without persisted checkout credentials. Its equivalent commands passed locally; GitHub-hosted execution remains unobserved until the repository is uploaded.
 
-```powershell
-pwsh -NoProfile -File scripts/build-portable.ps1
-& './scripts/run-project-command.ps1' -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('Docs/History/2026-10-03-ux-release/probe_integrity.py') -TimeoutSeconds 40
-```
+## Release artifacts
 
-The builder is bounded at 360 seconds, PyInstaller at 300 seconds. It renders the SVG before packaging, includes notices and matching tray source, and verifies every manifest hash and ZIP CRC. The integrity probe verifies deployed release-file hashes, source-wheel module/asset parity, MIT/runtime dependency metadata and all repository Markdown file targets.
+The unchanged portable ZIP is `dist/codex-auto-continuer-0.3.0-windows-x86_64.zip`, 16,299,281 bytes. SHA-256: `f3377108c1435400b6c6d723eb84f96e14245d12846dc1a6125b10a1ab5ed545`.
 
-Shareable artifact: `dist/codex-auto-continuer-0.3.0-windows-x86_64.zip`, 16,299,281 bytes. SHA-256: `f3377108c1435400b6c6d723eb84f96e14245d12846dc1a6125b10a1ab5ed545`.
+The wheel is `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`, 72,538 bytes, with updated README metadata. SHA-256: `ff24973657c9482d457a5cb28319b49b07df447f848dd5c328014e6ff66076e1`.
 
-Wheel: `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`. Stable source handoff: `codex-auto-continuer-codex-handoff.zip`. Runtime data, App, installed dependencies, renderer binaries, toolchains and build output are excluded from source transport.
-
-## Installed activation and log size
-
-The deployment is `App/CodexAutoContinuer.exe`, with annotated settings under `App/data/settings.toml`. The original JSON is retained in a recoverable previous-App backup, not used as a second active format. The saved nine-byte Continue prompt has unchanged SHA-256 `adb2540b253f1647fc7311e6085e4ab2d8c3425579873ed4d51ec2b373c794f3`. Detailed logging remains selected.
-
-The final deployment stopped the verified old supervisor gracefully and checked the exact tray executable/command line before stopping it. All seven current data files matched their backup hashes before activation. Previous App folders remain in ignored local staging for recovery. No pending obligations were present; state was not manufactured or deleted.
-
-The managed Startup shortcut targets the GUI EXE with `--config "...App/data/settings.toml" tray`. Actual shortcut launch emitted tray.ready for 0.3.0 and reached monitoring with three chats checked and zero detected/dispatched/pending. All 521 deployed release files match the final manifest. The installed Python package also reports 0.3.0 and controls the registered App copy. Startup and Detailed telemetry are enabled. Unrelated global dependency versions remain intact.
-
-A short observational comparison used the same host, all three clients, three recent chats, 30-second polling and Detailed privacy. Ten old completed intervals averaged 32,876.9 bytes and 26 events; four initial new intervals averaged 971.5 bytes and two events, with zero dispatches in both samples: about 97.0% fewer bytes. Startup was excluded. This is a local sample, not a universal benchmark or a completeness proof.
-
-The old 15,688,423-byte telemetry stream became a 1,846,324-byte gzip backup. Decompression matched the original backup byte-for-byte. Existing logs were preserved, not scrubbed.
+The stable full-source handoff is `codex-auto-continuer-codex-handoff.zip`; its manifest records source hashes and Git provenance. It includes development records, unlike the lean portable app. Builds are not claimed to be byte-for-byte reproducible.
 
 ## Remaining limits
 
 - Actual VS Code extension UI delivery and a natural account-reset automatic continuation have not been observed. Shared-protocol support is an inference where direct evidence is unavailable.
 - Two simultaneous real quota failures were not available; multi-chat safety is covered by regression fixtures.
 - Shortcut launch is verified, not a fresh Windows login.
-- Native dialog/button checks are not a manual mouse or screen-reader review. Associated-editor target and asynchronous launch are tested, not external editor startup performance.
+- Native dialog/button checks are not a manual mouse or screen-reader review. Associated-editor launch is tested, not external editor startup performance.
 - Queue addition has no verified atomic turn precondition or idempotency contract. Immediate revalidation cannot eliminate every concurrent-progress race.
 - Subsequent-turn telemetry reports observed metadata, not guaranteed attribution to a queued message.
 - Other Windows/Codex installations must pass capability checks. EXEs are unsigned; SmartScreen reputation and other machines have not been tested.
+- GitHub-hosted CI has not run. Five failed system-temp socket fixtures remain outside the repository because the host rejected their cleanup; no such fixtures are in source or release artifacts.

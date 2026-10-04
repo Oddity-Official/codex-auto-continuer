@@ -11,47 +11,27 @@ This is an independent tool, not an OpenAI product. It uses experimental local C
 3. Right-click the tray icon. Select `Start With Windows` to enable per-user login launch.
 4. Select `Modify Prompt` to open `data/continue-prompt.md` in your default Markdown editor. The default is simply `Continue`. Save as UTF-8; the next continuation reads the saved file.
 
-The downloadable folder includes a [short user guide](Docs/USER-GUIDE.md), runtime, licenses and checksums. Developer documentation and audit history stay in this repository and the source handoff.
+You need Windows 11 x86_64 and a signed-in native Codex installation. The release bundles Python and tray dependencies; users do not need Python, PowerShell 7, WSL or administrator rights. Startup management can use Windows' built-in PowerShell.
 
-The portable release needs Windows 11 x86_64 and a signed-in native Codex installation. It bundles Python and the tray dependencies. Recipients do not need Python, PowerShell 7, WSL or administrator privileges. Startup management can use Windows' built-in PowerShell.
+Codex 0.160.0 is the tested baseline. Newer versions must expose the required capabilities. CAC finds a native `codex.exe` on `PATH`, in the standard Desktop installation, or behind the npm launcher. Set `codex_executable` in settings for another absolute native EXE path.
 
-Codex CLI and app-server 0.160.0 are the tested baseline. Newer versions must expose the same required capabilities. The tool finds `codex.exe` on `PATH`, the standard Desktop installation, or a native executable behind the npm launcher. Set `codex_executable` in settings for another absolute native EXE path.
+The EXEs are unsigned. Windows may display a reputation warning. Verify the download and its provenance; this project does not provide a code-signing certificate.
 
-The EXEs are unsigned. Windows may display a reputation warning. Verify your download and its provenance; this project does not provide a code-signing certificate.
-
-## Tray and terminal controls
+## Controls and settings
 
 Double-click the icon or select `Status` for local status and last scan counts. Green means monitoring, including waiting for quota. Yellow means stopped, starting, paused or reconnecting. Red means continuation is blocked by an error. `Exit CAC` stops the supervisor before closing the tray.
 
-The companion terminal program is `CodexAutoContinuer-CLI.exe`. The menu and CLI control the same supervisor and saved settings:
-
-| Tray action | Terminal command |
-| --- | --- |
-| Status | `status` |
-| Start or stop monitoring | `start`, `stop` |
-| Modify prompt | `modify-prompt` |
-| Open settings or telemetry folder | `open-config`, `open-logs` |
-| Restore defaults, preserving the selected prompt, state, logs and login shortcut | `restore-defaults` |
-| Independently select VS Code, CLI and Desktop; select all; pause | `clients vscode cli desktop`, `clients all`, `clients` |
-| Detailed or Private telemetry, with a confirmation in the tray | `logging detailed`, `logging private` |
-| Start with Windows toggle | `install-startup`, `uninstall-startup` |
-| Open tray; show version | `tray`, `--version` |
-
-The terminal also offers `run` for foreground diagnostics, `restart`, `scan`, `once`, `status --live`, `config-path` and explicit `init`. These diagnostic commands stay out of the everyday tray menu. `--help` lists the full interface.
-
-For example, from the extracted folder:
+Use the tray to select clients, edit the prompt and settings, choose Private or Detailed logging, and toggle login launch. The companion terminal controls the same supervisor and saved settings:
 
 ```powershell
 .\CodexAutoContinuer-CLI.exe status
 .\CodexAutoContinuer-CLI.exe scan
-.\CodexAutoContinuer-CLI.exe --config 'D:\My settings\settings.toml' status
+.\CodexAutoContinuer-CLI.exe --help
 ```
 
-`scan` acknowledges its request, waits for that scan to complete and prints the actual counts. While stopped, it performs one cycle. Both can send an eligible continuation: neither is a preview. `stop` finishes the current cycle and preserves pending obligations.
+`scan` reports its completed counts and can send an eligible continuation; it is not a preview. `stop` finishes the current cycle and preserves pending work. The [short user guide](Docs/USER-GUIDE.md) covers every menu action, terminal diagnostics and moving a used copy. It is shipped beside the EXEs with the runtime, licenses and checksums, not developer docs or audits.
 
-## Editable settings
-
-`data/settings.toml` contains annotated overrides. If it is missing, built-in defaults apply without writing a settings file. `Modify Settings` creates a commented template on demand. Uncomment only the values you want to override:
+`Modify Settings` opens `data/settings.toml`, creating a commented template if missing. Built-in defaults apply without a file. Uncomment only values you want to override:
 
 ```toml
 clients = ["cli", "desktop"]  # Monitor these clients; [] pauses client monitoring.
@@ -59,15 +39,15 @@ poll_seconds = 30.0  # Seconds between scans.
 detailed_telemetry = true  # Retain real metadata locally, never conversation bodies.
 ```
 
-Tray changes preserve comments. Valid saved changes apply automatically at safe cycle boundaries without restarting the supervisor. Invalid settings or an empty, invalid or unreadable prompt pause continuation until repaired; pending work is preserved. File-opening actions bypass the monitor control queue. If Windows has no file association, the file opens in Notepad; other launch errors are reported.
+Tray changes preserve comments. Valid edits apply between cycles without restarting. Invalid settings or an empty, invalid or unreadable prompt pause continuation until repaired, preserving pending work. Files open asynchronously in their associated editor, or Notepad if no association exists.
 
-`Restore Defaults` preserves the selected prompt and its content, pending state, existing logs and Windows login shortcut, while future logging returns to Private. It does not delete your files.
+`Restore Defaults` preserves the selected prompt and its content, pending state, existing logs and login shortcut. Future logging returns to Private; existing files are not deleted.
 
-## Which Codex clients are covered
+## Client coverage
 
-The default selection includes local interactive CLI, VS Code extension and Desktop sessions visible to the same native Codex home and account. Each client can be enabled independently. CLI selection uses its source even if its originator says Desktop. Desktop selection checks the verified `vscode` plus `Codex Desktop` originator pair, or configured Desktop custom sources. It always excludes `codex exec`, sub-agents, arbitrary app-server sessions and unknown sources.
+Local interactive CLI, VS Code extension and Desktop sessions are selected by default. Each can be enabled independently. They must share the same native Codex home and account. `codex exec`, sub-agents, arbitrary app-server sessions and unknown sources are always excluded.
 
-Shared Codex internals are not enough by themselves. Clients can own separate app-server processes. We verify the exact active-writer condition and use Codex's shared queue without stealing ownership. [Official app-server documentation](https://learn.chatgpt.com/docs/app-server) describes the shared integration layer; [our native probes](Docs/RESEARCH.md) establish the recovery path on the tested installation.
+Shared internals do not guarantee shared chats: clients may use different homes, accounts or app-server processes. CAC checks the exact active writer and uses Codex's shared queue without stealing ownership. [Native research](Docs/RESEARCH.md) records the tested recovery path and source-filter rules.
 
 Remote, cloud, WSL, different Windows users, different `CODEX_HOME` directories and different accounts are not automatically covered. Real CLI queue delivery and Desktop-owned server delivery have native evidence. VS Code filtering is tested, but the actual extension UI was not available for an end-to-end test.
 
@@ -75,29 +55,25 @@ Remote, cloud, WSL, different Windows users, different `CODEX_HOME` directories 
 
 The latest turn must be `failed` with structured `usageLimitExceeded`. A network error, approval, user-input wait or interrupted task is not eligible. The discovery window is 24 hours from failure completion, including failures before launch. Once recorded, an obligation remains durable beyond that window.
 
-Reset timestamps are hints, not permission. Only `ordinaryUsageAllowed == true` authorizes dispatch. We re-read the exact thread and failed turn immediately before sending. Manual progress cancels the obligation and deletes only this tool's still-queued message.
+Reset timestamps are hints, not permission. Only `ordinaryUsageAllowed == true` authorizes dispatch. CAC re-checks the exact failed turn immediately before sending. Manual progress cancels stale work and deletes only CAC's still-queued message.
 
 The queue has no verified atomic turn precondition or idempotent-send guarantee. A narrow concurrent-progress race remains. An ambiguous send is reconciled, never blindly retried. Do not delete `state.json` to force a retry. See [the safety model](Docs/ARCHITECTURE.md).
 
 ## Local telemetry and privacy
 
-There is no remote analytics, upload endpoint or automatic updater. This tool writes local JSONL telemetry: one JSON event per line. Codex's own network traffic and telemetry are separate.
+There is no remote analytics, upload endpoint or automatic updater. Codex's own network traffic and telemetry are separate.
 
-Beside the EXEs, `data/` holds settings, Markdown prompt, durable state, runtime status, `telemetry.jsonl`, `tray.jsonl` and a private identifier-correlation key. Compact events capture process/version information, changed settings and quota, relevant chat metadata changes, per-cycle RPC timing aggregates, failed-turn metadata, revalidation, queue ownership, every dispatch intent and result, cancellation, reconnection, errors and subsequent turn outcomes. Error diagnostics contain exception types and stack locations, not arbitrary server error text.
+Beside the EXEs, `data/` holds settings, prompt, pending state, local status and compact JSONL logs. Logs retain quota failures, recovery decisions, dispatch results, subsequent-turn observations and RPC timings so a later investigation can follow an entire recovery.
 
-The default private mode omits chat names and filesystem paths from telemetry. Thread, turn and queue identifiers become stable keyed pseudonyms, so events remain traceable within one installation. Detailed mode retains real identifiers, chat names and paths. Neither mode records conversation bodies, prompt contents, authentication tokens, credentials, raw RPC payloads or exception locals. A prompt hash and length identify which saved prompt was used. Numeric token-usage notifications are retained when available.
+Private mode omits names and paths and uses keyed identifiers. Detailed mode retains real identifiers, chat names and paths. Neither records conversation bodies, prompt text, credentials, raw RPC payloads or exception locals. Each stream defaults to 8 MiB plus three gzip backups. `diagnostic_trace` adds allowlisted request summaries. Settings comments explain retention and tracing.
 
-Default retention is 8 MiB per stream plus 3 gzip-compressed backups. Unchanged routine RPC summaries are suppressed; each cycle retains counts and timing totals. `diagnostic_trace = true` adds allowlisted per-request summaries when needed, independently of Private/Detailed privacy. `log_max_mb` and `log_backups` are configurable. Switching to Private affects future events; it does not scrub older detailed logs. Files are not encrypted.
+Files are not encrypted. Switching to Private affects future events, not old detailed logs. Private logging does not anonymize pending state or user-authored settings and prompts. Share the clean release ZIP, not a used `data/` folder. See [safe reporting](SECURITY.md) before attaching diagnostics.
 
-Private telemetry is not an anonymized installation: `state.json` needs real IDs to target chats, and settings and the prompt are user-authored. Do not share the whole used `data/` folder without inspecting it. Share the clean release ZIP instead. Builds exclude all runtime data.
-
-Each account also has small coordination files under `%LOCALAPPDATA%\CodexAutoContinuer`. These prevent two portable copies from monitoring simultaneously. A pip-installed CLI controls the last registered app copy. Source checkouts use `.data/runtime`; portable EXEs use their own adjacent `data` folder.
-
-To move a used copy, quit first, move the entire folder with `data`, then launch from the new location. Reinstall its login shortcut. A new clean release starts with private logging and no obligations.
+Small per-user coordination files prevent competing portable copies. A pip-installed CLI controls the last registered app copy. Source checkouts use `.data/runtime`; portable EXEs use adjacent `data`. A clean release starts with Private logging and no obligations.
 
 ## Why this design suits us
 
-The public survey below was checked on 3 October 2026. It describes each project's documented approach, not a benchmark or a claim to have found every existing tool.
+The survey below was checked on 3 October 2026. It describes documented approaches, not a benchmark or a claim to have found every existing tool.
 
 | Tool | Documented approach | Why ours fits this workflow |
 | --- | --- | --- |
@@ -111,24 +87,12 @@ The public survey below was checked on 3 October 2026. It describes each project
 | [Perpetual](https://github.com/SakethSripada/Perpetual) | VS Code orchestration, provider switching, cloud handoff and Docker | We want to stay on the original Codex task and wait for authorized usage |
 | [rate-tray](https://github.com/nowrap/rate-tray), [Codex Companion](https://github.com/heycarollan/codex-usage-status), [Limit Reset Tracker](https://codexlimitreset.com/) | Usage displays, alerts or countdowns rather than this exact recovery policy | We need automatic exact-chat continuation as well as visibility |
 
-Our preference is about fit: native Windows, existing interactive chats, exact-thread checks, no UI input, editable Markdown and local diagnostics. It is not a claim that other tools are worse for every user. Experimental queue dependence is our main tradeoff.
+Our preference is about fit: native Windows, existing interactive chats, exact-thread checks, no UI input, editable Markdown and local diagnostics. Other tools can suit different users. Experimental queue dependence is our main tradeoff.
 
-## Source install and build
+## Development and repository layout
 
-For source development, use Python 3.13 and PowerShell 7. Build in an isolated virtual environment:
+[Contributing](CONTRIBUTING.md) covers the isolated Python setup, Windows verification, source launch and release build. Windows CI runs the tests and produces a clean portable ZIP and wheel; it does not publish releases automatically.
 
-```powershell
-py -3.13 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install '.[dev,build]'
-pwsh -NoProfile -File scripts/verify-windows.ps1
-pwsh -NoProfile -File scripts/build-portable.ps1
-.\.venv\Scripts\python.exe -m pip wheel --no-deps --no-build-isolation --wheel-dir dist .
-```
+`src/` owns runtime code and the [SVG icon](src/codex_auto_continuer/assets/cac.svg); `tests/` owns product regressions; `scripts/` owns build and verification tools. [Docs](Docs/README.md) links the user guide, technical contracts and dated evidence. Audit history and the ChatGPT/Codex manifests are tracked development records, not runtime requirements or downloadable-app contents.
 
-The native gate uses the configured `py -3.13` interpreter; install `.[dev]` there too if it lacks test dependencies. Source commands work as `python -m codex_auto_continuer ...` after installation. `python -m codex_auto_continuer tray` provides the same tray UI.
-
-The portable builder creates a clean folder release, dependency notices and source, a per-file SHA-256 manifest and a verified ZIP. It never copies deployed runtime data. One-folder packaging avoids a self-extracting runtime on every launch and keeps tray libraries replaceable. [PyInstaller operating modes](https://pyinstaller.org/en/stable/operating-mode.html) explain this tradeoff.
-
-The lossless icon master is [cac.svg](src/codex_auto_continuer/assets/cac.svg). Build-only `resvg-py` renders its three runtime PNG states and the multi-size EXE icon; it is not shipped as a runtime dependency. TOMLKit preserves settings comments.
-
-The wheel is `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`. The stable source handoff is `codex-auto-continuer-codex-handoff.zip`, produced by `scripts/pack-codex-handoff.ps1`. Our code uses the [MIT license](LICENSE). See [dependency notices](Docs/THIRD-PARTY.md) and [the documentation index](Docs/README.md).
+Our code uses the [MIT license](LICENSE). See [dependency notices](Docs/THIRD-PARTY.md). Runtime data, deployed apps, virtual environments and build output remain local and are excluded from source transports.

@@ -93,6 +93,36 @@ def test_handoff_is_self_contained_and_preserves_bytes(project):
         assert archive.testzip() is None
 
 
+def test_source_export_excludes_portable_data_settings_and_env_variants(project):
+    actual = json.loads((SCRIPTS.parent / workflow.CONFIG).read_text(encoding="utf-8"))
+    config = workflow.settings(project)
+    for key in ("exclude_directories", "exclude_files"):
+        config[key] = actual[key]
+    (project / workflow.CONFIG).write_text(json.dumps(config), encoding="utf-8")
+    private_names = ["data/state.json", "data/telemetry.jsonl", "settings.toml",
+                     "continue-prompt.md", "telemetry.jsonl.9.gz", ".env.local", "nested/.env.production"]
+    for name in private_names:
+        path = project / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"private export canary")
+    archive_path = workflow.build(project)
+    with zipfile.ZipFile(archive_path) as archive:
+        assert not set(private_names) & set(archive.namelist())
+        assert all(b"private export canary" not in archive.read(name) for name in archive.namelist())
+        assert archive.read("src/tool.py") == b"old source\r\n"
+
+
+def test_git_ignores_runtime_and_env_files_but_keeps_public_sources(project):
+    shutil.copyfile(SCRIPTS.parent / ".gitignore", project / ".gitignore")
+    private_names = ["data/state.json", "App/data/settings.toml", ".data/runtime/telemetry.jsonl",
+                     "settings.toml", "continue-prompt.md", "telemetry.jsonl.1.gz",
+                     ".env.local", "nested/.env.production"]
+    result = subprocess.run(["git", "-C", str(project), "check-ignore", "-z", "--stdin"],
+                            input="\0".join(private_names + ["src/tool.py", "Docs/README.md"]).encode(),
+                            capture_output=True, check=True, timeout=15)
+    assert set(result.stdout.decode().rstrip("\0").split("\0")) == set(private_names)
+
+
 def test_checkpoint_preview_and_import_preserve_runtime_and_backup(project, tmp_path):
     archive = checkpoint(project, tmp_path)
     before = (project / "src/tool.py").read_bytes()

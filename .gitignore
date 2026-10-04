@@ -6,6 +6,17 @@
 /Docs/Audits/.audit.lock
 /.data/
 /App/
+/data/
+/settings.toml
+/continue-prompt.md
+/state.json
+/runtime-status.json
+/telemetry.jsonl*
+/tray.jsonl*
+/telemetry.key
+/owner.json
+.env
+.env.*
 __pycache__/
 .pytest_cache/
 .ruff_cache/

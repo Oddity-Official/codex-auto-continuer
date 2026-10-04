@@ -2,54 +2,51 @@
 
 ChatGPT base checkpoint: v001
 
-Updated: 2026-10-03
+Updated: 2026-10-04
 
 ## Imported base
 
-The extracted checkpoint matched all 46 checksum entries. A standalone Git repository preserves the verified base as `643ba04`. ChatGPT's manifest is unchanged. Earlier native work and verification remain in Git and indexed historical evidence.
+All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba04` preserves v001 and its original checksum manifest. ChatGPT's manifest is unchanged. The stale imported checksum file is not retained as a current-source checksum; each new transport owns its generated manifest.
 
-## Local changes
+## Local product changes since the base
 
-- Application version 0.3.0, with independent VS Code, CLI and Desktop choices; executor and sub-agent jobs remain excluded.
-- Native Windows socket transport, exact-thread separate-writer handling, quota-only authority, 24-hour failed-turn discovery, durable obligations, stale queue cancellation and conservative ambiguous-send behavior remain intact.
-- Annotated TOML overrides use built-in defaults when absent and preserve comments on tray edits. Valid saved changes apply at cycle boundaries; invalid settings or prompts pause dispatch without losing state and recover after repair.
-- The default saved Markdown prompt is Continue. Existing user text is preserved and re-read before every send.
-- The tray contains everyday controls only. Diagnostic scan/once/restart/init remain in the CLI; scan now acknowledges its exact completed request and returns actual counts.
-- About/status/privacy/reset dialogs have independent owned native UI threads; the tray's popup and monitor worker remain responsive.
-- Settings/prompt/folder actions run directly and asynchronously, independent of the control queue and companion EXE startup.
-- Private/Detailed remains a privacy choice. Compact logging records cycle/RPC aggregates, changed metadata and explicit critical recovery events; optional trace enables allowlisted RPC summaries.
-- Rotation defaults to 8 MiB plus three compressed backups per stream. Nested excluded sub-agent payloads are not copied into telemetry.
-- A project-owned lossless SVG renders the green/yellow/red runtime assets and multi-size EXE icon at build time, without a shipped SVG renderer.
-- Portable packaging contains a short guide, licenses, matching LGPL tray source, runtime and per-file checksums, not developer docs or audits.
-- Shared per-user locks still prevent competing app copies while data remains portable.
-- MIT licensing and the concise primary-source comparison remain in the public README.
-- The user's installed App and Python package are 0.3.0, monitoring at Windows login, with all three clients, Detailed logging, unchanged Continue prompt and compact 8 MiB/three-backup retention.
-- Previous deployments and original JSON/logs remain in recoverable ignored local staging; runtime data is excluded from artifacts.
+- Native Windows socket transport, exact-thread separate-writer queue handling, quota-only authority, 24-hour discovery, durable obligations, stale cancellation and conservative ambiguous-send recovery.
+- Portable 0.3.0 Windows tray and companion CLI, shared per-user locks, owned non-blocking native dialogs, preserved popup highlights, per-user login launch and independent interactive-client choices. Executor/sub-agent jobs remain excluded.
+- Annotated TOML overrides with implicit defaults, comment-preserving edits and safe cycle-boundary reload. Invalid settings or prompts pause dispatch and preserve pending work. Saved Markdown defaults to Continue and is re-read before every send.
+- Compact local telemetry with Private/Detailed modes, keyed private IDs, allowlisted tracing, RPC/cycle aggregates, explicit recovery events and compressed rotation. Conversation bodies, credentials, raw RPC payloads and nested excluded sub-agent provenance are not logged.
+- Lossless SVG-derived green/yellow/red assets; clean one-folder builds with a short guide, licenses, corresponding tray source and checksums, without developer records or runtime data.
+- The installed App and Python package remain 0.3.0. All three clients, Detailed logging and Windows login startup remain enabled locally. The existing Continue prompt and runtime data were not changed by publication work.
+
+## Publication work
+
+The user chose one public repository. Sanitized audits, history and ChatGPT/Codex manifests remain Git-tracked; no separate public checkout, historical rewrite or GitHub upload was performed.
+
+- Git and source-export exclusions now protect root portable data, root runtime settings/prompt/state/logs, any root log backup count and environment-file variants. Synthetic regression canaries prove the source boundary; custom locations still need explicit exclusions.
+- The Windows gate uses the local venv without a second global install, supports explicit interpreter selection and fails clearly on a wrong Python version.
+- Native socket fixtures use short ignored checkout-local staging. This fixes the observed host-specific system-temp fixture failure; the actual daemon connection works and production socket code is unchanged.
+- README and docs navigation prioritize usage, source setup/build, safety and current evidence. Contributor and security guides distinguish public development records from lean app releases. Prior 0.3.0 verification is dated in history, and rotated-audit links resolve.
+- Windows CI uses commit-pinned official actions, read-only permissions, no persisted checkout credentials and bounded commands. It builds ZIP/wheel artifacts, never publishes a release automatically.
 
 ## Verification
 
-Native Windows 11 build 10.0.26300, PowerShell 7.6.6, Python 3.13.7, Codex CLI/daemon 0.160.0:
+Windows 11 build 10.0.26300 x86_64; PowerShell 7.6.6; CPython 3.13.7; Codex CLI/daemon 0.160.0.
 
-- Final native gate: 161 passed, no skips, 29.49 seconds; compileall and 0.3.0 version smoke passed.
-- Real owned About dialog checks pass OK, X and Escape, with separate native tray/dialog threads and no held popup callback.
-- Native HMENU lifetime/highlight checks remain green; no claim of a manual mouse-hover review.
-- All eight interactive client combinations, comment-preserving TOML, safe pause/recovery, no-client no-connection behavior, local status, correlated scan output, prompt-preserving reset, asynchronous repair actions and fail-fast empty-prompt startup are covered.
-- Frozen 0.3.0 probe passes spaces/percent paths, implicit defaults, local data, exclusive once, exact scan acknowledgement, same-PID settings/privacy reload, invalid settings/prompt pause and repair, and graceful stop.
-- The isolated frozen probe uses no selected clients: zero Codex connections and zero user-chat dispatches.
-- Final portable CRC and 521 file hashes, deployed hashes, source-wheel module/asset parity, dependency notices/source and repository Markdown targets are verified.
-- The final update preserves all seven current data files byte-for-byte before activation. Original pre-TOML data and logs remain backed up.
-- Actual login-shortcut launch reaches monitoring, three chats checked, zero detected/dispatched/pending. Installed CLI resolves App/data, reports 0.3.0 and confirms startup, all clients and Detailed telemetry.
-- Local steady-scan samples show about 97% fewer bytes; gzip historical preservation is byte-exact after decompression. This is an observational sample, not a universal benchmark.
-- Earlier real interactive CLI and Desktop-style separate-writer queue delivery remain evidence for unchanged interfaces.
-- Natural quota-reset delivery, actual VS Code UI delivery, two simultaneous real quota failures, fresh login and external editor startup performance remain unobserved.
-- Exact settings, bounds and limits are in Docs/VALIDATION.md and the retained implementation evidence.
+- Final native gate: 163 passed, no skips/warnings, 43.70s; compileall and 0.3.0 version smoke passed. Explicit interpreter selection was exercised.
+- Fresh self-contained 96-file source export: new venv installation, 163 tests in 54.69s, portable build, wheel build and frozen UX probe passed without a parent checkout or existing installation.
+- Frozen probe: isolated controls, no clients, one-second polling; implicit defaults, Continue, scan feedback, exclusive once, same-PID reload and settings/prompt pause/repair, graceful stop; zero Codex connections and zero user-chat dispatches.
+- Initial privacy inventory: all five existing commits, 171 distinct blobs, working tree, portable ZIP and wheel; no credential/profile/project-path matches, runtime files or private author emails. Pre-delivery scanning includes updated source and the source handoff.
+- Deep frozen inspection: both executable CArchives/PYZ archives, nested stdlib ZIP and 440 bytecode modules/code filenames; no personal build paths found.
+- Actual deployed 521 release hashes, wheel source/asset parity, licenses/source and repository Markdown file targets pass. Current portable bytes are unchanged; wheel README metadata is refreshed.
+- Audit cleanup reports zero deletions. No production monitor was restarted or live user chat resumed during this audit.
+- GitHub-hosted CI, natural quota-reset delivery, actual VS Code UI delivery, fresh login, manual visual/accessibility review and other Windows installations remain unobserved. EXEs are unsigned and queue concurrency/idempotency limits remain documented.
+- Five failed system-temp socket fixtures remain outside the repo because the host rejected their exact scoped cleanup. Successful fresh staging/fixtures clean up normally and no failed fixture is in an artifact.
+
+Exact settings, commands and limits are in Docs/VALIDATION.md and the dated publication audit.
 
 ## Artifacts
 
-Shareable portable ZIP: `dist/codex-auto-continuer-0.3.0-windows-x86_64.zip`.
+Portable: `dist/codex-auto-continuer-0.3.0-windows-x86_64.zip`, SHA-256 `f3377108c1435400b6c6d723eb84f96e14245d12846dc1a6125b10a1ab5ed545`.
 
-Optional wheel: `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`.
+Optional wheel: `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`, SHA-256 `ff24973657c9482d457a5cb28319b49b07df447f848dd5c328014e6ff66076e1`.
 
-Stable source transport: `codex-auto-continuer-codex-handoff.zip`.
-
-The handoff includes source, tests, docs, helpers and audit state with hashes and Git provenance. It excludes App, runtime data, installed dependencies, build output and secrets. Packaging runs audit retention and transport validation.
+Stable source transport: `codex-auto-continuer-codex-handoff.zip`. It includes useful public development records and audit state with per-file hashes and Git provenance, excluding runtime data, App, dependencies, build output and secrets. Packaging runs retention and transport validation.

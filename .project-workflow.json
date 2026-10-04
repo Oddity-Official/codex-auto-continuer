@@ -10,7 +10,10 @@
     "src/codex_auto_continuer/supervisor.py",
     "tests/test_supervisor.py"
   ],
-  "exclude_directories": ["App"],
-  "exclude_files": [],
+  "exclude_directories": ["App", "data"],
+  "exclude_files": [
+    "settings.toml", "continue-prompt.md", "state.json", "runtime-status.json",
+    "telemetry.key", "owner.json"
+  ],
   "windows_python": "3.13"
 }

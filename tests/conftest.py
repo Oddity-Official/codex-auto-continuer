@@ -59,6 +59,10 @@ def unix_listener():
 
 @pytest.fixture
 def unix_path():
-    # pytest's descriptive Windows temp paths exceed sockaddr_un's 107-byte limit.
-    with tempfile.TemporaryDirectory(prefix="cac-") as directory:
-        yield Path(directory) / "s.sock"
+    # Keep native socket fixtures short and in the checkout's ignored staging area.
+    # This host cannot connect to venv-created sockets in the system temp directory.
+    directory = ROOT / ".data" if os.name == "nt" else None
+    if directory is not None:
+        directory.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="uds-", dir=directory) as temporary:
+        yield Path(temporary) / "s.sock"

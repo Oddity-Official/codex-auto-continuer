@@ -106,6 +106,10 @@ def excluded(name, config):
         return True
     if parts[-1].casefold() in {p.casefold() for p in SKIP_FILES}:
         return True
+    if lowered[-1].startswith(".env."):
+        return True
+    if len(parts) == 1 and lowered[-1].startswith(("telemetry.jsonl", "tray.jsonl")):
+        return True
     if lowered[-1] == f"{config['name']}-codex-handoff.zip".casefold():
         return True
     return Path(parts[-1]).suffix.casefold() in SKIP_SUFFIXES
