@@ -35,7 +35,7 @@ def main():
             assert not any("/Docs/" in name or "/data/" in name or "resvg_py" in name for name in names)
             assert any("Licenses/tomlkit/" in name for name in names)
             assert bundle.read("CodexAutoContinuer/Licenses/pystray/source/pystray/_win32.py")
-            assert bundle.read("CodexAutoContinuer/README.md") == (ROOT / "Docs/USER-GUIDE.md").read_bytes()
+            assert bundle.read("CodexAutoContinuer/README.md").decode("utf-8").splitlines() == (ROOT / "Docs/USER-GUIDE.md").read_text(encoding="utf-8").splitlines()
             bundle.extractall(stage)
         app = stage / "CodexAutoContinuer"
         settings = app / "data/settings.toml"

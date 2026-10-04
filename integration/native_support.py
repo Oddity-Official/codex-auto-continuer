@@ -315,7 +315,8 @@ class NativeFixture:
             source = Path(self.daemon_binary).resolve().parent.parent
             assert (source / "codex-package.json").is_file(), "Mixed daemon needs a complete official package"
             shutil.copytree(source, self.home / "packages/app-server-daemon/current")
-        result = _run(self.binary, ["app-server", "daemon", "bootstrap"], 25, env=self.env)
+        # Fresh official package copying/migration on a hosted VM is not an RPC latency test.
+        result = _run(self.binary, ["app-server", "daemon", "bootstrap"], 60, env=self.env)
         if result.returncode:
             raise RuntimeError("Isolated daemon bootstrap failed: " + result.stderr.replace(str(self.home), "<fixture>"))
 

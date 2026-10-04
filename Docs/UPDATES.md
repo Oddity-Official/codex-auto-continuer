@@ -24,7 +24,7 @@ On a copy or health-check failure, the worker restores previous code and restart
 
 ## Recovery and limits
 
-Replacement is recoverable, not an atomic multi-file transaction. Power loss can leave partial code until recovery runs. `update-status.json` names the owned job and recovery folder. Run a surviving CLI from that job's `bundle/CodexAutoContinuer` folder with `update recover <absolute-job.json-path>`. This replays rollback from the journal and retains current runtime data. Do not delete state or queue records to recover an installation.
+Replacement is recoverable, not an atomic multi-file transaction. Power loss can leave partial code until recovery runs. The installation result in `update-status.json` names its job and recovery folder; later release checks replace this latest-status snapshot. Durable jobs remain under `%LOCALAPPDATA%/CodexAutoContinuer/updates/<job>/job.json`, and code recovery journals remain beside the app in `.cac-updates/<job>/recovery.json`. Run a surviving CLI from the job's `bundle/CodexAutoContinuer` folder with `update recover <absolute-job.json-path>`. This replays rollback from the journal and retains current runtime data. Do not delete state or queue records to recover an installation.
 
 Recovery/staging folders remain local for diagnosis and rollback. They are not in releases or source transports. Remove old completed recovery folders only after verifying that the current build and saved state work; never remove an in-progress job. Disk, permission, process-stop and rollback failures are reported rather than bypassed. CAC's EXEs are not Authenticode-signed; signed update metadata does not remove Windows reputation prompts.
 
