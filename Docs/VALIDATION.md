@@ -23,7 +23,7 @@ pwsh -NoProfile -File scripts/verify-windows.ps1
 
 | Check | Observed result |
 | --- | --- |
-| Final native gate | 163 passed, no skips or warnings, 49.34s; compileall including integration sources and version 0.3.0 passed; prior explicit interpreter selection exercised |
+| Final native gate | 163 passed, no skips or warnings, 39.16s; compileall including integration sources and version 0.3.0 passed; prior explicit interpreter selection exercised |
 | Fresh source export | 96 files copied through transport exclusions; no parent checkout, deployed app, data, Git metadata or pre-existing venv required |
 | Fresh dependency installation | `.[dev,build]` installed in a new venv without a second global installation |
 | Fresh native gate | 163 passed, no skips or warnings, 54.69s; compileall and version passed |
@@ -103,9 +103,11 @@ The Windows workflow uses read-only permissions and commit-pinned official actio
 
 ## Release artifacts
 
-The unchanged portable ZIP is `dist/codex-auto-continuer-0.3.0-windows-x86_64.zip`, 16,299,281 bytes. SHA-256: `f3377108c1435400b6c6d723eb84f96e14245d12846dc1a6125b10a1ab5ed545`.
+The icon contrast update uses an off-white stack (#f1f5f9) with a darker outline and white upper facet. The status arrows are unchanged. SVG/PNG hash and state-color checks passed; generated 16px/32px samples retained bright opaque stack pixels. Fresh portable/wheel builds passed, and the installed App was refreshed after graceful monitoring stop and exact tray-process verification. All seven runtime files matched saved hashes before activation. Deployed 521 release-file hashes and wheel/source asset parity passed; the startup path is unchanged and the prior App is retained as an ignored recovery copy.
 
-The wheel is `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`, 72,755 bytes, with updated README metadata. SHA-256: `4e690e28bdb7ae36ac267c93ae40952a65645d9caceb3191605251b897bc3ef8`.
+The portable ZIP is `dist/codex-auto-continuer-0.3.0-windows-x86_64.zip`, 16,295,688 bytes, with the off-white stack icon. SHA-256: `27fd454fc9290578a0da3d8b1637198dfe1bc09a5b6400ea618a05afc94a8f5c`.
+
+The wheel is `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`, 72,275 bytes, with matching icon assets and README metadata. SHA-256: `73b889b3266d006c235791900c852226fb91bf24d7bb77b550f54d1b58928758`.
 
 The stable full-source handoff is `codex-auto-continuer-codex-handoff.zip`; its manifest records source hashes and Git provenance. It includes development records, unlike the lean portable app. Builds are not claimed to be byte-for-byte reproducible.
 

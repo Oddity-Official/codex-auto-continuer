@@ -12,7 +12,7 @@ Settings are annotated TOML overrides in `settings.toml`. Missing settings use b
 
 About, status and confirmation dialogs use a dedicated native UI thread and a hidden Windows STATIC owner, not the tray notification window. Menu callbacks enqueue dialogs and return before modal interaction. Duplicate dialogs are suppressed. Exit dismisses only dialogs owned by that thread. The native OK button, X and Escape are regression tested.
 
-The SVG master renders green, yellow and red runtime PNGs at build time; Pillow loads these without an SVG renderer dependency. Green includes waiting for quota; yellow covers stopped, starting, paused and reconnecting; red means a blocking error.
+The SVG master uses an off-white stack with a darker outline and renders green, yellow and red runtime PNGs at build time. Pillow loads these without an SVG renderer dependency. Green includes waiting for quota; yellow covers stopped, starting, paused and reconnecting; red means a blocking error.
 
 The Win32 tray adapter builds the native menu on the UI thread immediately before each right-click popup. Labels, checks and enabled states are snapshots for that opening. Background updates and selected-item callbacks never replace a tracked menu; changes appear on the next opening. This preserves Windows' native hover highlighting and selection. The adapter uses the pinned pystray 0.19.5 backend without modifying its bundled sources.
 

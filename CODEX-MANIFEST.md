@@ -31,7 +31,7 @@ The user chose one public repository. Sanitized audits, history and ChatGPT/Code
 
 Windows 11 build 10.0.26300 x86_64; PowerShell 7.6.6; CPython 3.13.7; Codex CLI/daemon 0.160.0.
 
-- Final native gate: 163 passed, no skips/warnings, 49.34s; compileall includes integration sources and 0.3.0 version smoke passed. Explicit interpreter selection was previously exercised.
+- Final native gate: 163 passed, no skips/warnings, 39.16s; compileall includes integration sources and 0.3.0 version smoke passed. Explicit interpreter selection was previously exercised.
 - Fresh self-contained 96-file source export: new venv installation, 163 tests in 54.69s, portable build, wheel build and frozen UX probe passed without a parent checkout or existing installation.
 - Frozen probe: isolated controls, no clients, one-second polling; implicit defaults, Continue, scan feedback, exclusive once, same-PID reload and settings/prompt pause/repair, graceful stop; zero Codex connections and zero user-chat dispatches.
 - Initial privacy inventory: all five existing commits, 171 distinct blobs, working tree, portable ZIP and wheel; no credential/profile/project-path matches, runtime files or private author emails. Pre-delivery scanning includes updated source and the source handoff.
@@ -65,10 +65,18 @@ Contributor array-argument commands now invoke the PowerShell runner directly; n
 
 Pre-commit privacy inspection covered seven existing commits, 204 unique blobs, all 105 source files, the unchanged portable ZIP and refreshed wheel. No credential/profile/project-path matches, tracked runtime data, private author emails or broken Markdown file targets were found. Audit cleanup reported zero deletions. All test homes cleaned up; installed CAC PIDs remained unchanged. Scoped commit and stable source transport retain the repeatable tests without shipping them in the portable app.
 
+## Icon contrast
+
+Changed the SVG stack to off-white (#f1f5f9), with a subtle darker outline (#64748b) and white upper facet. Green/yellow/red arrow colors and recovery behavior are unchanged. Regenerated all three PNG states and rebuilt the portable EXEs/ZIP and wheel. Existing icon parity/state-color regression passed; generated 16px and 32px tray samples retain bright opaque stack pixels.
+
+Activated the rebuilt App after gracefully stopping monitoring and verifying the exact tray process. All seven runtime files matched their preserved hashes before activation; settings, prompt, pending state, logs and Windows startup path were preserved. Previous App remains in an ignored local recovery folder. The deployed 521 release-file hashes and source/wheel assets match.
+
+Windows gate: 163 passed, no skips/warnings, 39.16s; compileall and version smoke passed. Audit cleanup deleted nothing. Pre-commit privacy scan covered eight existing commits, 217 blobs and 105 source files, plus deep inspection of both rebuilt EXEs, 440 bytecode modules and the wheel. No credential/personal-path matches, tracked runtime data, private author emails or broken Markdown file targets were found. The refreshed tray and supervisor are running with phase monitoring.
+
 ## Artifacts
 
-Portable: `dist/codex-auto-continuer-0.3.0-windows-x86_64.zip`, SHA-256 `f3377108c1435400b6c6d723eb84f96e14245d12846dc1a6125b10a1ab5ed545`.
+Portable: `dist/codex-auto-continuer-0.3.0-windows-x86_64.zip`, SHA-256 `27fd454fc9290578a0da3d8b1637198dfe1bc09a5b6400ea618a05afc94a8f5c`.
 
-Optional wheel: `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`, README metadata refreshed, SHA-256 `4e690e28bdb7ae36ac267c93ae40952a65645d9caceb3191605251b897bc3ef8`.
+Optional wheel: `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`, matching icon assets and README metadata, SHA-256 `73b889b3266d006c235791900c852226fb91bf24d7bb77b550f54d1b58928758`.
 
 Stable source transport: `codex-auto-continuer-codex-handoff.zip`. It includes useful public development records and audit state with per-file hashes and Git provenance, excluding runtime data, App, dependencies, build output and secrets. Packaging runs retention and transport validation.
