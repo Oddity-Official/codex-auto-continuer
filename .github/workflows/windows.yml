@@ -6,14 +6,15 @@ on:
     paths: &build-inputs
       - 'src/**'
       - 'tests/**'
-      - 'scripts/**'
+      - 'scripts/**/*.py'
+      - 'scripts/**/*.ps1'
       - 'integration/**'
       - 'pyproject.toml'
       - '.project-workflow.json'
-      - 'Docs/USER-GUIDE.md'
-      - 'Licenses/**'
-      - 'LICENSE'
       - '.github/workflows/windows.yml'
+      - '!src/**/*.md'
+      - '!tests/**/*.md'
+      - '!integration/**/*.md'
   pull_request:
     paths: *build-inputs
 
