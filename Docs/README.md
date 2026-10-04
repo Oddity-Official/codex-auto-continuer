@@ -19,7 +19,7 @@
 
 ## Development records
 
-These sanitized records are public and Git-tracked, but excluded from binary releases. Ordinary use and contributions do not require the checkpoint workflow.
+These sanitized records are Git-tracked and suitable for public sharing, but excluded from binary releases. Ordinary use and contributions do not require the checkpoint workflow.
 
 - [Workflow](WORKFLOW.md): environment ownership, checkpoint import/export and source transport boundaries
 - [Audits](Audits/README.md): dated audit evidence, rotation and retention

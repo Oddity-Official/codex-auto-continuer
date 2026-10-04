@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from codex_auto_continuer.state import Obligation, State, save_state
-from codex_auto_continuer.updates import check_release, launch_update, parse_json, write_json, update_status
+from codex_auto_continuer.updates import check_release, launch_update, parse_json, write_json
 from codex_auto_continuer.config import Config
 
 
@@ -33,16 +33,16 @@ def command(executable, *args, env, timeout=90):
     return output
 
 
-def wait_status(settings, wanted, timeout=90):
+def wait_job(job, wanted, timeout=90):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        path = settings.parent / "update-status.json"
-        if path.exists():
-            record = update_status(settings)
+        if job.exists():
+            record = parse_json(job.read_bytes())
             if record.get("status") == wanted:
                 return record
-            if record.get("status") == "failed":
-                raise AssertionError(record["reason"])
+            failure = job.parent / "failure.json"
+            if failure.exists():
+                raise AssertionError(parse_json(failure.read_bytes())["reason"])
         time.sleep(0.2)
     raise AssertionError("Update did not reach its expected terminal status within the deadline")
 
@@ -95,7 +95,7 @@ def main():
         job = Path(result["job"])
         write_json(settings.parent / "update-status.json", result)
         launch_update(job, tray.pid)
-        terminal = wait_status(settings, "completed")
+        terminal = wait_job(job, "completed")
         assert command(cli, "--version", env=env).decode().strip() == result["version"]
         assert all((settings.parent / name).read_bytes() == data for name, data in protected.items())
         # Code-only rollback must retain state written after successful installation.
@@ -110,7 +110,7 @@ def main():
         write_json(job, request)
         worker = job.parent / "bundle/CodexAutoContinuer/CodexAutoContinuer-CLI.exe"
         command(worker, "_update-worker", str(job), "--recover", env=env)
-        terminal = wait_status(settings, "rolled_back")
+        terminal = wait_job(job, "rolled_back")
         assert command(cli, "--version", env=env).decode().strip() == original_version
         assert (settings.parent / "state.json").read_bytes() == newer_state
         assert (settings.parent / "continue-prompt.md").read_bytes() == protected["continue-prompt.md"]
