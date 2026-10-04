@@ -23,15 +23,15 @@ The complete official CLI package was fetched through the CI downloader into ign
 | Check | Observed result |
 | --- | --- |
 | Regular Windows gate | 194 passed in 33.81s; compileall and 0.4.0 import passed |
-| Native continuation gate | 10 passed in 74.35s against the downloaded complete official package |
+| Native continuation gate | 10 passed in 74.84s against the downloaded complete official package |
 | Installed extension gate | One scenario passed in 14.96s; all eight client combinations, quota denial, one original-owner Continue/completed turn, no duplicates, Private telemetry and original-file hashes |
-| Consumer schema | Native generated contract matches the packaged projection and certificate; prerelease/build suffixes are retained; separate-package bootstrap/schema follow-up passed: two cases in 13.87s |
+| Consumer schema | Native generated contract matches the packaged projection and certificate; prerelease/build suffixes are retained; separate-package bootstrap/schema follow-up passed: two cases in 14.30s |
 | Unit safety | Unknown tuple, queue/read drift, identity mismatch, same-version file replacement, reconnect revalidation and before-send version change block mutations; pending/uncertain state survives |
 | Download boundary | Traversal, absolute/drive paths, links, case collisions and extracted-size limits are rejected before extraction |
 
 The managed native case uses production discovery, handshake, managed-binary schema and certification. It survives a real daemon restart, deliberately removes certification, records no send and preserves the exact pending-state bytes. Restoring certification permits one saved Continue on the separate original writer. Three later scans produce no duplicate. Updater and remote control are disabled only in the disposable home. Native Codex must create private Windows socket/state directories; Python-created inherited permissions were rejected during fixture development.
 
-The follow-up used the installed CLI and the separately downloaded complete CLI package as the managed candidate, exercising CI's package-copy/bootstrap path. Both have the certified 0.160.0 identity; this is not evidence for different-release mixed behavior.
+The follow-up used the installed CLI and the separately downloaded complete CLI package as the managed candidate, exercising CI's package-copy/bootstrap path. The test asserts the requested CLI/daemon versions and executable hashes after every connection, including restart, so a bootstrap substitution cannot produce a false compatibility pass. Both have the certified 0.160.0 identity; this is not evidence for different-release mixed behavior.
 
 The separate official `codex-app-server.exe` 0.160.0 package was also inspected. Its version output and option-only help expose no schema generator. Eight controlled queue scenarios passed, but managed bootstrap failed because Codex expected `current/bin/codex.exe`. That package is not certified or used by managed CI. CAC rejects the standalone identity, even with a matching CLI version or synthetic certificate; it never substitutes the CLI's schema.
 

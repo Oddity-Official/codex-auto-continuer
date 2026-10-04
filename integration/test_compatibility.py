@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -25,6 +26,11 @@ def test_native_schema_and_connected_build(codex_binary, native):
 def test_managed_daemon_restart_reconnect_and_unknown_tuple_preserve_pending(codex_binary, monkeypatch, request):
     original_run = codex._run
     daemon_binary = request.config.getoption("--daemon-executable") or codex_binary
+    expected = {"cli_version": codex.codex_version(codex_binary, 10),
+                "app_server_version": codex.codex_version(daemon_binary, 10)}
+    for key, binary in (("cli_sha256", codex_binary), ("server_sha256", daemon_binary)):
+        with Path(binary).open("rb") as stream:
+            expected[key] = hashlib.file_digest(stream, "sha256").hexdigest()
     with NativeFixture(ROOT, codex_binary, managed=True, daemon_binary=daemon_binary) as native:
         def isolated_run(binary, args, timeout, **kwargs):
             return original_run(binary, args, timeout, env=native.env)
@@ -34,7 +40,11 @@ def test_managed_daemon_restart_reconnect_and_unknown_tuple_preserve_pending(cod
         native.assert_quota_failure(failed)
         supervisor = Supervisor(Config(codex_executable=codex_binary, dispatch_spacing_seconds=0), native.data / "state.json")
         native.supervisors.append(supervisor)
-        supervisor.connect()
+        def connect_candidate():
+            supervisor.connect()
+            report = supervisor.compatibility.report()
+            assert {key: report[key] for key in expected} == expected, "Bootstrap/restart must run the requested candidate, not silently replace it with the invoking CLI"
+        connect_candidate()
         assert supervisor.compatibility.status in {"certified", "untested"}, supervisor.compatibility.reason
         result = supervisor.run_cycle()
         assert result.detected == result.pending == 1 and result.dispatched == 0
@@ -42,20 +52,20 @@ def test_managed_daemon_restart_reconnect_and_unknown_tuple_preserve_pending(cod
         supervisor.close()
         restart = isolated_run(codex_binary, ["app-server", "daemon", "restart"], 25)
         assert restart.returncode == 0
-        supervisor.connect()
+        connect_candidate()
         assert supervisor.state_file.read_bytes() == saved
         assert supervisor.compatibility.status in {"certified", "untested"}
         native.service.allowed = True
         native.service.fail_inference = False
         supervisor.compatibility_gate.record["certificates"] = []
-        supervisor.close(); supervisor.connect()
+        supervisor.close(); connect_candidate()
         assert supervisor.compatibility.status == "untested"
         result = supervisor.run_cycle()
         assert result.dispatched == 0 and result.pending == 1
         assert supervisor.state_file.read_bytes() == saved
         assert native.service.inference_count == 1
         supervisor.compatibility_gate = CompatibilityGate(native.data)
-        supervisor.close(); supervisor.connect()
+        supervisor.close(); connect_candidate()
         if not supervisor.compatibility.dispatch_allowed:
             # Candidate evidence is established inside the isolated test, never granted to a user daemon.
             supervisor.compatibility = Compatibility(status="certified", reason="Isolated candidate behavioral probe")
