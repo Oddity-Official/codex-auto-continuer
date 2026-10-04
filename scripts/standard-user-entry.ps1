@@ -16,7 +16,7 @@ try {
     if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Native CI must be non-elevated.' }
     'Native CI token: standard user (non-elevated), outside the runner job.' | Add-Content -LiteralPath $logPath
     & (Join-Path $PSScriptRoot 'run-project-command.ps1') -FileName $request.fileName -Arguments @($request.arguments) -TimeoutSeconds $request.timeout *>&1 |
-        Out-String | Add-Content -LiteralPath $logPath -Encoding utf8NoBOM
+        ForEach-Object { $_.ToString() | Add-Content -LiteralPath $logPath -Encoding utf8NoBOM }
     $exitCode = 0
 }
 catch { $_ | Out-String | Add-Content -LiteralPath $logPath -Encoding utf8NoBOM }

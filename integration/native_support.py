@@ -320,13 +320,13 @@ class NativeFixture:
             raise RuntimeError("Isolated daemon bootstrap failed: " + result.stderr.replace(str(self.home), "<fixture>"))
 
     def client(self, path=None):
-        client = AppServerClient.connect(path or self.socket, 5)
+        client = AppServerClient.connect(path or self.socket, Config().rpc_timeout_seconds)
         self.clients.append(client)
         return client
 
     def supervisor(self):
         from codex_auto_continuer.compatibility import Compatibility
-        supervisor = Supervisor(Config(dispatch_spacing_seconds=0, rpc_timeout_seconds=5), self.data / "state.json")
+        supervisor = Supervisor(Config(dispatch_spacing_seconds=0), self.data / "state.json")
         # Select the isolated control socket, not the user's daemon. All RPCs are native.
         supervisor.client = self.client()
         # This isolated harness establishes behavioral evidence, including for untested builds.
