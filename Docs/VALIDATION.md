@@ -36,4 +36,8 @@ The actual installed App upgraded from 0.5.1 through its signed updater. The dur
 
 No conversation-body storage or user-message replay was introduced. The dark menu/status redesign is not part of this recovery patch.
 
+Pre-delivery privacy inspection covered 28 reachable commits, 396 distinct Git blobs, 142 working source files and the downloaded ZIP/wheel plus refreshed source handoff. It found no configured privacy matches, tracked runtime files, private author emails, compiled personal paths or broken Markdown links. Both frozen executables and 481 bytecode modules were inspected. This is a defined inspection, not a guarantee that any conceivable secret pattern is detectable. The repository remains private.
+
+The final result-only push triggered and passed documentation CI without another binary build or native matrix. Changes to workflow code itself retain Windows validation. Source handoffs still refresh for completed documentation deliveries.
+
 Native computer-control APIs are disabled in this session's tool surface. This is separate from CAC's prohibition on UI automation as a continuation fallback; testing CAC's own UI is allowed. Fresh Windows login, different hardware and a fresh installed VS Code extension pass are not asserted. Experimental queue APIs still lack verified idempotency or an atomic quota/turn/add precondition. EXEs remain unsigned by Authenticode.
