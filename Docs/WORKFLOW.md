@@ -8,7 +8,7 @@ The project is self-contained. `AGENTS.md` owns environment-specific instruction
 
 ## Codex to ChatGPT
 
-Run audit cleanup, run `pwsh -NoProfile -File scripts/verify-windows.ps1`, review docs, update the Codex manifest and commit scoped changes when safe. Then run:
+Apply the development/delivery tiers below, run audit cleanup, review affected docs, update the Codex manifest and commit scoped changes when safe. Completed application-code changes require `pwsh -NoProfile -File scripts/verify-windows.ps1`; prose-only changes need relevant documentation checks, not unrelated runtime builds. Every completed delivery still needs the handoff:
 
 ```powershell
 pwsh -NoProfile -File scripts/pack-codex-handoff.ps1
@@ -50,3 +50,43 @@ Both builders exclude `.git`, local runtime data in `.data/`, portable `App/` an
 Exports walk the relevant tree rather than relying on Git ignore rules. This intentionally includes ignored audit retention state and useful untracked evidence. Archive paths must work on both Windows and Linux. The source-only transport has a 128 MiB extracted-size limit and a 10,000-entry safety limit; imports also reject ZIPs larger than 256 MiB before opening their directory. If it exceeds those limits, remove duplicated/generated output before changing policy. Never silently drop requested evidence.
 
 `Docs/History/` contains completed long-lived records. [`Audits/README.md`](Audits/README.md) owns the current dated audit and its shorter retention policy. Packaging runs cleanup but does not rotate the current audit. Maintenance is invocation-driven, not a background scheduler.
+
+<!-- shared-development-policy:start -->
+## Development and delivery policy
+
+This policy separates fast iteration, completed delivery and release validation. It does not waive project-specific safety, documentation or native-platform checks.
+
+### Read what the change needs
+
+Read the current user request and applicable `AGENTS.md`. Use the product contract for behavior, architecture for boundaries, verification docs for relevant checks, and transport docs when importing or delivering. Do not reread every owner document for a wording-only edit.
+
+Search relevant shared lessons before repeating a difficult investigation. Current project files and user instructions outrank lessons. Delete stale knowledge before merging overlap or adding a new lesson. Record verified reusable causes and fixes, not routine progress.
+
+### Verification tiers
+
+| Change | During iteration | Before completed delivery |
+| --- | --- | --- |
+| Prose or instruction-only | Check affected text, links and instruction conflicts | Relevant documentation/workflow checks; no unrelated runtime build or native integration rerun |
+| UI or application source | Narrow regression or source-run fixture preview | Project native verification gate and relevant actual-platform UI checks |
+| Recovery, protocol, state or compatibility | Narrow failure reproduction | Native gate and affected real integration scenarios |
+| Packaging, installer or updater | Focused packaging/update regressions | Frozen-artifact and relevant upgrade/rollback checks |
+| Published release | Candidate checks | Full declared release gate, package/privacy inspection, signing and artifact validation |
+
+Use observed test durations to identify bottlenecks. Do not remove meaningful regressions simply because they take time. Never retry away a failure, replace real checks with cached results, or claim a previous run verified changed code. Reuse unchanged evidence with its source identity and date stated.
+
+### Commit and export
+
+Small local commits do not each require another release build. Push coherent completion points rather than triggering expensive hosted runs for every bookkeeping edit. Documentation-only pushes should still receive documentation checks, not binary builds or unrelated native compatibility matrices.
+
+At each completed user-requested delivery, reconcile affected owner documents and the environment-owned manifest, run audit cleanup through the existing helper, commit scoped changes when safe, and refresh the stable Codex handoff ZIP. This also applies to documentation-only deliveries. It does not apply after each intermediate edit or test.
+
+Keep ChatGPT checkpoints and Codex handoffs distinct. ChatGPT owns its monotonically numbered canonical checkpoints and `CHAT-MANIFEST.md`; Codex owns local work and `CODEX-MANIFEST.md`. Never overwrite a checkpoint, invent an imported base, or package secrets, runtime data, dependencies, build output, caches or previous archives.
+
+Use existing import/export safety helpers. Preserve unrelated changes and runtime data. Inspect Git status after packaging; if retention changed tracked audit data, commit only those managed changes and refresh the archive again. Report a failed transport clearly and retain the preceding verified archive.
+
+### Native and hosted checks
+
+Windows-targeted behavior needs native Windows evidence. Linux checks do not establish Windows compatibility. Bound processes from their first invocation and stop their children on timeout. Run a broad gate once after the final relevant code change; repeat it only for a new change, failure or concrete unresolved risk.
+
+Schedule upstream compatibility probes independently from ordinary edits. Filter hosted workflows by the files they actually consume. Resolve version identities before running matrices; equivalent package tuples need one behavioral run, not differently named duplicates. Cache dependency/download inputs only with version and integrity validation, never safety outcomes.
+<!-- shared-development-policy:end -->

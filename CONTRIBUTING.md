@@ -17,10 +17,12 @@ The gate selects `.venv/Scripts/python.exe` when present; otherwise it uses the 
 For a focused check:
 
 ```powershell
-& ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m', 'pytest', 'tests/test_supervisor.py', '-q') -TimeoutSeconds 60
+pwsh -NoProfile -File scripts/dev.ps1 -Tests tests/test_supervisor.py
 ```
 
 Add regressions for real failure modes, not implementation details. Keep recovery quota-only, exact-chat and fail-closed. Never add UI input, automatic approval answers or blind retries after ambiguous sends. [Architecture](Docs/ARCHITECTURE.md) owns these contracts.
+
+Use `scripts/dev.ps1 -Mode verify` for the full local gate, `-Mode native -CodexPath 'absolute-codex.exe-path'` for isolated native recovery, and `-Mode build` for a portable candidate. Focused mode reports slow tests and does not build or install anything. [Workflow](Docs/WORKFLOW.md) owns completion tiers: prose-only changes still receive link checks and a source handoff, not unrelated builds. Hosted builds and native probes are filtered by consumed inputs; scheduled upstream checks remain independent. Exact equivalent CLI/daemon version tuples run once.
 
 To exercise the actual native continuation chain with synthetic local service responses:
 

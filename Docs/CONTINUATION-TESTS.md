@@ -60,6 +60,7 @@ Backend shapes follow first-party source at the matching release: [account quota
 | Manual progress before recovery | A new native user turn cancels stale work while usage is still denied. Later permission and reload do not add a continuation. |
 | Invalid then edited prompt | An empty saved file raises a helpful error before queue submission, preserving pending state. Repair sends the newly saved text, not a cached/default prompt. |
 | Two failed chats | Permission is rechecked after the first send. Denial stops fan-out; only later verified permission continues the remaining chat. Each chat gets exactly one continuation. |
+| Queued failures and usage-service outage | Two queued follow-ups fail with quota errors. CAC retains the latest obligation. Native quota read returns internal error after local HTTP 503; the loop reconnects without changing state or sending. Service recovery with denied permission still sends nothing. True permission then produces exactly one Continue and no duplicates. |
 | Accepted send, lost response | Native queue accepts and completes the turn, while CAC saves uncertain state. Reload reconciles progress without resending. |
 | Write not accepted | No native queue entry or advanced turn exists. After the reconciliation deadline CAC fails explicitly, including on another cycle, without resending. |
 

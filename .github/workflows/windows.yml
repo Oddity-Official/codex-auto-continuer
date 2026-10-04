@@ -1,6 +1,21 @@
 name: Windows verification and build
 
-on: [push, pull_request, workflow_dispatch]
+on:
+  workflow_dispatch:
+  push:
+    paths: &build-inputs
+      - 'src/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'integration/**'
+      - 'pyproject.toml'
+      - '.project-workflow.json'
+      - 'Docs/USER-GUIDE.md'
+      - 'Licenses/**'
+      - 'LICENSE'
+      - '.github/workflows/windows.yml'
+  pull_request:
+    paths: *build-inputs
 
 permissions:
   contents: read

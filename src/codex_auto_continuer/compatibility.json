@@ -1530,7 +1530,7 @@
   },
   "certificates": [
     {
-      "cac_version": "0.5.1",
+      "cac_version": "0.5.2",
       "platform": "windows-x86_64",
       "cli_version": "0.160.0",
       "app_server_version": "0.160.0",

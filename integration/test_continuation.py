@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import time
 
 import pytest
 
@@ -32,6 +33,49 @@ def assert_no_duplicates(native, thread_id, count, *, total_inferences=None):
     assert len(native.turns(thread_id)) == count
     assert native.service.inference_count == (count if total_inferences is None else total_inferences)
     assert not native.service.errors
+
+
+def test_native_queued_quota_failures_and_usage_read_outage_recover(native):
+    thread_id, failed, supervisor = record_failure(native)
+    native.owner.queue_add(thread_id, "Synthetic follow-up one", "fixture-follow-up-one")
+    native.owner.queue_add(thread_id, "Synthetic follow-up two", "fixture-follow-up-two")
+    deadline = time.monotonic() + 20
+    while len(native.turns(thread_id)) < 3 and time.monotonic() < deadline:
+        time.sleep(0.1)
+    latest = native.wait_turn(thread_id, after=failed["id"])
+    turns = native.turns(thread_id)
+    assert len(turns) == 3
+    for turn in turns:
+        native.assert_quota_failure(turn)
+    # A newer failed follow-up replaces stale work, rather than dropping recovery.
+    supervisor.run_cycle()
+    result = supervisor.run_cycle()
+    assert result.pending == 1
+    assert supervisor.state.obligations[0].failed_turn_id == latest["id"]
+    before = supervisor.state_file.read_bytes()
+    native.service.fail_usage = True
+    phases, cycles, waits = [], [], []
+    def sleep(seconds):
+        assert supervisor.client is None
+        assert supervisor.state_file.read_bytes() == before
+        assert native.service.inference_count == 3
+        assert supervisor.read_problem["errorMethod"] == "account/rateLimits/read"
+        assert supervisor.read_problem["errorCode"] == -32603
+        waits.append(seconds)
+        native.service.fail_usage = False
+    supervisor.sleep = sleep
+    supervisor.on_cycle = cycles.append
+    supervisor.run_forever(lambda: bool(cycles), on_phase=phases.append)
+    assert "reconnecting" in phases and waits and cycles[0].pending == 1
+    assert cycles[0].ordinary_usage_allowed is False
+    native.service.allowed = True
+    native.service.fail_inference = False
+    supervisor.connect()
+    assert supervisor.run_cycle().dispatched == 1
+    completed = native.wait_turn(thread_id, after=latest["id"])
+    assert completed["status"] == "completed"
+    assert native.service.user_messages[-1] == "Continue"
+    assert_no_duplicates(native, thread_id, 4)
 
 
 def test_native_quota_recovery_exact_chat_and_restart(native):

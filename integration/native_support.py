@@ -39,6 +39,7 @@ class Service:
         self.user = USER
         self.reset_at = int(time.time()) - 60
         self.fail_inference = True
+        self.fail_usage = False
         self.requests = []
         self.user_messages = []
         self.errors = []
@@ -113,6 +114,9 @@ class Service:
                 if path is None:
                     return
                 if path == "/api/codex/usage":
+                    if service.fail_usage:
+                        self.reply(503, {"error": "Synthetic usage-service outage"})
+                        return
                     if self.headers.get("ChatGPT-Account-Id") != ACCOUNT:
                         service.errors.append("Missing or different account header")
                     with service.lock:
@@ -329,6 +333,11 @@ class NativeFixture:
         from codex_auto_continuer.compatibility import Compatibility
         supervisor = Supervisor(Config(dispatch_spacing_seconds=0), self.data / "state.json")
         # Select the isolated control socket, not the user's daemon. All RPCs are native.
+        def connect():
+            if supervisor.client is None:
+                supervisor.client = self.client()
+                supervisor._probe_required_methods()
+        supervisor.connect = connect
         supervisor.client = self.client()
         # This isolated harness establishes behavioral evidence, including for untested builds.
         # It is not a production override: every home, socket and credential belongs to the fixture.

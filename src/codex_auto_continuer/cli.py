@@ -16,12 +16,12 @@ from . import __version__
 from .codex import codex_version, ensure_daemon, find_codex
 from .config import (default_config_path, load_config, lock_path, log_path, state_path, stop_path,
                      Config, ALL_CLIENTS, write_config, initialize_files, prompt_path, read_prompt, save_config, scan_path, owner_path)
-from .errors import AutoContinuerError
+from .errors import AutoContinuerError, ConfigurationError
 from .instance_lock import SingleInstanceLock, is_running
 from .state import load_state
 from .startup import launch_command, install_startup, uninstall_startup, startup_path
 from .supervisor import Supervisor, _parse_rate_limits, observed_interactive_sources
-from .appserver import AppServerClient
+from .appserver import AppServerClient, RpcError
 from . import telemetry
 from .actions import open_local
 from .status import read_runtime, owns_monitor, phase
@@ -391,7 +391,12 @@ def main(argv: list[str] | None = None) -> int:
                 _snapshot(args.config, phase="failed", errorType="ConfigurationError", lastScan=last_result,
                           lastScanAt=last_scan_at, reason="Settings or prompt need repair. Modify Settings or Modify Prompt, then save.")
             def on_phase(value):
-                _snapshot(args.config, phase=value, lastScan=last_result, lastScanAt=last_scan_at,
+                fields = dict(last_result)
+                fields.update(pending=len(supervisor.state.obligations), compatibility=supervisor.compatibility.report())
+                if value == "reconnecting":
+                    fields["ordinary_usage_allowed"] = None
+                    fields.update(supervisor.read_problem or {})
+                _snapshot(args.config, phase=value, **fields, lastScan=last_result, lastScanAt=last_scan_at,
                           scanRequestId=completed_scan)
             supervisor = Supervisor(cfg, state_path(args.config), prompt_file=prompt_path(cfg, args.config), on_cycle=on_cycle)
             try:
@@ -420,9 +425,24 @@ def main(argv: list[str] | None = None) -> int:
             pass  # The independent runtime snapshot and stderr report logging failures too.
         if owns_runtime:
             try:
-                _snapshot(args.config, phase="failed", errorType=type(exc).__name__,
-                          reason="Monitoring stopped. Check settings, free space, permissions and local telemetry, then start after repair.")
-            except OSError:
+                prior = read_runtime(args.config)
+                fields = dict(prior.get("lastScan") or {})
+                fields.update(lastScan=prior.get("lastScan"), lastScanAt=prior.get("lastScanAt"),
+                              scanRequestId=prior.get("scanRequestId"), ordinary_usage_allowed=None)
+                try:
+                    fields["pending"] = len(load_state(state_path(args.config)).obligations)
+                except AutoContinuerError:
+                    fields["pending"] = None
+                if isinstance(exc, RpcError):
+                    code = exc.error.get("code")
+                    fields.update(errorMethod=exc.method, errorCode=code if type(code) is int else None)
+                    reason = str(exc) + " Monitoring stopped; repair the reported Codex issue, then Start Monitoring."
+                elif isinstance(exc, ConfigurationError):
+                    reason = "Settings or prompt need repair. Modify Settings or Modify Prompt, then save and Start Monitoring."
+                else:
+                    reason = f"Monitoring stopped ({type(exc).__name__}). Open Data Folder for local telemetry; repair the cause, then Start Monitoring."
+                _snapshot(args.config, phase="failed", errorType=type(exc).__name__, reason=reason, **fields)
+            except (OSError, AutoContinuerError):
                 pass  # Do not hide the original failure if the entire data folder is unwritable.
         logging.getLogger(__name__).error("%s", exc)
         if command == "tray" and os.name == "nt":

@@ -2,7 +2,7 @@
 
 ## Project-specific contract
 
-- Read `Docs/PRODUCT.md`, `Docs/ARCHITECTURE.md`, `Docs/RESEARCH.md`, and `Docs/VALIDATION.md` before changing product behavior.
+- Read `Docs/PRODUCT.md` for behavior, `Docs/ARCHITECTURE.md` for boundaries, `Docs/RESEARCH.md` for upstream assumptions and `Docs/VALIDATION.md` for affected checks. Do not reread unrelated contracts for prose-only changes.
 - Default scope includes interactive CLI, VS Code and Desktop, never executor or sub-agent sessions. Desktop-only scope checks originator as well as source: this installation uses `vscode` with originator `Codex Desktop`.
 - The daemon and Desktop can be separate app-server owners. Handle only the verified exact-thread active-writer error by using the shared queue; never treat unrelated resume errors as successful ownership detection.
 - Discovery defaults to the last 24 hours of failed-turn completion time. Recorded obligations remain durable beyond that window.
@@ -31,7 +31,7 @@
 - Work in native Windows with PowerShell 7 and Python 3.13. Do not use WSL or sandbox-only toolchain bundles.
 - Preview incoming canonical checkpoints with `pwsh -File scripts/import-checkpoint.ps1 -ArchivePath 'absolute-path.zip' -Preview`. Import only after the project subtree is clean and the preview is understood. Unrelated sibling changes need not be cleared.
 - The importer verifies archive paths, role, project anchors and hashes, preserves runtime data and unowned files, and creates a recovery backup outside the checkout. Keep that backup until native verification succeeds. After import, verify before committing; the importer resets the Codex record to the new base with verification marked pending.
-- After every completed project modification, run audit cleanup, applicable tests and the native gate, reconcile documentation, update `CODEX-MANIFEST.md`, commit scoped changes when safe, then refresh `pwsh -File scripts/pack-codex-handoff.ps1`. Inspect project status afterward; if packaging pruned tracked audit data, commit those managed changes and refresh again. Give the user the stable `codex-auto-continuer-codex-handoff.zip` path. Never make the user ZIP source manually.
+- Apply the development/delivery tiers in `Docs/WORKFLOW.md`: focused checks during iteration; native gate and relevant integration checks for completed code changes; documentation checks for prose-only changes. At every completed delivery, including prose-only work, run audit cleanup, reconcile docs, update `CODEX-MANIFEST.md`, commit scoped changes when safe, and refresh `pwsh -File scripts/pack-codex-handoff.ps1`. Inspect status afterward and include managed retention changes if needed. Give the user the stable handoff path. Do not build releases or repeat full gates after each intermediate edit.
 - Do not rewrite `CHAT-MANIFEST.md` for Codex work.
 
 ## Shared workflow

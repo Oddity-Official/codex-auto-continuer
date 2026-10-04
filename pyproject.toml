@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codex-auto-continuer"
-version = "0.5.1"
+version = "0.5.2"
 description = "Windows-native supervisor that resumes Codex threads after verified usage-limit recovery"
 readme = "README.md"
 license = "MIT"

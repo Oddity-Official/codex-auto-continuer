@@ -20,6 +20,11 @@ class RpcError(ProtocolError):
         code = code if type(code) is int else "unknown"
         super().__init__(f"Codex RPC {method} failed (code {code}). Inspect Codex's own logs for details; server error bodies are not logged here.")
 
+    def is_unavailable_quota_read(self) -> bool:
+        # This read has no submission side effects. Internal server errors are
+        # unavailable evidence, not an incompatible contract or permission to send.
+        return self.method == "account/rateLimits/read" and type(self.error.get("code")) is int and self.error["code"] == -32603
+
     def is_active_writer(self, thread_id: str) -> bool:
         return (
             self.method == "thread/resume"

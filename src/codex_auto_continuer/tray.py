@@ -263,7 +263,7 @@ class TrayController:
         body = (f"Status: {self.status_label()}\nClients: {', '.join(self.cfg.clients) or 'None'}\n"
                 f"Last scan: {when}\n"
                 f"Chats checked: {scan.get('scanned_threads', 0)}\nNew quota failures: {scan.get('detected', 0)}\n"
-                f"Continuations sent: {scan.get('dispatched', 0)}\nPending: {scan.get('pending', 0)}\n"
+                f"Continuations sent: {scan.get('dispatched', 0)}\nPending: {self.snapshot.get('pending', 'Unknown')}\n"
                 f"Telemetry: {'Detailed' if self.cfg.detailed_telemetry else 'Private'}, local only")
         compatibility = self.snapshot.get("compatibility") or {}
         body += (f"\n\nCompatibility: {compatibility.get('status', 'Not checked')} ({self.cfg.compatibility_policy})"
@@ -281,6 +281,8 @@ class TrayController:
             body += "\n\nUpdates: " + str(exc)
         if self.problem:
             body += f"\n\nIssue: {self.problem}"
+        elif self.snapshot.get("reason"):
+            body += f"\n\nIssue: {self.snapshot['reason']}"
         self.dialogs.show("status", body, title=f"CAC {__version__} status")
 
     def select_clients(self, name: str):
@@ -340,8 +342,8 @@ class TrayController:
                 Item("Detailed", lambda icon, item: self.privacy("detailed"), checked=lambda item: self.cfg.detailed_telemetry, radio=True),
                 Item("Private", lambda icon, item: self.privacy("private"), checked=lambda item: not self.cfg.detailed_telemetry, radio=True))),
             Item("Restore Defaults", lambda icon, item: self.restore_defaults()),
-            Item("Check For Updates", lambda icon, item: self.check_updates(), enabled=lambda item: not self._update_busy),
             Menu.SEPARATOR,
+            Item("Check For Updates", lambda icon, item: self.check_updates(), enabled=lambda item: not self._update_busy),
             Item(f"About CAC {__version__}", lambda icon, item: self.about()),
             Item("Exit CAC", action("quit"), enabled=lambda item: not self._installing),
         )

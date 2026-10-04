@@ -67,6 +67,7 @@ class Supervisor:
         self._cli_version: str | None = None
         self.compatibility = Compatibility()
         self.compatibility_gate = CompatibilityGate(state_file.parent / "compatibility-cache")
+        self.read_problem: dict | None = None
 
     def connect(self) -> None:
         if self.client is not None:
@@ -131,6 +132,7 @@ class Supervisor:
                 remaining -= step
 
         settings_failed = False
+        unavailable_reads = 0
         while not stop_requested():
             try:
                 if reload_settings:
@@ -162,6 +164,8 @@ class Supervisor:
                         on_phase("scanning")
                     self.connect()
                     result = self.run_cycle()
+                self.read_problem = None
+                unavailable_reads = 0
                 if self.on_cycle:
                     self.on_cycle(result)
                 LOG.info(
@@ -183,7 +187,29 @@ class Supervisor:
                     self.on_cycle(CycleResult(pending=len(self.state.obligations), compatibility=self.compatibility.report()))
                 self.close()
                 wait(max(1.0, self.config.poll_seconds))
+            except RpcError as exc:
+                if not exc.is_unavailable_quota_read():
+                    raise
+                unavailable_reads += 1
+                delay = min(max(30.0, self.config.reconnect_backoff_seconds),
+                            self.config.reconnect_backoff_seconds * 2 ** min(unavailable_reads - 1, 8))
+                self.read_problem = {
+                    "errorType": "RpcError", "errorMethod": exc.method, "errorCode": -32603,
+                    "reason": "Codex could not read account usage (internal error -32603). "
+                              "CAC is retrying automatically; no continuation is sent without a fresh permission read. "
+                              "If this persists, check Codex sign-in and its service/network connection.",
+                    "retrySeconds": delay,
+                }
+                if on_phase:
+                    on_phase("reconnecting")
+                changed("quota.unavailable", "quota-read", method=exc.method, errorCode=-32603, retrySeconds=delay)
+                self.close()
+                wait(max(1.0, delay))
             except TransportError as exc:
+                self.read_problem = {
+                    "reason": "Codex connection unavailable. CAC is reconnecting automatically; pending work is preserved.",
+                    "errorType": "TransportError", "retrySeconds": self.config.reconnect_backoff_seconds,
+                }
                 if on_phase:
                     on_phase("reconnecting")
                 failure("transport.reconnecting", exc, delaySeconds=self.config.reconnect_backoff_seconds)

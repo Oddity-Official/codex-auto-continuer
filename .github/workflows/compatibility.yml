@@ -5,8 +5,29 @@ on:
     - cron: '23 9 * * *'
   workflow_dispatch:
   pull_request:
+    paths: &native-inputs
+      - 'src/codex_auto_continuer/supervisor.py'
+      - 'src/codex_auto_continuer/appserver.py'
+      - 'src/codex_auto_continuer/codex.py'
+      - 'src/codex_auto_continuer/compatibility*'
+      - 'src/codex_auto_continuer/config.py'
+      - 'src/codex_auto_continuer/state.py'
+      - 'src/codex_auto_continuer/errors.py'
+      - 'src/codex_auto_continuer/ws_unix.py'
+      - 'src/codex_auto_continuer/uds.py'
+      - 'src/codex_auto_continuer/cli.py'
+      - 'src/codex_auto_continuer/telemetry.py'
+      - 'integration/**'
+      - 'pyproject.toml'
+      - 'scripts/download-probe-codex.py'
+      - 'scripts/compatibility-matrix.py'
+      - 'scripts/probe-compatibility.py'
+      - 'scripts/run-standard-user-ci.ps1'
+      - 'scripts/run-project-command.ps1'
+      - '.github/workflows/compatibility.yml'
   push:
     branches: [master, main]
+    paths: *native-inputs
 
 permissions:
   contents: read
@@ -16,22 +37,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  resolve:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.13'
+      - name: Resolve and deduplicate official stable version tuples
+        id: matrix
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $raw = & ./scripts/run-project-command.ps1 -FileName (Get-Command gh).Source -Arguments @('api','repos/openai/codex/releases/latest','--jq','.tag_name') -TimeoutSeconds 30 6>&1
+          $tag = ($raw | Out-String).Trim()
+          if ($tag -notmatch '^rust-v(\d+\.\d+\.\d+)$') { throw 'Official stable release did not resolve to an exact stable Codex version.' }
+          $stable = $Matches[1]
+          $matrix = & python scripts/compatibility-matrix.py --baseline '0.160.0' --stable $stable
+          if ($LASTEXITCODE -ne 0) { throw 'Could not resolve compatibility matrix.' }
+          "matrix=$matrix" >> $env:GITHUB_OUTPUT
+          Write-Host "Distinct tuples: $matrix"
   native:
+    needs: resolve
     runs-on: windows-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: certified-baseline
-            cli: '0.160.0'
-            daemon: '0.160.0'
-          - name: current-stable
-            cli: latest
-            daemon: latest
-          - name: mixed-daemon-update
-            cli: '0.160.0'
-            daemon: latest
+      matrix: ${{ fromJSON(needs.resolve.outputs.matrix) }}
     defaults:
       run:
         shell: pwsh

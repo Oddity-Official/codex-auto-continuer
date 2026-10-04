@@ -8,6 +8,14 @@ Updated: 2026-10-04
 
 All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba04` preserves v001 and its original checksum manifest. ChatGPT's manifest is unchanged. The stale imported checksum file is not retained as a current-source checksum; each new transport owns its generated manifest.
 
+## CAC 0.5.2 local work
+
+- Investigated the red status against private metadata and session lifecycle. An internal read-only quota RPC error stopped monitoring before reset; the pending obligation remained durable. Restart restored monitoring. Queued follow-ups failed with structured quota errors but did not erase the obligation.
+- Retry only internal account-usage read errors, preserving state and withholding current permission. Retain pending count, last scan, compatibility and safe method/code in status; other contract/request/mutation errors still fail diagnostically. Check For Updates now sits immediately above About.
+- Added a real native queued-failure/HTTP-503/recovery scenario and focused regressions. Fixture reconnects remain on the synthetic socket. No conversation-body storage, queue interception or text-equality delivery assertion was introduced.
+- Focused development commands, documentation-only CI, consumed-input workflow filters and exact-tuple deduplication reduce repeated release work. Completed deliveries still receive source handoffs. Shared policy snapshots preserve portable project ownership.
+- The approved dark tray/status presentation choices are not claimed implemented by this recovery patch. Native computer control remains unavailable in this session's tool surface, unrelated to CAC's prohibition on automating Codex for dispatch.
+
 ## CAC 0.5.1 implementation
 
 - Balanced defaults permit schema-verified stable Codex builds; Strict retains exact-build certification. Status explains evidence and unknown builds get deduplicated non-modal notices.

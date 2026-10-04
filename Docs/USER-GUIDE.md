@@ -1,6 +1,6 @@
 # Codex Auto Continuer
 
-CAC 0.5.1 continues the exact local Codex chat stopped by a usage limit, once Codex confirms ordinary usage is available. It does not click windows, change the clipboard or answer approvals.
+CAC 0.5.2 continues the exact local Codex chat stopped by a usage limit, once Codex confirms ordinary usage is available. It does not click windows, change the clipboard or answer approvals.
 
 ## Get started
 

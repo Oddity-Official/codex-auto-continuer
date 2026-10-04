@@ -467,3 +467,56 @@ def test_loop_closes_subscription_before_sleep_and_stops_gracefully(tmp_path):
     s.sleep = sleep
     s.run_forever(lambda: bool(stopped))
     assert len(closed) == 1
+
+
+@pytest.mark.parametrize("during_probe", [False, True])
+def test_unavailable_quota_read_preserves_state_reconnects_and_recovers(tmp_path, during_probe):
+    ob = Obligation.create("t", "turn-1", 900, None)
+    save_state(tmp_path / "state.json", State(obligations=[ob]))
+    before = (tmp_path / "state.json").read_bytes()
+    c = FakeClient([thread()], {"t": failed_turn()}, allowed=False)
+    s = supervisor(tmp_path, c)
+    reads, delays, phases, cycles = [], [], [], []
+    original = c.rate_limits
+    def read():
+        reads.append(True)
+        if len(reads) == 1:
+            raise RpcError("account/rateLimits/read", {"code": -32603, "message": "private upstream body"})
+        return original()
+    c.rate_limits = read
+    def connect():
+        s.client = c
+        if during_probe:
+            s._probe_required_methods()
+    s.connect = connect
+    def sleep(seconds):
+        assert s.client is None
+        assert (tmp_path / "state.json").read_bytes() == before
+        assert not c.added and not c.deleted
+        assert "private upstream body" not in str(s.read_problem)
+        delays.append(seconds)
+    s.sleep = sleep
+    s.on_cycle = cycles.append
+    s.run_forever(lambda: bool(cycles), on_phase=phases.append)
+    assert "reconnecting" in phases and delays
+    assert cycles[0].pending == 1 and cycles[0].ordinary_usage_allowed is False
+    assert s.read_problem is None and not c.added
+
+
+@pytest.mark.parametrize("method,code", [("thread/queue/add", -32603), ("thread/read", -32603),
+                                      ("account/rateLimits/read", -32600), ("account/rateLimits/read", -32601)])
+def test_only_internal_quota_reads_are_retryable(tmp_path, method, code):
+    s = supervisor(tmp_path, FakeClient())
+    def connect():
+        raise RpcError(method, {"code": code, "message": "private upstream body"})
+    s.connect = connect
+    with pytest.raises(RpcError):
+        s.run_forever(lambda: False)
+
+
+def test_malformed_quota_contract_still_fails_loud(tmp_path):
+    c = FakeClient()
+    c.rate_limits = lambda: {"rateLimits": {}}
+    s = supervisor(tmp_path, c)
+    with pytest.raises(ProtocolError, match="ordinaryUsageAllowed"):
+        s.run_forever(lambda: False)

@@ -34,6 +34,8 @@ No UI automation or model-switching path exists. Each RPC has a total deadline t
 
 Each fresh connection verifies the CLI, daemon lifecycle response, connected server's user-agent version and managed binary. The managed binary generates the experimental schema. CAC checks its consumer-specific contract and looks for an exact-version/build certificate. Balanced mode also permits matching unknown stable builds; Strict requires certification. Schema results cache only in memory by binary SHA-256 and full version; file identity changes invalidate them. Rechecks before resume, queue addition and deletion catch daemon updates during a cycle. [Compatibility](COMPATIBILITY.md) owns policy and identity limits.
 
+An internal `-32603` error from the read-only `account/rateLimits/read` endpoint is unavailable evidence, not a fatal contract failure. Monitoring closes the connection, clears current usage permission and retries at the configured reconnect interval with backoff capped at the greater of 30 seconds or that interval. Pending state remains unchanged. Status retains last-scan metadata, actual pending count and the safe method/code with repair guidance. Authentication/request errors, missing methods, malformed responses and mutation errors are not converted into this retry path. Server error bodies remain excluded.
+
 ## Thread scope
 
 Default `clients = ["vscode", "cli", "desktop"]` accepts all three interactive clients. CLI source wins over originator. Desktop accepts vscode with a configured Desktop originator, initially Codex Desktop, or configured custom sources, initially chatgpt and atlas. Other vscode sources are extension sessions. Any combination, including [], is valid. Exec, appServer, unknown and subAgent sources remain excluded.

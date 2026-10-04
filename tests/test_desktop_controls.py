@@ -38,6 +38,33 @@ def test_status_uses_local_snapshot_without_connecting_to_codex(tmp_path, monkey
     assert not (tmp_path / "settings.toml").exists()
 
 
+def test_fatal_rpc_status_keeps_pending_count_scan_and_safe_error_details(tmp_path, monkeypatch, capsys):
+    import json
+    from codex_auto_continuer.appserver import RpcError
+    from codex_auto_continuer.compatibility import Compatibility
+    from codex_auto_continuer.state import Obligation, State, save_state
+    from codex_auto_continuer.supervisor import CycleResult
+    settings = tmp_path / "settings.toml"
+    config.initialize_files(settings)
+    save_state(tmp_path / "state.json", State(obligations=[Obligation.create("t", "failed", 1, None)]))
+    for name in ("lock_path", "owner_path", "stop_path", "scan_path"):
+        monkeypatch.setattr(cli, name, lambda name=name: tmp_path / name)
+    def run(self, *args):
+        self.compatibility = Compatibility(status="certified", reason="fixture")
+        self.on_cycle(CycleResult(pending=1, ordinary_usage_allowed=False, compatibility=self.compatibility.report()))
+        raise RpcError("thread/read", {"code": -32600, "message": "private error body"})
+    monkeypatch.setattr(cli.Supervisor, "run_forever", run)
+    assert cli.main(["--config", str(settings), "run"]) == 2
+    status = json.loads((tmp_path / "runtime-status.json").read_text())
+    assert status["pending"] == 1 and status["lastScanAt"]
+    assert status["compatibility"]["status"] == "certified"
+    assert status["ordinary_usage_allowed"] is None
+    assert status["errorMethod"] == "thread/read" and status["errorCode"] == -32600
+    assert "thread/read" in status["reason"] and "Start Monitoring" in status["reason"]
+    assert "private error body" not in (tmp_path / "runtime-status.json").read_text()
+    assert "private error body" not in capsys.readouterr().err
+
+
 def test_client_cli_can_pause_and_restore_defaults_preserves_selected_prompt(tmp_path, monkeypatch):
     from dataclasses import replace
     monkeypatch.setattr(cli, "is_running", lambda path: False)
