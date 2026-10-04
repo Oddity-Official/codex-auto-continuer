@@ -32,9 +32,9 @@ try {
     # Task Scheduler starts outside the runner's non-breakaway job object. Codex's
     # supported daemon launcher can then detach normally, without patching its guard.
     $action = New-ScheduledTaskAction -Execute (Get-Command pwsh).Source -WorkingDirectory $root -Argument (
-        '-NoProfile -File "{0}" -RequestPath "{1}"' -f $entry, $request
+        '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}" -RequestPath "{1}"' -f $entry, $request
     )
-    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::FromSeconds($TimeoutSeconds + 30))
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::FromSeconds($TimeoutSeconds + 30))
     Register-ScheduledTask -TaskName $identity -Action $action -Settings $settings -User "$($env:COMPUTERNAME)\$identity" -Password $plainPassword -RunLevel Limited | Out-Null
     $registered = $true
     Start-ScheduledTask -TaskName $identity
@@ -49,6 +49,10 @@ try {
     $logPath = Join-Path $directory 'output.txt'
     if (Test-Path -LiteralPath $logPath) { Get-Content -LiteralPath $logPath -Raw | Write-Host }
     if (-not (Test-Path -LiteralPath $resultPath)) {
+        $task = Get-ScheduledTask -TaskName $identity
+        Write-Host ($task | Select-Object State, Principal, Settings | ConvertTo-Json -Depth 5)
+        Get-WinEvent -FilterHashtable @{ LogName = 'Microsoft-Windows-TaskScheduler/Operational'; StartTime = [DateTime]::Now.AddMinutes(-10) } -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -like "*$identity*" } | Select-Object -Last 10 -Property Id, Message | ConvertTo-Json | Write-Host
         Stop-ScheduledTask -TaskName $identity
         $info = Get-ScheduledTaskInfo -TaskName $identity
         throw ('The native CI task did not report completion. Task Scheduler result: 0x{0:X8}. Inspect the entry log; the task was stopped.' -f $info.LastTaskResult)
