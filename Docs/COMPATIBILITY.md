@@ -42,13 +42,13 @@ Status shows the policy, evidence level, CLI/daemon versions and reason. An unkn
 
 Jobs create a short `C:/cac-probe` Git worktree before testing. This avoids Codex's 107-byte Windows socket-path limit regardless of the GitHub repository name. Long-path aliases are not used.
 
-GitHub Windows runners are elevated, while Codex correctly rejects elevated daemon startup. CI creates an ephemeral standard account and runs the complete native gate under its non-elevated token. It grants access only to the disposable checkout, uses an in-memory random password, bounds the process tree and removes the account afterward. The helper refuses normal local execution. Tests and upstream security checks are not skipped or patched.
+GitHub Windows runners are elevated, while Codex correctly rejects elevated daemon startup. CI creates an ephemeral standard account and runs the complete native gate through Task Scheduler, outside the runner's background-process restrictions. It grants access to the disposable checkout and the single batch-logon right, uses an in-memory random password, bounds startup and execution, then removes the task, right and account. The helper refuses normal local execution. Tests and upstream security checks are not skipped or patched.
 
 `scripts/download-probe-codex.py` fetches complete official GitHub release packages into ignored test staging. It requires GitHub's asset SHA-256 and exact size before extraction/execution. Paths, links, duplicates and extracted-size limits are validated. It never installs into a developer's Codex home. Downloads have 180-second deadlines; the outer runner bounds download/extraction at 240 seconds.
 
 The probe runs schema comparison and 11 native scenarios. These use synthetic authentication and loopback model/account services, not an OpenAI login or real allowance. Managed lifecycle tests disable Codex updater/remote control in their disposable home, exercise production discovery/reconnect, deliberately remove certification, prove Strict pending-state preservation and Balanced recovery, then verify one continuation and no duplicates. Candidate builds receive test-only access inside isolated behavioral fixtures; CI never changes production certificates automatically.
 
-Reports contain versions, checksums, schema differences and synthetic-test results. Jobs fail if either schema or behavior fails. Artifacts expire after 14 days. No CI job edits certificates or publishes a release. GitHub schedules start only after the repository is uploaded and Actions is enabled; hosted execution is not claimed from a local pass.
+Reports contain versions, checksums, schema differences and synthetic-test results. Jobs fail if either schema or behavior fails. Artifacts expire after 14 days. Compatibility jobs never edit certificates or publish releases; the separate signed release workflow owns publication.
 
 ## Certifying another build
 

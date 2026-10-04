@@ -303,7 +303,7 @@ class TrayController:
                           confirm=True, then=lambda: self.enqueue("reset", "restore-defaults", "--prompt-file", self.cfg.prompt_file))
 
     def about(self):
-        self.dialogs.show("about", f"Codex Auto Continuer {__version__}\n\nContinues exact local Codex chats after usage recovers.\nLocal diagnostics only; no analytics uploads or credential collection.\n\nIndependent tool, not an OpenAI product. MIT license.",
+        self.dialogs.show("about", f"Codex Auto Continuer {__version__}\n\nContinues exact local Codex chats after usage recovers.\nLocal diagnostics; no analytics uploads or credential logging.\n\nIndependent tool, not an OpenAI product. MIT license.",
                           title=f"About CAC {__version__}")
 
     def watch(self):
