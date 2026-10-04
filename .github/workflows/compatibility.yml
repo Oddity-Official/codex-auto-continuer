@@ -1,0 +1,96 @@
+name: Codex compatibility probe
+
+on:
+  schedule:
+    - cron: '23 9 * * *'
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [master, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compatibility-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: certified-baseline
+            cli: '0.160.0'
+            daemon: '0.160.0'
+          - name: current-stable
+            cli: latest
+            daemon: latest
+          - name: mixed-daemon-update
+            cli: '0.160.0'
+            daemon: latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: C:/cac-probe
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.13'
+      - name: Use a short checkout for native Windows socket paths
+        working-directory: ${{ github.workspace }}
+        run: |
+          & ./scripts/run-project-command.ps1 -FileName (Get-Command git).Source -Arguments @('worktree','add','--detach','C:/cac-probe','HEAD') -TimeoutSeconds 30
+      - name: Prepare isolated Python
+        run: |
+          & ./scripts/run-project-command.ps1 -FileName (Get-Command python).Source -Arguments @('-m','venv','.venv') -TimeoutSeconds 60
+          & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m','pip','install','--timeout','30','.[dev]') -TimeoutSeconds 180
+      - name: Fetch official complete packages and verify checksums
+        env:
+          CLI_VERSION: ${{ matrix.cli }}
+          DAEMON_VERSION: ${{ matrix.daemon }}
+        run: |
+          & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('scripts/download-probe-codex.py','--version',$env:CLI_VERSION,'--destination','.data/cli') -TimeoutSeconds 240
+          $cli = Get-Content -LiteralPath '.data/cli/download.json' -Raw | ConvertFrom-Json
+          $cliPath = Join-Path "$PWD/.data/cli" $cli.binary
+          $daemonPath = $cliPath
+          if ($env:DAEMON_VERSION -ne $env:CLI_VERSION) {
+            & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('scripts/download-probe-codex.py','--version',$env:DAEMON_VERSION,'--destination','.data/daemon') -TimeoutSeconds 240
+            $daemon = Get-Content -LiteralPath '.data/daemon/download.json' -Raw | ConvertFrom-Json
+            $daemonPath = Join-Path "$PWD/.data/daemon" $daemon.binary
+          }
+          "CAC_PROBE_CLI=$cliPath" >> $env:GITHUB_ENV
+          "CAC_PROBE_DAEMON=$daemonPath" >> $env:GITHUB_ENV
+      - name: Check experimental schemas
+        id: schema
+        continue-on-error: true
+        run: |
+          & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('scripts/probe-compatibility.py','--codex-executable',$env:CAC_PROBE_CLI,'--report','.data/reports/cli-schema.json') -TimeoutSeconds 40
+          & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('scripts/probe-compatibility.py','--codex-executable',$env:CAC_PROBE_DAEMON,'--report','.data/reports/daemon-schema.json') -TimeoutSeconds 40
+      - name: Native recovery and managed lifecycle behavior
+        id: behavior
+        continue-on-error: true
+        run: |
+          & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m','pytest','integration/test_continuation.py','integration/test_compatibility.py','-q','-s','--tb=short','--codex-executable',$env:CAC_PROBE_CLI,'--daemon-executable',$env:CAC_PROBE_DAEMON,'--junitxml=.data/reports/native.xml') -TimeoutSeconds 300
+      - name: Require both checks
+        env:
+          SCHEMA_RESULT: ${{ steps.schema.outcome }}
+          BEHAVIOR_RESULT: ${{ steps.behavior.outcome }}
+        run: |
+          if ($env:SCHEMA_RESULT -ne 'success' -or $env:BEHAVIOR_RESULT -ne 'success') { throw 'Codex compatibility failed. Review the schema and native reports before certifying this build.' }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: compatibility-${{ matrix.name }}
+          path: |
+            C:/cac-probe/.data/reports/
+            C:/cac-probe/.data/cli/download.json
+            C:/cac-probe/.data/daemon/download.json
+          if-no-files-found: warn
+          retention-days: 14

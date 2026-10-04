@@ -10,6 +10,7 @@ from typing import Any, Callable
 
 from .appserver import AppServerClient, RpcError
 from .codex import codex_version, ensure_daemon, find_codex
+from .compatibility import Compatibility, CompatibilityGate, CompatibilityBlocked
 from .config import Config, read_prompt
 from .errors import ConfigurationError, ProtocolError, TransportError
 from .state import Obligation, State, load_state, save_state
@@ -35,6 +36,7 @@ class CycleResult:
     pending: int = 0
     ordinary_usage_allowed: bool | None = None
     next_reset_at: float | None = None
+    compatibility: dict | None = None
 
 
 class Supervisor:
@@ -58,21 +60,34 @@ class Supervisor:
         self.client: AppServerClient | None = None
         self.codex_bin: str | None = None
         self._cli_version: str | None = None
+        self.compatibility = Compatibility()
+        self.compatibility_gate = CompatibilityGate(state_file.parent / "compatibility-cache")
 
     def connect(self) -> None:
         if self.client is not None:
             return
         codex_bin = self.codex_bin or find_codex(self.config.codex_executable)
-        cli_version = self._cli_version or codex_version(codex_bin, self.config.codex_command_timeout_seconds)
+        cli_version = codex_version(codex_bin, self.config.codex_command_timeout_seconds)
         daemon = ensure_daemon(codex_bin, self.config.codex_command_timeout_seconds, self.config.auto_start_daemon)
         client = AppServerClient.connect(daemon.socket_path, self.config.rpc_timeout_seconds)
         self.codex_bin = codex_bin
         self._cli_version = cli_version
         self.client = client
+        self.compatibility = self.compatibility_gate.recheck(codex_bin, client.user_agent, self.config.codex_command_timeout_seconds)
+        changed("compatibility.checked", "compatibility", **self.compatibility.report())
         LOG.info("Connected to Codex %s app-server %s", cli_version, client.user_agent)
         changed("codex.connected", "connection", cliVersion=cli_version, daemonVersion=daemon.app_server_version,
              socketPath=str(daemon.socket_path), userAgent=client.user_agent)
-        self._probe_required_methods()
+        if self.compatibility.read_allowed:
+            self._probe_required_methods()
+
+    def _check_dispatch_compatibility(self) -> None:
+        if self.codex_bin is not None:
+            self.compatibility = self.compatibility_gate.recheck(
+                self.codex_bin, self._require_client().user_agent, self.config.codex_command_timeout_seconds)
+            changed("compatibility.checked", "compatibility", **self.compatibility.report())
+        if not self.compatibility.dispatch_allowed:
+            raise CompatibilityBlocked(self.compatibility.reason)
 
     def close(self) -> None:
         client, self.client = self.client, None
@@ -138,7 +153,7 @@ class Supervisor:
                     begin_cycle()
                     emit("cycle.completed", **result.__dict__, observations=0)
                 else:
-                    if on_phase:
+                    if on_phase and self.compatibility.dispatch_allowed:
                         on_phase("scanning")
                     self.connect()
                     result = self.run_cycle()
@@ -158,6 +173,11 @@ class Supervisor:
                 # cannot linger and receive approval or requestUserInput traffic while sleeping.
                 self.close()
                 wait(delay)
+            except CompatibilityBlocked:
+                if self.on_cycle:
+                    self.on_cycle(CycleResult(pending=len(self.state.obligations), compatibility=self.compatibility.report()))
+                self.close()
+                wait(max(1.0, self.config.poll_seconds))
             except TransportError as exc:
                 if on_phase:
                     on_phase("reconnecting")
@@ -169,11 +189,16 @@ class Supervisor:
     def run_cycle(self) -> CycleResult:
         begin_cycle()
         client = self._require_client()
+        if not self.compatibility.read_allowed:
+            result = CycleResult(pending=len(self.state.obligations), compatibility=self.compatibility.report())
+            emit("cycle.completed", **result.__dict__, observations=len(self.state.observations))
+            return result
         now = self.clock()
         limits = _parse_rate_limits(client.rate_limits())
         result = CycleResult(
             ordinary_usage_allowed=limits.ordinary_usage_allowed,
             next_reset_at=limits.next_reset_at,
+            compatibility=self.compatibility.report(),
         )
         self._observe_deliveries()
 
@@ -183,6 +208,8 @@ class Supervisor:
 
         # Resolve existing obligations first. Manual progress always wins, even before reset.
         for obligation in list(self.state.obligations):
+            if not self.compatibility.dispatch_allowed:
+                continue  # Keep potentially submitted work intact until queue reconciliation is certified.
             if limits.next_reset_at is not None:
                 obligation.reset_at = limits.next_reset_at
             thread = by_id.get(obligation.thread_id) or self._find_thread_by_id(obligation.thread_id)
@@ -216,7 +243,7 @@ class Supervisor:
                 emit("obligation.detected", threadId=thread_id, failedTurnId=turn_id,
                      completedAt=completed, detectedAt=now, resetAt=limits.next_reset_at)
 
-        if limits.ordinary_usage_allowed is True:
+        if limits.ordinary_usage_allowed is True and self.compatibility.dispatch_allowed:
             for obligation in sorted(list(self.state.obligations), key=lambda item: item.detected_at):
                 if self._dispatch_if_still_valid(obligation, now):
                     result.dispatched += 1
@@ -341,6 +368,7 @@ class Supervisor:
         return True
 
     def _dispatch_if_still_valid(self, obligation: Obligation, now: float) -> bool:
+        self._check_dispatch_compatibility()
         client = self._require_client()
         thread = self._find_thread_by_id(obligation.thread_id)
         if not self._revalidate_obligation(obligation, thread):
@@ -357,6 +385,7 @@ class Supervisor:
         assert thread is not None
         status_type, _ = _thread_status(thread)
         if status_type == "notLoaded":
+            self._check_dispatch_compatibility()
             try:
                 resumed = client.resume_thread(obligation.thread_id)
             except RpcError as exc:
@@ -386,6 +415,7 @@ class Supervisor:
 
         # Resuming and other RPCs take time. Both quota and the exact failed turn
         # must still be valid immediately before the non-idempotent queue send.
+        self._check_dispatch_compatibility()
         if not self._revalidate_obligation(obligation, client.thread_read(obligation.thread_id)):
             self._cancel_queued_continuations(obligation)
             self.state.obligations.remove(obligation)
@@ -436,12 +466,14 @@ class Supervisor:
         if obligation.phase == "pending" and obligation.queued_submission_id is None:
             return
         client = self._require_client()
+        self._check_dispatch_compatibility()
         matches = [
             item
             for item in client.queue_items(obligation.thread_id)
             if item.get("clientUserMessageId") == obligation.client_user_message_id
         ]
         for item in matches:
+            self._check_dispatch_compatibility()
             queue_id = _required_string(item, "id", "thread/queue/list")
             deleted = client.queue_delete(obligation.thread_id, queue_id)
             emit("queue.stale_item_deleted", threadId=obligation.thread_id, queuedSubmissionId=queue_id, deleted=deleted)

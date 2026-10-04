@@ -14,7 +14,7 @@ codex app-server generate-json-schema --experimental --out .data/schema
 
 These are temporary references, not exported runtime dependencies. [Official app-server documentation](https://learn.chatgpt.com/docs/app-server) describes the integration layer, initialization, thread/turn lifecycle and approval requests. Installed schemas and native probes establish the experimental queue and quota fields used here. General documentation does not establish a queue idempotency or atomic turn-precondition guarantee.
 
-The guarded minimum version is 0.160.0. Only that installation has current native evidence. Required methods and fields are checked at runtime; a version number alone is insufficient.
+The guarded minimum version is 0.160.0. Dispatch additionally requires the reviewed exact CLI/daemon build certificate and generated experimental contract. [Compatibility](COMPATIBILITY.md) owns that policy and identity limits; [verification](VALIDATION.md#compatibility-certification) records current native evidence.
 
 ## Verified native facts
 
@@ -38,7 +38,7 @@ The supported scope is local interactive CLI, VS Code and Desktop visible to one
 
 Actual CLI delivery and Desktop-style separate-owner delivery have native evidence. On 4 October 2026, the installed official VS Code extension passed the [isolated extension-host gate](CONTINUATION-TESTS.md#installed-vs-code-extension). Its unchanged bundle launched and initialized its unchanged Codex executable. The resulting thread recorded `source=vscode` and `originator=codex_vscode`. All eight client-selection combinations classified it correctly. CAC waited through denied scans, then queued one Continue; the original extension-owned server completed the exact chat and subsequent scans did not duplicate it.
 
-The test supplies initial thread/turn RPCs through an instrumented native transport, not a clicked composer. It proves real extension-owned recovery, not visual chat rendering. Generic app-server processes can also report `vscode`; the bucket is not a positive extension-originator allowlist. Explicit `appServer`, executor, sub-agent and unknown source labels remain excluded. Current versions and measurements belong to [verification](VALIDATION.md#vs-code-extension-owner).
+The test supplies initial thread/turn RPCs through an instrumented native transport, not a clicked composer. It proves real extension-owned recovery, not visual chat rendering. Generic app-server processes can also report `vscode`; the bucket is not a positive extension-originator allowlist. Explicit `appServer`, executor, sub-agent and unknown source labels remain excluded. Current versions and measurements belong to [verification](VALIDATION.md#compatibility-certification).
 
 Remote, WSL, cloud, different homes, accounts or users are separate environments. A native supervisor cannot assume visibility into them.
 

@@ -14,6 +14,7 @@ from codex_auto_continuer.codex import codex_version, find_codex
 
 def pytest_addoption(parser):
     parser.addoption("--codex-executable", help="Native Codex executable; otherwise auto-detect.")
+    parser.addoption("--daemon-executable", help="Complete CLI package used to bootstrap the isolated managed daemon, for mixed-version probes.")
     parser.addoption("--vscode-executable", help="Installed Code.exe for the separate extension integration gate.")
     parser.addoption("--vscode-extension", help="Installed openai.chatgpt extension directory, used without modification.")
 
@@ -27,6 +28,7 @@ def codex_binary(request):
 
 
 @pytest.fixture
-def native(codex_binary):
-    with NativeFixture(ROOT, codex_binary) as fixture:
+def native(codex_binary, request):
+    candidate = request.config.getoption("--daemon-executable") or codex_binary
+    with NativeFixture(ROOT, candidate) as fixture:
         yield fixture

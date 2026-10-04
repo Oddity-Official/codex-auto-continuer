@@ -19,7 +19,7 @@ The Win32 tray adapter builds the native menu on the UI thread immediately befor
 ## Codex control path
 
 1. Find the native Codex executable from explicit configuration, PATH, the standard Desktop location or recognized npm vendor layout. Never execute an arbitrary shell launcher.
-2. Require CLI version 0.160.0 or newer. Probe the daemon version; optionally start it.
+2. Require CLI version 0.160.0 or newer, retaining its full prerelease/build suffix. Probe the daemon version; optionally start it. A minimum version is not dispatch certification.
 3. Connect to its private Unix-domain control socket and perform WebSocket initialization. On Windows, a standard-library ctypes bridge marshals Winsock's Unix-domain address. Python owns all socket I/O; paths must fit 107 UTF-8 bytes.
 4. Read account limits and paginated thread metadata. Discovery uses descending update time, but eligibility uses the failed turn's completion time.
 5. Read the latest turn with `itemsView = notLoaded`. Record only `failed / usageLimitExceeded` within the 24-hour window. Never cache by second-granularity thread timestamps.
@@ -31,6 +31,8 @@ The Win32 tray adapter builds the native menu on the UI thread immediately befor
 11. Reconcile the queue and latest turn on later cycles. Close each connection before sleeping, so a resume subscription cannot become a sleeping approval/input subscriber.
 
 No UI automation or model-switching path exists. Each RPC has a total deadline that notifications, pings and fragmented frames cannot extend.
+
+Each fresh connection verifies the CLI, daemon lifecycle response, connected server's user-agent version and managed binary. The managed binary generates the experimental schema. CAC checks its consumer-specific contract and the packaged exact-version/build certificate before permitting writes. Schema results cache only in memory by binary SHA-256 and full version; file identity changes invalidate them. Rechecks before resume, queue addition and deletion catch daemon updates during a cycle. [Compatibility](COMPATIBILITY.md) owns certification, blocked-state behavior and identity limits.
 
 ## Thread scope
 

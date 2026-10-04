@@ -8,6 +8,8 @@
     "pyproject.toml",
     "src/codex_auto_continuer/cli.py",
     "src/codex_auto_continuer/supervisor.py",
+    "src/codex_auto_continuer/compatibility.py",
+    "src/codex_auto_continuer/compatibility.json",
     "tests/test_supervisor.py"
   ],
   "exclude_directories": ["App", "data"],

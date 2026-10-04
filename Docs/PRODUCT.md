@@ -33,7 +33,8 @@ Continue existing local interactive Codex tasks after account usage recovers, wi
 - monitoring remote, cloud or WSL sessions outside the visible native Codex home
 - uploading telemetry, collecting credentials or maintaining a remote analytics service
 - supporting unverified queue retry or atomicity guarantees
+- automatically trusting new Codex releases or modifying Codex's installation/update policy
 
 ## Supported release
 
-Version 0.3.0 targets Windows 11 x86_64 and Codex 0.160.0-compatible local interfaces. The portable release bundles Python, a short user guide and dependency notices, not developer docs or audit history. Source development uses Python 3.13 and PowerShell 7. Current results and limits belong to [VALIDATION.md](VALIDATION.md).
+Version 0.4.0 targets Windows 11 x86_64. Queue writes require a reviewed exact CLI/daemon version and binary-checksum certificate, plus schema and runtime checks. [Compatibility](COMPATIBILITY.md) owns that policy. The portable release bundles Python, a short user guide and dependency notices, not developer docs or audit history. Source development uses Python 3.13 and PowerShell 7. Current results and limits belong to [VALIDATION.md](VALIDATION.md).

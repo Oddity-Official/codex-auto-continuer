@@ -185,9 +185,11 @@ def fixture_auth():
 
 
 class NativeFixture:
-    def __init__(self, root: Path, binary: str):
+    def __init__(self, root: Path, binary: str, *, managed=False, daemon_binary=None):
         self.root = root
         self.binary = binary
+        self.daemon_binary = daemon_binary or binary
+        self.managed = managed
         self.stack = ExitStack()
         self.clients = []
         self.supervisors = []
@@ -232,12 +234,15 @@ class NativeFixture:
                 "XDG_CONFIG_HOME": str(self.home / "config"), "CAC_FIXTURE_KEY": TOKEN,
                 "HTTP_PROXY": self.service.base_url, "HTTPS_PROXY": self.service.base_url,
                 "ALL_PROXY": self.service.base_url, "NO_PROXY": "127.0.0.1,localhost"})
-            self.owner_socket = self.home / "app-server-control" / "app-server-control.sock"
-            self.socket = self.owner_socket.parent / "m.sock"
-            for path in (self.owner_socket, self.socket):
+            self.owner_socket = self.home / "app-server-control/o.sock" if self.managed else self.home / "app-server-control" / "app-server-control.sock"
+            self.socket = self.home / "app-server-control/app-server-control.sock" if self.managed else self.owner_socket.parent / "m.sock"
+            for path in ((self.socket, self.owner_socket) if self.managed else (self.owner_socket, self.socket)):
                 if len(str(path).encode()) > 107:
                     raise ValueError("Native fixture socket exceeds 107 bytes. Use a shorter checkout path.")
-                self.start_server(path, default=path == self.owner_socket)
+                if self.managed and path == self.socket:
+                    self.start_managed()
+                else:
+                    self.start_server(path, default=not self.managed and path == self.owner_socket)
             self.owner = self.client(self.owner_socket)
             return self
         except BaseException:
@@ -259,7 +264,8 @@ class NativeFixture:
         error_path = self.home / f"{path.name}.stderr"
         stderr = self.stack.enter_context(error_path.open("wb"))
         listen = "unix://" if default else f"unix://{path}"
-        process = subprocess.Popen([self.binary, "app-server", "--listen", listen],
+        binary = self.daemon_binary if self.managed else self.binary
+        process = subprocess.Popen([binary, "app-server", "--listen", listen],
             cwd=self.home, env=self.env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=stderr,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             start_new_session=os.name != "nt")
@@ -291,15 +297,41 @@ class NativeFixture:
                     raise TimeoutError("Isolated native server did not become ready within 15 seconds.")
                 time.sleep(0.1)
 
+    def start_managed(self):
+        from codex_auto_continuer.codex import _run
+        settings = self.home / "app-server-daemon/settings.json"
+        # Native lifecycle commands create their state directory with a private Windows ACL.
+        _run(self.binary, ["app-server", "daemon", "stop"], 10, env=self.env)
+        assert settings.parent.is_dir(), "Codex did not create its private daemon state directory"
+        settings.write_text(json.dumps({"remoteControlEnabled": False, "shutdownGraceSeconds": 0,
+            "updater": {"autoUpdateEnabled": False, "updateIntervalMinutes": 120}}), encoding="utf-8")
+        def stop():
+            result = _run(self.binary, ["app-server", "daemon", "stop"], 15, env=self.env)
+            if (self.home / "app-server-daemon/app-server.pid").exists():
+                assert result.returncode == 0, "Isolated managed daemon did not stop cleanly: " + result.stderr.replace(str(self.home), "<fixture>")
+        self.stack.callback(stop)
+        if self.daemon_binary != self.binary:
+            import shutil
+            source = Path(self.daemon_binary).resolve().parent.parent
+            assert (source / "codex-package.json").is_file(), "Mixed daemon needs a complete official package"
+            shutil.copytree(source, self.home / "packages/app-server-daemon/current")
+        result = _run(self.binary, ["app-server", "daemon", "bootstrap"], 25, env=self.env)
+        if result.returncode:
+            raise RuntimeError("Isolated daemon bootstrap failed: " + result.stderr.replace(str(self.home), "<fixture>"))
+
     def client(self, path=None):
         client = AppServerClient.connect(path or self.socket, 5)
         self.clients.append(client)
         return client
 
     def supervisor(self):
+        from codex_auto_continuer.compatibility import Compatibility
         supervisor = Supervisor(Config(dispatch_spacing_seconds=0, rpc_timeout_seconds=5), self.data / "state.json")
         # Select the isolated control socket, not the user's daemon. All RPCs are native.
         supervisor.client = self.client()
+        # This isolated harness establishes behavioral evidence, including for untested builds.
+        # It is not a production override: every home, socket and credential belongs to the fixture.
+        supervisor.compatibility = Compatibility(status="certified", reason="Isolated native certification probe")
         supervisor._probe_required_methods()
         self.supervisors.append(supervisor)
         return supervisor

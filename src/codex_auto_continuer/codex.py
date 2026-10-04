@@ -12,7 +12,7 @@ from pathlib import Path
 from .errors import CodexCommandError, ProtocolError
 
 MIN_VERSION = (0, 160, 0)
-_VERSION_RE = re.compile(r"(?:codex-cli\s+)?(\d+)\.(\d+)\.(\d+)")
+_VERSION_RE = re.compile(r"(?:(codex-cli|codex-app-server)\s+)?(\d+)\.(\d+)\.(\d+)((?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)")
 
 
 @dataclass(frozen=True)
@@ -21,6 +21,8 @@ class DaemonInfo:
     socket_path: Path
     cli_version: str | None
     app_server_version: str | None
+    managed_codex_path: Path | None = None
+    managed_codex_version: str | None = None
 
 
 def find_codex(executable: str | None = None) -> str:
@@ -55,7 +57,7 @@ def find_codex(executable: str | None = None) -> str:
     raise CodexCommandError("Cannot locate native Codex. Install and sign in to Codex, or set codex_executable to its absolute executable path in settings.")
 
 
-def _run(codex_bin: str, args: list[str], timeout: float) -> subprocess.CompletedProcess[str]:
+def _run(codex_bin: str, args: list[str], timeout: float, *, env: dict | None = None) -> subprocess.CompletedProcess[str]:
     process = None
     try:
         process = subprocess.Popen(
@@ -67,6 +69,7 @@ def _run(codex_bin: str, args: list[str], timeout: float) -> subprocess.Complete
             encoding="utf-8",
             errors="replace",
             shell=False,
+            env=env,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             start_new_session=os.name != "nt",
         )
@@ -90,18 +93,25 @@ def _run(codex_bin: str, args: list[str], timeout: float) -> subprocess.Complete
         raise CodexCommandError(f"Failed to run `codex {' '.join(args)}`: {exc}") from exc
 
 
-def codex_version(codex_bin: str, timeout: float) -> str:
+def binary_version(codex_bin: str, timeout: float) -> tuple[str, str]:
     cp = _run(codex_bin, ["--version"], timeout)
     if cp.returncode != 0:
         raise CodexCommandError(f"`codex --version` failed ({cp.returncode}): {cp.stderr.strip()}")
-    match = _VERSION_RE.search(cp.stdout.strip())
+    match = _VERSION_RE.fullmatch(cp.stdout.strip())
     if not match:
         raise ProtocolError(f"Unrecognized Codex version output: {cp.stdout.strip()!r}")
-    version_tuple = tuple(int(x) for x in match.groups())
+    version_tuple = tuple(int(x) for x in match.groups()[1:4])
     if version_tuple < MIN_VERSION:
         required = ".".join(map(str, MIN_VERSION))
         raise ProtocolError(f"Codex {match.group(0)} is too old; this build requires Codex >= {required}.")
-    return ".".join(match.groups())
+    return ".".join(match.groups()[1:4]) + match.group(5), match.group(1) or "codex-cli"
+
+
+def codex_version(codex_bin: str, timeout: float) -> str:
+    version, kind = binary_version(codex_bin, timeout)
+    if kind != "codex-cli":
+        raise ProtocolError("codex_executable must select the full Codex CLI, not the dedicated app-server executable.")
+    return version
 
 
 def _parse_daemon_json(cp: subprocess.CompletedProcess[str], command: str) -> DaemonInfo:
@@ -120,7 +130,7 @@ def _parse_daemon_json(cp: subprocess.CompletedProcess[str], command: str) -> Da
         raise ProtocolError(f"Daemon {command} response omitted status.")
     if not isinstance(socket_path, str) or not socket_path:
         raise ProtocolError(f"Daemon {command} response omitted socketPath.")
-    for name in ("cliVersion", "appServerVersion"):
+    for name in ("cliVersion", "appServerVersion", "managedCodexPath", "managedCodexVersion"):
         if name in data and data[name] is not None and not isinstance(data[name], str):
             raise ProtocolError(f"Daemon {command} response field {name} has an invalid type.")
     return DaemonInfo(
@@ -128,6 +138,8 @@ def _parse_daemon_json(cp: subprocess.CompletedProcess[str], command: str) -> Da
         socket_path=Path(socket_path),
         cli_version=data.get("cliVersion"),
         app_server_version=data.get("appServerVersion"),
+        managed_codex_path=Path(data["managedCodexPath"]) if data.get("managedCodexPath") else None,
+        managed_codex_version=data.get("managedCodexVersion"),
     )
 
 

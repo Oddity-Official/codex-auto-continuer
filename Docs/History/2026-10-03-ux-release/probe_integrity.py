@@ -27,6 +27,7 @@ def main():
     with zipfile.ZipFile(wheel) as package:
         assert package.testzip() is None
         sources = [*sorted((ROOT / "src/codex_auto_continuer").glob("*.py")),
+                   ROOT / "src/codex_auto_continuer/compatibility.json",
                    *sorted((ROOT / "src/codex_auto_continuer/assets").iterdir())]
         for module in sources:
             assert package.read(module.relative_to(ROOT / "src").as_posix()) == module.read_bytes(), module
@@ -34,6 +35,7 @@ def main():
         assert "Requires-Dist: tomlkit<1,>=0.13" in metadata and "License-Expression: MIT" in metadata
         assert ("# Codex Auto Continuer" in metadata) and ("settings.toml" in metadata)
     manifest = json.loads((ROOT / "App/RELEASE-MANIFEST.json").read_text())
+    assert manifest["version"] == __version__
     for name, entry in manifest["files"].items():
         body = (ROOT / "App" / name).read_bytes()
         assert hashlib.sha256(body).hexdigest() == entry["sha256"] and len(body) == entry["bytes"], name

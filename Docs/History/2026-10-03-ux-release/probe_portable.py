@@ -61,7 +61,9 @@ def main():
                 if predicate():
                     return
                 time.sleep(0.1)
-            raise TimeoutError("Expected frozen state was not observed")
+            report = {key: current().get(key) for key in ("phase", "errorType", "lastScanAt")}
+            events = [json.loads(line)["event"] for line in log.read_text().splitlines()] if log.exists() else []
+            raise TimeoutError(f"Expected frozen state was not observed: snapshot={report}, recentEvents={events[-15:]}")
         def current():
             return json.loads(snapshot.read_text()) if snapshot.exists() else {}
         pid = None

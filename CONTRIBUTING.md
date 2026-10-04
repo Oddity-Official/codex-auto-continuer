@@ -30,7 +30,7 @@ pwsh -NoProfile -File scripts/verify-continuation.ps1
 
 This separate gate requires native Codex, but no real login or allowance. It tests recovery, exact targeting, saved prompts, telemetry, multi-chat permission checks and ambiguous sends. [Native continuation tests](Docs/CONTINUATION-TESTS.md) explains isolation, deadlines and what is real versus simulated.
 
-An additional opt-in [VS Code extension gate](Docs/CONTINUATION-TESTS.md#installed-vs-code-extension) uses your installed editor and extension in a disposable test profile. It is separate from both regular CI and the native eight-scenario gate.
+An additional opt-in [VS Code extension gate](Docs/CONTINUATION-TESTS.md#installed-vs-code-extension) uses your installed editor and extension in a disposable test profile. It is separate from both regular CI and the native ten-scenario gate. [Compatibility](Docs/COMPATIBILITY.md) explains the daily Windows baseline, stable and mixed-daemon probes, and reviewed certification updates.
 
 ## Run from source
 
@@ -46,7 +46,7 @@ Source data lives in `.data/runtime`. A tray launch starts real monitoring. Use 
 ```powershell
 pwsh -NoProfile -File scripts/build-portable.ps1
 & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m', 'pip', 'wheel', '--timeout', '30', '--no-deps', '--no-build-isolation', '--wheel-dir', 'dist', '.') -TimeoutSeconds 120
-Get-FileHash -LiteralPath 'dist/codex-auto-continuer-0.3.0-windows-x86_64.zip' -Algorithm SHA256
+Get-FileHash -LiteralPath 'dist/codex-auto-continuer-0.4.0-windows-x86_64.zip' -Algorithm SHA256
 ```
 
 The builder stages a fresh one-folder release, renders the SVG icon, bundles runtime licenses and pystray's corresponding source, and checks every manifest hash and ZIP CRC. It never copies an installed app or its data. Build-only tools and developer records do not ship. Unsigned EXEs may trigger Windows reputation warnings.

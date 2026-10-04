@@ -9,6 +9,7 @@ from codex_auto_continuer.config import Config, DEFAULT_CONTINUE_PROMPT
 from codex_auto_continuer.appserver import RpcError
 from codex_auto_continuer.errors import ConfigurationError, ProtocolError, TransportError
 from codex_auto_continuer.state import Obligation, State, load_state, save_state
+from codex_auto_continuer.compatibility import Compatibility
 from codex_auto_continuer.supervisor import (
     Supervisor,
     _is_usage_limit_failure,
@@ -78,6 +79,7 @@ def supervisor(tmp_path: Path, client: FakeClient, *, cfg=None, clock=lambda:100
         prompt.write_text(DEFAULT_CONTINUE_PROMPT, encoding="utf-8")
     s=Supervisor(cfg or Config(dispatch_spacing_seconds=0), tmp_path/"state.json", clock=clock, sleep=lambda _:None)
     s.client=client
+    s.compatibility = Compatibility(status="certified", reason="Unit-test fixture")
     return s
 
 

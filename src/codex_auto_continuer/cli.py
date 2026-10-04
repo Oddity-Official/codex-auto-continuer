@@ -25,6 +25,7 @@ from .appserver import AppServerClient
 from . import telemetry
 from .actions import open_local
 from .status import read_runtime, owns_monitor, phase
+from .compatibility import CompatibilityGate
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -75,6 +76,8 @@ def _status(config_path: Path, live: bool = False) -> int:
     state = load_state(state_path(config_path))
     output = {
         "version": __version__, "phase": phase(config_path, snapshot),
+        "compatibility": snapshot.get("compatibility"),
+        "reason": snapshot.get("reason"),
         "ordinaryUsageAllowed": snapshot.get("ordinary_usage_allowed"),
         "nextResetAt": snapshot.get("next_reset_at"),
         "lastScanAt": snapshot.get("lastScanAt"), "lastScan": snapshot.get("lastScan"),
@@ -104,13 +107,17 @@ def _status(config_path: Path, live: bool = False) -> int:
         daemon = ensure_daemon(codex_bin, cfg.codex_command_timeout_seconds, cfg.auto_start_daemon)
         client = AppServerClient.connect(daemon.socket_path, cfg.rpc_timeout_seconds)
         try:
-            limits = _parse_rate_limits(client.rate_limits())
-            output.update(ordinaryUsageAllowed=limits.ordinary_usage_allowed, nextResetAt=limits.next_reset_at,
-                          observedInteractiveSources=observed_interactive_sources(client), appServerUserAgent=client.user_agent)
+            report = CompatibilityGate(config_path.parent / "compatibility-cache").recheck(
+                codex_bin, client.user_agent, cfg.codex_command_timeout_seconds)
+            output["compatibility"] = report.report()
+            if report.read_allowed:
+                limits = _parse_rate_limits(client.rate_limits())
+                output.update(ordinaryUsageAllowed=limits.ordinary_usage_allowed, nextResetAt=limits.next_reset_at,
+                              observedInteractiveSources=observed_interactive_sources(client), appServerUserAgent=client.user_agent)
         finally:
             client.close()
     print(json.dumps(output, indent=2))
-    return 0
+    return 2 if live and not output["compatibility"]["dispatch_allowed"] else 0
 
 
 def _start(config_file: Path | None) -> int:
@@ -200,9 +207,10 @@ def _request_scan(config_file: Path) -> int:
             snapshot = read_runtime(config_file)
             if snapshot.get("scanRequestId") == request_id:
                 print(json.dumps(snapshot.get("lastScan", {}), indent=2))
-                return 0
-            if not owns_monitor(config_file) or snapshot.get("phase") == "failed":
-                raise AutoContinuerError("The scan could not complete because monitoring stopped or settings need repair. Open settings and telemetry.")
+                compatibility = snapshot.get("compatibility") or {}
+                return 2 if compatibility and not compatibility.get("dispatch_allowed") else 0
+            if not owns_monitor(config_file) or (snapshot.get("phase") == "failed" and not snapshot.get("compatibility")):
+                raise AutoContinuerError("The scan could not complete. Read Status for the blocking issue and local telemetry for diagnostics.")
             time.sleep(0.1)
         raise AutoContinuerError("Scan was requested but completion was not observed within 60 seconds. Read status and telemetry; do not assume it completed.")
 
@@ -285,8 +293,12 @@ def main(argv: list[str] | None = None) -> int:
                 completed_scan = requested_scan or completed_scan
                 requested_scan = None
                 current_phase = "paused" if not supervisor.config.clients else "waiting" if result.pending else "monitoring"
+                compatibility = result.compatibility or {}
+                if compatibility and not compatibility.get("dispatch_allowed"):
+                    current_phase = "failed"
                 _snapshot(args.config, phase=current_phase, **last_result, lastScan=dict(last_result),
-                          lastScanAt=last_scan_at, scanRequestId=completed_scan)
+                          lastScanAt=last_scan_at, scanRequestId=completed_scan,
+                          reason=compatibility.get("reason") if current_phase == "failed" else None)
             def settings_stamp():
                 paths = (args.config, prompt_path(cfg, args.config))
                 signatures = []
@@ -334,8 +346,9 @@ def main(argv: list[str] | None = None) -> int:
                 if command in {"once", "scan"}:
                     supervisor.connect()
                     result = supervisor.run_cycle()
+                    on_cycle(result)
                     print(json.dumps(result.__dict__, indent=2))
-                    return 0
+                    return 0 if supervisor.compatibility.dispatch_allowed else 2
                 supervisor.run_forever(stop_path().exists, wake_requested, reload_settings, on_pause, on_phase)
                 return 0
             finally:

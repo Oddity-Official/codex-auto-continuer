@@ -8,6 +8,7 @@ The portable application includes Python, pystray, Pillow, six and TOMLKit. PyIn
 - [six](https://github.com/benjaminp/six/blob/master/LICENSE): MIT
 - [TOMLKit](https://github.com/python-poetry/tomlkit/blob/master/LICENSE): MIT; preserves settings comments
 - [PyInstaller](https://pyinstaller.org/en/stable/license.html): GPL with its distribution exception for bundled applications
+- [Codex](https://github.com/openai/codex/blob/rust-v0.160.0/LICENSE): Apache-2.0; the packaged compatibility contract is a filtered, modified projection of generated 0.160.0 protocol schemas, not Codex executable code. Its upstream license is included in the wheel and portable notices.
 
 Build-only resvg-py renders our SVG master; it is not bundled in the app. The matching source dependency licenses remain in the build environment. Our SVG and generated PNGs use the project's MIT license.
 

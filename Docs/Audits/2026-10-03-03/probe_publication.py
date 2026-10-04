@@ -10,11 +10,13 @@ import re
 import subprocess
 import tempfile
 import types
+import tomllib
 import zipfile
 from pathlib import Path
 from urllib.parse import unquote
 
 ROOT = next(path for path in Path(__file__).resolve().parents if (path / "pyproject.toml").exists())
+VERSION = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
 RULES = {
     "credential-shaped value": re.compile(rb"(?:sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9_]{20,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|Bearer [A-Za-z0-9._-]{24,})"),
 }
@@ -119,7 +121,7 @@ def main():
     authors = git("log", "--all", "--format=%ae%n%ce").decode().splitlines()
     private_emails = sorted({email for email in authors if not email.endswith("@users.noreply.github.com")})
     artifacts = []
-    paths = sorted((ROOT / "dist").glob("*0.3.0*"))
+    paths = sorted((ROOT / "dist").glob(f"*{VERSION}*"))
     handoff = ROOT / "codex-auto-continuer-codex-handoff.zip"
     if handoff.exists():
         paths.append(handoff)

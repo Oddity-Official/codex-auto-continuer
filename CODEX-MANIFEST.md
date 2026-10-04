@@ -11,11 +11,11 @@ All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba0
 ## Local product changes since the base
 
 - Native Windows socket transport, exact-thread separate-writer queue handling, quota-only authority, 24-hour discovery, durable obligations, stale cancellation and conservative ambiguous-send recovery.
-- Portable 0.3.0 Windows tray and companion CLI, shared per-user locks, owned non-blocking native dialogs, preserved popup highlights, per-user login launch and independent interactive-client choices. Executor/sub-agent jobs remain excluded.
+- Portable 0.4.0 Windows tray and companion CLI, shared per-user locks, owned non-blocking native dialogs, preserved popup highlights, per-user login launch and independent interactive-client choices. Executor/sub-agent jobs remain excluded.
 - Annotated TOML overrides with implicit defaults, comment-preserving edits and safe cycle-boundary reload. Invalid settings or prompts pause dispatch and preserve pending work. Saved Markdown defaults to Continue and is re-read before every send.
 - Compact local telemetry with Private/Detailed modes, keyed private IDs, allowlisted tracing, RPC/cycle aggregates, explicit recovery events and compressed rotation. Conversation bodies, credentials, raw RPC payloads and nested excluded sub-agent provenance are not logged.
 - Lossless SVG-derived green/yellow/red assets; clean one-folder builds with a short guide, licenses, corresponding tray source and checksums, without developer records or runtime data.
-- The installed App and Python package remain 0.3.0. All three clients, Detailed logging and Windows login startup remain enabled locally. The existing Continue prompt and runtime data were not changed by publication work.
+- The installed App is 0.4.0. All three clients, Detailed logging and Windows login startup remain enabled locally. The existing Continue prompt and runtime data were preserved through activation.
 
 ## Publication work
 
@@ -27,7 +27,7 @@ The user chose one public repository. Sanitized audits, history and ChatGPT/Code
 - README and docs navigation prioritize usage, source setup/build, safety and current evidence. Contributor and security guides distinguish public development records from lean app releases. Prior 0.3.0 verification is dated in history, and rotated-audit links resolve.
 - Windows CI uses commit-pinned official actions, read-only permissions, no persisted checkout credentials and bounded commands. It builds ZIP/wheel artifacts, never publishes a release automatically.
 
-## Verification
+## Publication verification (0.3.0)
 
 Windows 11 build 10.0.26300 x86_64; PowerShell 7.6.6; CPython 3.13.7; Codex CLI/daemon 0.160.0.
 
@@ -73,10 +73,30 @@ Activated the rebuilt App after gracefully stopping monitoring and verifying the
 
 Windows gate: 163 passed, no skips/warnings, 39.16s; compileall and version smoke passed. Audit cleanup deleted nothing. Pre-commit privacy scan covered eight existing commits, 217 blobs and 105 source files, plus deep inspection of both rebuilt EXEs, 440 bytecode modules and the wheel. No credential/personal-path matches, tracked runtime data, private author emails or broken Markdown file targets were found. The refreshed tray and supervisor are running with phase monitoring.
 
+## Compatibility hardening
+
+Implemented CAC 0.4.0 from clean `6016c21`. A packaged exact-version/build certificate now gates ownership resume and queue writes. Fresh connections and pre-write checks verify CLI, daemon lifecycle, running user-agent version and managed binary identities. The managed binary generates a consumer-specific experimental schema. Prerelease/build suffixes remain intact; unrelated endpoints and unconsumed fields do not change the contract. Matching schemas alone do not grant dispatch.
+
+Untested tuples preserve pending/uncertain/submitted obligations and continue safe read-only discovery. Read-contract or unverifiable-identity failures pause scanning too. The running monitor retries; red tray Status and CLI snapshots explain the block. Telemetry retains versions, checksums, transitions and sanitized verification failures, never raw schemas/RPC bodies or credentials. A daemon restart during a pre-write check is a retryable block, not an uncertain send.
+
+Added checksum-verified official-package downloads, schema reports and daily/manual/PR/default-branch Windows compatibility CI. The matrix covers baseline/baseline, current stable/current stable and baseline/current-stable daemon. Short native-test worktrees avoid Windows socket limits. Reports expire after 14 days; CI never edits certificates or publishes releases. This repository has no remote, so hosted execution/scheduling remain unobserved.
+
+Certification evidence: official Windows 0.160.0 CLI/daemon binary SHA-256 `fdda5fa3cf3fb3d000b876720742857676293e4315e4b045fae6f8bd7e866d1d`; contract SHA-256 `e738465218e57a4e519855347a7728e25813c148e4b09a5a4383cdf3b668dfeb`. Final Windows gate: 194 passed in 33.81s; compileall/version passed. Native ten-case gate against the downloaded complete official package: 10 passed in 74.35s; separate-package schema/managed follow-up: 2 passed in 13.87s. Installed VS Code owner/filtering gate: one passed in 14.96s, with all eight client combinations and unchanged original-file hashes.
+
+Inspected the separate standalone app-server package rather than assuming its role. Its eight controlled queue cases passed, but the 0.160.0 managed lifecycle requires the full package's bin/codex.exe and rejected the standalone layout. The standalone executable has no schema generator. No certificate was issued; the gate rejects that identity rather than borrowing a same-version CLI schema. CI uses complete CLI packages for managed-daemon candidates.
+
+Final portable/frozen UX checks passed, including 525 file hashes, controls, same-PID settings/prompt reload, repair, scan feedback and graceful stop, with no Codex connections or user-chat dispatches. One earlier invalid-prompt phase wait timed out and was not reproduced; timeout diagnostics now include sanitized phase/event context. No speculative runtime fix is claimed. Source/wheel/contract parity and deep privacy inspection of two EXEs, 441 bytecode modules and the wheel passed. The pre-commit inventory found no private values, tracked runtime data, private author emails or broken links in nine existing commits, 224 blobs and 117 source files.
+
+Activated the new App after graceful monitor stop and exact tray identity checks. Eight runtime files matched preserved hashes before launch. All clients, Detailed logging, Continue and Windows login path remain intact; the previous App is retained as an ignored recovery copy. Frozen live status reports monitoring/certified, zero pending and zero dispatches in the sampled cycle. Audit cleanup deleted nothing. No user chat was deliberately resumed by a probe.
+
+Native fixture homes/processes cleaned up. The host rejected recursive cleanup of downloaded probe packages; they remain ignored in .data and excluded from every public artifact.
+
+Limits remain explicit: current stable is also 0.160.0, so real different-release mixed behavior awaits another stable build. Running versions/disk hashes cannot attest loaded bytes after an out-of-band same-version replacement, or discover every separate writer's binary. No queue atomicity/idempotency, natural account reset, visual extension rendering, fresh login or hosted-CI pass is claimed. Docs/COMPATIBILITY.md owns policy and Docs/VALIDATION.md owns current evidence. Previous 0.3.0 verification is retained in dated history.
+
 ## Artifacts
 
-Portable: `dist/codex-auto-continuer-0.3.0-windows-x86_64.zip`, SHA-256 `27fd454fc9290578a0da3d8b1637198dfe1bc09a5b6400ea618a05afc94a8f5c`.
+Portable: `dist/codex-auto-continuer-0.4.0-windows-x86_64.zip`, SHA-256 `be6bdbe6481caf10bd61ede8dddd39f81c257162010281263c0c6b734f49499a`.
 
-Optional wheel: `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`, matching icon assets and README metadata, SHA-256 `73b889b3266d006c235791900c852226fb91bf24d7bb77b550f54d1b58928758`.
+Optional wheel: `dist/codex_auto_continuer-0.4.0-py3-none-any.whl`, matching modules/assets/contract, README metadata and Codex attribution, SHA-256 `c903b469dcd8ad7509a8336264e96e52a5d1275a9412a4e1a4fd6891c7bae624`.
 
 Stable source transport: `codex-auto-continuer-codex-handoff.zip`. It includes useful public development records and audit state with per-file hashes and Git provenance, excluding runtime data, App, dependencies, build output and secrets. Packaging runs retention and transport validation.

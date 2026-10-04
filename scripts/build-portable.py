@@ -50,6 +50,8 @@ def main():
         # Include original dependency notices, not just links to changing websites.
         notices = bundle / "Licenses"
         notices.mkdir()
+        shutil.copy2(ROOT / "Licenses/Codex-LICENSE.txt", notices / "Codex-LICENSE.txt")
+        shutil.copy2(ROOT / "Licenses/Codex-NOTICE.txt", notices / "Codex-NOTICE.txt")
         shutil.copy2(Path(sys.base_prefix) / "LICENSE.txt", notices / "Python-LICENSE.txt")
         for package in ("pystray", "Pillow", "six", "tomlkit", "PyInstaller"):
             dist = importlib.metadata.distribution(package)

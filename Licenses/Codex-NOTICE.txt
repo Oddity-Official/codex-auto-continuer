@@ -1,0 +1,6 @@
+OpenAI Codex
+Copyright 2025 OpenAI
+
+CAC's compatibility.json contains a filtered, modified projection of Codex
+0.160.0 generated protocol schemas. Codex is licensed under Apache-2.0;
+see Codex-LICENSE.txt. CAC does not bundle the Codex executable.

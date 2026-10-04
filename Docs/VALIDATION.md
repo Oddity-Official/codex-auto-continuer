@@ -1,123 +1,85 @@
 # Verification
 
-Current checks completed on 4 October 2026. Application: 0.3.0. Extension follow-up baseline: `eb42085`; imported checkpoint: v001, verified bootstrap `643ba04`. Publication and extension verification change documentation, workflow and tests, not application behavior. [Historical records](README.md#historical-records) retain earlier release, activation and telemetry measurements.
+Current checks: 4 October 2026. Application: CAC 0.4.0. Implementation baseline: `6016c21`; imported checkpoint: v001. [The dated 0.3.0 record](History/2026-10-04-native-0.3.0-validation.md) preserves earlier publication, extension and icon evidence.
 
 ## Environment
 
 | Item | Exact value |
 | --- | --- |
-| Native host | Windows 11 build 10.0.26300, x86_64; PowerShell 7.6.6 |
-| Python | CPython 3.13.7; isolated virtual environments |
-| Runtime dependencies | pystray 0.19.5; Pillow 12.3.0; TOMLKit 0.15.1; six 1.17.0 |
-| Test/build dependencies | pytest 9.1.1; PyInstaller 6.22.3; hooks 2026.8; setuptools 84.0.0; resvg-py 0.5.0 |
-| Native Codex baseline | CLI and daemon 0.160.0 |
-| Frozen-probe settings | No clients selected; poll 1s; isolated control directory; no Codex connections |
-| Normal release defaults | All three interactive clients; 24h discovery; poll 30s; prompt Continue; Private logging; trace off; 8 MiB/three gzip backups |
+| Host | Windows 11 build 10.0.26300, x86_64; PowerShell 7.6.6 |
+| Python | CPython 3.13.7, project `.venv` |
+| Runtime | pystray 0.19.5; Pillow 12.3.0; TOMLKit 0.15.1; six 1.17.0 |
+| Tests/build | pytest 9.1.1; PyInstaller 6.22.3; hooks 2026.8; setuptools 84.0.0; resvg-py 0.5.0 |
+| Codex | Official Windows x86_64 0.160.0 CLI, managed daemon and installed extension binary |
+| VS Code | 1.140.0; official openai.chatgpt 26.930.41038 |
+| Defaults | All interactive clients; 24h lookback; 30s poll; Continue; Private telemetry; tracing off; 8 MiB/three gzip backups |
 
-## Native and clean-source checks
+## Compatibility certification
+
+The certified CAC 0.4.0 tuple is Windows x86_64, CLI 0.160.0 and managed daemon 0.160.0. Both EXE SHA-256 values are `fdda5fa3cf3fb3d000b876720742857676293e4315e4b045fae6f8bd7e866d1d`. The consumer-schema SHA-256 is `e738465218e57a4e519855347a7728e25813c148e4b09a5a4383cdf3b668dfeb`. [Compatibility](COMPATIBILITY.md) owns policy and identity limits.
+
+The complete official CLI package was fetched through the CI downloader into ignored staging. Its GitHub-published size and SHA-256 passed before extraction: `7f7fbbc8d6fd4ea2f3b13855ef47ea59663ba7e61fb2e9821df37163b8030891`. Its extracted binary matches the installed CLI/daemon/extension. The official latest stable API also reported rust-v0.160.0 during this run. No user installation, account or updater setting was changed by these probes.
+
+| Check | Observed result |
+| --- | --- |
+| Regular Windows gate | 194 passed in 33.81s; compileall and 0.4.0 import passed |
+| Native continuation gate | 10 passed in 74.35s against the downloaded complete official package |
+| Installed extension gate | One scenario passed in 14.96s; all eight client combinations, quota denial, one original-owner Continue/completed turn, no duplicates, Private telemetry and original-file hashes |
+| Consumer schema | Native generated contract matches the packaged projection and certificate; prerelease/build suffixes are retained; separate-package bootstrap/schema follow-up passed: two cases in 13.87s |
+| Unit safety | Unknown tuple, queue/read drift, identity mismatch, same-version file replacement, reconnect revalidation and before-send version change block mutations; pending/uncertain state survives |
+| Download boundary | Traversal, absolute/drive paths, links, case collisions and extracted-size limits are rejected before extraction |
+
+The managed native case uses production discovery, handshake, managed-binary schema and certification. It survives a real daemon restart, deliberately removes certification, records no send and preserves the exact pending-state bytes. Restoring certification permits one saved Continue on the separate original writer. Three later scans produce no duplicate. Updater and remote control are disabled only in the disposable home. Native Codex must create private Windows socket/state directories; Python-created inherited permissions were rejected during fixture development.
+
+The follow-up used the installed CLI and the separately downloaded complete CLI package as the managed candidate, exercising CI's package-copy/bootstrap path. Both have the certified 0.160.0 identity; this is not evidence for different-release mixed behavior.
+
+The separate official `codex-app-server.exe` 0.160.0 package was also inspected. Its version output and option-only help expose no schema generator. Eight controlled queue scenarios passed, but managed bootstrap failed because Codex expected `current/bin/codex.exe`. That package is not certified or used by managed CI. CAC rejects the standalone identity, even with a matching CLI version or synthetic certificate; it never substitutes the CLI's schema.
+
+The eight other recovery cases cover quota failure, expired advisory reset, account/user mismatch, manual progress, edited/invalid prompts, multi-chat permission rechecks and accepted/unaccepted ambiguous writes. [Native continuation tests](CONTINUATION-TESTS.md) owns full settings and assertions. All credentials and chats are synthetic; account/model services are loopback-only. No real allowance is spent.
+
+## Commands and bounds
 
 ```powershell
 pwsh -NoProfile -File scripts/verify-windows.ps1
-& ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('Docs/Audits/2026-10-03-03/probe_clean_source.py') -TimeoutSeconds 600
+pwsh -NoProfile -File scripts/verify-continuation.ps1 -CodexPath 'C:/probe/package/bin/codex.exe'
+pwsh -NoProfile -File scripts/verify-vscode.ps1 -CodePath 'C:/path/to/Code.exe' -ExtensionPath 'C:/path/to/openai.chatgpt-version-win32-x64'
+& ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('scripts/probe-compatibility.py','--codex-executable','C:/probe/package/bin/codex.exe','--report','.data/reports/schema.json') -TimeoutSeconds 40
 ```
 
-| Check | Observed result |
+Regular pytest is bounded at 180 seconds, compileall at 120, version checks at 30, native integration at 240 and extension integration at 180. Managed bootstrap/restart allow 25 seconds and stop 15. Schema generation allows 20. The official-package downloader has a 180-second transfer deadline and a 240-second outer bound. Fixture homes and owned native processes cleaned up; deployed CAC processes were unchanged during integration.
+
+## Release checks
+
+The release remains one portable folder with two EXEs and `_internal`, a short guide, original notices and per-file hashes. The generated contract and Codex attribution ship; development docs, tests, audits, runtime data and downloaded probe packages do not.
+
+The frozen UX probe checks implicit defaults, spaces/percent in paths, exclusive controls, correlated scan feedback, same-PID reload, invalid-settings/prompt pause and repair, graceful stop and zero Codex connections. One early run timed out waiting for an invalid-prompt phase; its retry passed. The probe now reports sanitized phase/event context on timeout. No unverified runtime fix was applied for that single transient observation.
+
+Final frozen probe passed with all 525 release-file hashes and ZIP CRC verified. It tested same-PID settings/prompt pause and repair, scan acknowledgement, controls and graceful stop in a path containing spaces and percent. It recorded zero Codex connections and zero user-chat dispatches. An earlier retry also passed. The one preceding invalid-prompt timeout was not reproduced; its cause remains unestablished.
+
+The installed App was updated after graceful monitor stop and exact tray/process identity checks. All eight runtime files matched saved hashes before activation. Settings, Continue prompt, pending state, logs and Windows login path were preserved. The previous App remains in an ignored recovery folder. All 525 deployed hashes, wheel module/asset/contract parity, dependency notices and repository Markdown targets passed.
+
+The new tray and supervisor are running. The frozen live-status command reports 0.4.0, monitoring and certified 0.160.0 CLI/daemon, with zero pending/dispatched work at the sampled cycle. All three clients, Detailed local logging and startup remain enabled. No user chat was forced to continue for testing.
+
+| Artifact | SHA-256 |
 | --- | --- |
-| Final native gate | 163 passed, no skips or warnings, 39.16s; compileall including integration sources and version 0.3.0 passed; prior explicit interpreter selection exercised |
-| Fresh source export | 96 files copied through transport exclusions; no parent checkout, deployed app, data, Git metadata or pre-existing venv required |
-| Fresh dependency installation | `.[dev,build]` installed in a new venv without a second global installation |
-| Fresh native gate | 163 passed, no skips or warnings, 54.69s; compileall and version passed |
-| Fresh portable and wheel builds | Both passed; portable ZIP CRC and all 521 manifest file hashes verified |
-| Fresh frozen integration | Default settings/prompt, exclusive once, scan feedback, same-PID reload, invalid-settings/prompt pause and repair, graceful stop; zero Codex connections or user-chat dispatches |
-| Current artifacts and docs | Deployed 521 file hashes, wheel module/asset parity and repository Markdown file targets passed |
+| `dist/codex-auto-continuer-0.4.0-windows-x86_64.zip` | `be6bdbe6481caf10bd61ede8dddd39f81c257162010281263c0c6b734f49499a` |
+| `dist/codex_auto_continuer-0.4.0-py3-none-any.whl` | `c903b469dcd8ad7509a8336264e96e52a5d1275a9412a4e1a4fd6891c7bae624` |
 
-The gate selects the local venv, or the configured launcher if no venv exists; `-PythonPath` is explicit. Version/import checks are bounded at 30s, pytest at 180s and compileall at 120s. The clean-source probe bounds environment creation at 60s, installation at 180s, gate at 300s, builder at 360s, wheel at 120s and frozen integration at 150s; each timeout stops its owned process tree.
+Portable size: 16,316,196 bytes; 526 ZIP entries including the manifest. Wheel: 85,819 bytes; 34 entries. The stable source transport is `codex-auto-continuer-codex-handoff.zip`, with generated checksums and Git provenance. Builds are not claimed byte-for-byte reproducible.
 
-Native socket tests initially failed under the venv when their listeners were created in this host's system temp directory, with Winsock 10022 and cleanup error 1920. Canonicalizing the path did not fix it. Short checkout-local socket fixtures pass under both global and venv interpreters; a venv connection to the real daemon also passes. The production transport was not changed. The exact host/Windows cause is not established.
+## CI and publication
 
-The suite covers quota authority, exact targeting, durable obligations, manual-progress cancellation, ownership, ambiguous sends, protocol deadlines, native sockets and locks, settings/prompt safety, native About closure, popup highlights, startup ownership, telemetry privacy/rotation and destructive-path/transport boundaries. Two new regressions verify Git exclusions and source-export privacy with synthetic canaries, including environment-file variants and non-default backup counts.
+The regular Windows build workflow and new scheduled compatibility workflow use commit-pinned official actions, read-only permissions and no persisted checkout credentials. Compatibility runs daily, manually, on pull requests and default-branch pushes, with baseline, current-stable and independently updated daemon cases. Passing CI never changes certificates automatically. Sanitized reports expire after 14 days.
 
-## Native continuation chain
+The pre-commit privacy probe inspected all nine existing commits, 224 unique Git blobs and 117 source files. No credential-shaped values, personal profile/project paths, private author emails, tracked runtime files or broken Markdown links were found. Deep inspection covered both new EXEs, 441 bytecode modules/code filenames, and the 34-entry wheel. Source transport is refreshed and inspected again after the scoped commit. Audit retention deleted nothing.
 
-```powershell
-pwsh -NoProfile -File scripts/verify-continuation.ps1
-```
-
-The standalone gate runs eight scenarios against installed, unmodified Codex 0.160.0, with two native app-server owners per case. [Native continuation tests](CONTINUATION-TESTS.md) owns the exact settings, service shapes, isolation, deadlines and assertions. No real account credentials, chat home or allowance are used. The existing installed tray/supervisor processes and saved prompt remain unchanged.
-
-Final result: 8 passed, no skips or warnings, in 60.31s, including compact Private telemetry checks. The earlier full native run also passed. The 163-test Windows gate is separate; native integration is not silently skipped by the normal gate or required by GitHub CI.
-
-| Scenario | Verified result |
-| --- | --- |
-| Quota-to-continuation chain | Native HTTP 429 persisted failed/usageLimitExceeded and numeric completedAt. Three denied scans after an advisory reset sent nothing. State reload retained the obligation. Verified allowance led CAC to send exactly one saved Continue through the original owner's native queue, completing the next turn of the exact chat. |
-| Unrelated chat and subsequent reload | Another successful chat stayed untouched. Reload and three further cycles created no duplicate turn or remaining queue item. |
-| Account and user mismatches | Both cases yielded native null permission despite backend allowance; no send. |
-| Manual progress | A native manual turn before recovery cancelled pending work; later allowance and reload did not continue it again. |
-| Invalid and repaired prompt | Empty prompt blocked before submission and preserved pending state. Repair sent newly saved text rather than a cached/default value. |
-| Two quota failures | Native failures were recorded independently. Permission denial after the first dispatch stopped the second; later verified permission resumed it exactly once. |
-| Lost queue response | Native acceptance and completion occurred despite discarded acknowledgement. CAC saved uncertainty; reload did not resend. |
-| Queue write not accepted | No native queue entry or advanced turn existed. Repeated reconciliation failed explicitly after its deadline without retrying the send. |
-| Local telemetry | Detection, permission transition, separate-owner handling, intent, one submission and observed completion were retained. Private logs excluded real fixture IDs, synthetic credentials and chat bodies. |
-
-This proves the controlled native recovery chain. It does not turn a service fixture into evidence of a real quota reset. The harness selects isolated sockets directly and reloads engine/state objects; it does not exercise production daemon discovery, actual UI clients, tray process restarts or Windows login.
-
-## VS Code extension owner
-
-The separate `scripts/verify-vscode.ps1` gate passed against installed VS Code 1.140.0, official `openai.chatgpt` 26.930.41038 and its bundled Codex 0.160.0. [Installed extension tests](CONTINUATION-TESTS.md#installed-vs-code-extension) owns the exact setup, instrumentation, assertions and deadlines.
-
-Final observed extension run: one scenario passed in 15.80s, with no pytest skips or warnings. The original installed manifest, JavaScript bundle and native EXE passed before-and-after SHA-256 checks. The regular profile and user account were not used. All disposable profiles/chats were removed, and installed CAC tray/supervisor PIDs remained unchanged.
-
-| Check | Observed result |
-| --- | --- |
-| Real initialization | Original extension spawned its bundled EXE with codex_vscode override and initialized with VS Code/Codex Extension client metadata |
-| Persisted provenance | Actual source=vscode and originator=codex_vscode; independent observer reported notLoaded |
-| Client filtering | All eight combinations accepted the thread exactly when VS Code was selected; CLI-only, Desktop-only and empty-scope scans discovered nothing |
-| Quota denial | Three denied scans persisted one exact obligation and made no continuation request |
-| Recovery | Verified allowance caused one native queue submission; the original extension-owned process emitted completed for the same chat's second turn |
-| No duplicate | Three later scans retained exactly two turns and two inference requests, with no remaining queue item |
-| Private telemetry | Separate-owner dispatch and observed completion present; chat bodies, fixture IDs and credentials absent |
-
-Initial transport instrumentation was installed too late: the extension imported its process API before the test runner started. A disposable bootstrap now installs the read-only taps before loading the unchanged original bundle. This fixes the test harness, not CAC or the extension. Workbench/extension remote requests were rejected by the local proxy; these expected rejections are counted separately from invalid native fixture routes.
-
-The native eight-scenario gate was rerun after the fixture change: 8 passed, no skips or warnings, 60.31s. Generic app-server sessions reporting vscode remain in that bucket unless classified as Desktop; this is not a positive extension-originator allowlist. The original README's blanket arbitrary-app-server exclusion was narrowed to the actual source-label rules.
-
-This is extension-host/native-owner integration. Initial thread/turn RPCs come from the test transport, not a clicked composer. Visual webview rendering, production daemon discovery and natural service-reset timing are not claimed.
-
-## Publication privacy
-
-```powershell
-& ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('Docs/Audits/2026-10-03-03/probe_publication.py') -TimeoutSeconds 120
-```
-
-The initial scan checked all five existing commits and 171 unique Git blobs. No credential-shaped values, real local profile/project paths, runtime data or private author emails were found. Authors use a GitHub no-reply address. The changed working tree is scanned separately before delivery.
-
-The continuation-test follow-up scan checked six existing commits, 192 unique blobs and all 101 source files. It found no privacy matches, tracked runtime files, private author emails or broken Markdown file targets. The unchanged portable ZIP and refreshed wheel also passed deep inspection. Source transport is rebuilt and checked again after the scoped commit.
-
-The extension follow-up pre-commit scan checked seven existing commits, 204 unique blobs and all 105 source files, including the new JavaScript test bootstrap/driver. It found no privacy matches, tracked runtime files, private author emails or broken Markdown file targets. The unchanged portable ZIP and newly refreshed wheel passed deep inspection; the refreshed source handoff is checked after committing.
-
-The portable ZIP has 522 entries: 521 release files plus its manifest. Inspection covers both executable CArchives/PYZ archives, nested `base_library.zip`, 440 Python bytecode modules and embedded code filenames, not just compressed file bytes. No local profile/project paths or credential matches were found. The 30-entry wheel is also clean. These checks combine targeted scanning with manual review; they are not proof that an arbitrary secret can always be recognized.
-
-One public Git repository retains sanitized audits and manifests. No history rewrite or GitHub upload was performed. Runtime folders, root runtime files, environment-file variants and log backups are excluded from Git and source export through separate rules. Custom data locations still require explicit exclusions.
-
-The Windows workflow uses read-only permissions and commit-pinned official actions, without persisted checkout credentials. Its equivalent commands passed locally; GitHub-hosted execution remains unobserved until the repository is uploaded.
-
-## Release artifacts
-
-The icon contrast update uses an off-white stack (#f1f5f9) with a darker outline and white upper facet. The status arrows are unchanged. SVG/PNG hash and state-color checks passed; generated 16px/32px samples retained bright opaque stack pixels. Fresh portable/wheel builds passed, and the installed App was refreshed after graceful monitoring stop and exact tray-process verification. All seven runtime files matched saved hashes before activation. Deployed 521 release-file hashes and wheel/source asset parity passed; the startup path is unchanged and the prior App is retained as an ignored recovery copy.
-
-The portable ZIP is `dist/codex-auto-continuer-0.3.0-windows-x86_64.zip`, 16,295,688 bytes, with the off-white stack icon. SHA-256: `27fd454fc9290578a0da3d8b1637198dfe1bc09a5b6400ea618a05afc94a8f5c`.
-
-The wheel is `dist/codex_auto_continuer-0.3.0-py3-none-any.whl`, 72,275 bytes, with matching icon assets and README metadata. SHA-256: `73b889b3266d006c235791900c852226fb91bf24d7bb77b550f54d1b58928758`.
-
-The stable full-source handoff is `codex-auto-continuer-codex-handoff.zip`; its manifest records source hashes and Git provenance. It includes development records, unlike the lean portable app. Builds are not claimed to be byte-for-byte reproducible.
+GitHub-hosted execution remains unobserved because this checkout has no remote and has not been uploaded. Local native results do not claim a hosted pass or an active GitHub schedule. One public repository retains sanitized Git-tracked audits/manifests; no history rewrite or upload is performed.
 
 ## Remaining limits
 
-- Visual VS Code chat rendering and a natural account-reset automatic continuation have not been observed. The actual installed extension's native owner and filtering have passed the isolated gate above.
-- Two simultaneous real quota failures were not available; multi-chat safety is covered by regression fixtures.
-- Shortcut launch is verified, not a fresh Windows login.
-- Native dialog/button checks are not a manual mouse or screen-reader review. Associated-editor launch is tested, not external editor startup performance.
-- Queue addition has no verified atomic turn precondition or idempotency contract. Immediate revalidation cannot eliminate every concurrent-progress race.
-- Subsequent-turn telemetry reports observed metadata, not guaranteed attribution to a queued message.
-- Other Windows/Codex installations must pass capability checks. EXEs are unsigned; SmartScreen reputation and other machines have not been tested.
-- GitHub-hosted CI has not run. Five failed system-temp socket fixtures remain outside the repository because the host rejected their cleanup; no such fixtures are in source or release artifacts.
+- No natural OpenAI quota-reset delivery or visual VS Code webview rendering was observed. Native recovery and installed extension ownership passed controlled tests.
+- Current stable equals the certified baseline. Actual different-release mixed behavior awaits a future stable version; unit tests cover conflicting identities now.
+- The gate certifies the discovered CLI/managed-daemon tuple, not an undisclosed binary behind every separate writer. Disk checksums and the running version cannot attest already-loaded bytes after an out-of-band same-version replacement.
+- Queue addition has no verified atomic turn precondition or idempotency guarantee. Subsequent-turn metadata is an observation, not certain attribution.
+- Shortcut launch is not a fresh Windows login; native UI checks are not a full manual accessibility review. EXEs remain unsigned.
+- Downloaded probe packages remain in ignored `.data` staging because the host rejected recursive cleanup. They are excluded from Git, app releases and source transports.

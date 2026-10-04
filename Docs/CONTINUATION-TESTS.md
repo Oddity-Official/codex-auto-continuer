@@ -12,7 +12,7 @@ pwsh -NoProfile -File scripts/verify-continuation.ps1
 
 Optional `-PythonPath` and `-CodexPath` select explicit native executables. Codex 0.160.0 is the verified baseline. Missing or incompatible Codex fails the check rather than skipping tests. Keep the checkout path short enough for the 107-byte native socket limit; the gate explains this restriction if needed.
 
-This is a separate integration gate. The regular Windows/CI gate does not need Codex, a login or an account. The integration suite adds no dependencies beyond `.[dev]`. Current results belong to [VALIDATION.md](VALIDATION.md#native-continuation-chain).
+This is a separate integration gate. The regular Windows/CI gate does not need Codex, a login or an account. The integration suite adds no dependencies beyond `.[dev]`. Current results belong to [VALIDATION.md](VALIDATION.md#compatibility-certification).
 
 ## What is real
 
@@ -33,7 +33,9 @@ local HTTP 429 usage_limit_reached
 
 Two independent Codex app-server processes share one disposable home. The observer sees the owner's chat as `notLoaded`. CAC handles the exact native active-writer error and queues without taking ownership. Native `thread/start` produces interactive `vscode` source metadata. This is an app-server integration test, not a launched VS Code extension or Desktop UI.
 
-The harness selects the isolated socket directly and probes capabilities. It does not call production daemon discovery or register a CAC process in the user's control directory. Recovery decisions, RPCs, queue writes, persistence and logging use unchanged application code. Restart checks create a new engine and connection from saved state; they are not an operating-system restart or a tray lifecycle test.
+The eight recovery scenarios select isolated sockets directly and grant test-only dispatch access. This lets the suite establish behavioral evidence for candidate binaries before production certification. Recovery decisions, RPCs, queue writes, persistence and logging use application code. Engine reload is not an operating-system restart or a tray lifecycle test.
+
+Two compatibility scenarios extend the gate to ten cases. One generates the native binary's experimental contract and checks its connected identity. The other bootstraps a real managed daemon in a disposable home and uses production discovery/certification. It verifies daemon restart and reconnect, removes certification to prove no send or pending-state loss, then verifies one Continue/completed turn and no duplicates. Optional `--daemon-executable` on pytest selects a different complete package for mixed-version testing. No CAC process is registered in the user's control directory.
 
 ## What is simulated
 
@@ -84,7 +86,7 @@ Scenarios explicitly change permission, identity, saved prompt or transport beha
 
 Both account and model endpoints use `127.0.0.1`. Apps, plugins, remote model discovery, analytics and telemetry exporters are disabled in the disposable Codex configuration. Child HTTP/HTTPS proxies reject external destinations rather than forwarding them; unexpected fixture traffic fails the test. This is configuration-level isolation, not an operating-system network sandbox.
 
-The complete gate has a 240-second process-tree deadline. Server readiness allows 15 seconds, readiness RPCs 3 seconds, normal RPCs 5 seconds, each turn 20 seconds, and cleanup commands 5 seconds. The local HTTP server uses five-second connection timeouts. Cleanup closes CAC connections, terminates only the spawned process trees and removes the disposable home, including synthetic chats and logs. Raw service requests, credentials and conversation bodies are never saved as public evidence.
+The complete gate has a 240-second process-tree deadline. Server readiness allows 15 seconds, readiness RPCs 3 seconds, normal RPCs 5 seconds, each turn 20 seconds, and embedded cleanup commands 5 seconds. Managed bootstrap/restart allow 25 seconds, stop 15 seconds, and schema generation 20 seconds. The disposable daemon has remote control and automatic updates disabled, with zero-second shutdown grace. Native Codex creates private socket/state directories; Python must not pre-create them with inherited Windows permissions. The local HTTP server uses five-second connection timeouts. Cleanup closes CAC connections, stops only fixture processes and removes the disposable home. Raw service requests, credentials and conversation bodies are never saved as public evidence.
 
 ## What this cannot prove
 
