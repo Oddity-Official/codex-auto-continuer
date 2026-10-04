@@ -64,5 +64,17 @@
     "continueThenFollowups": true,
     "forkTurns": 4,
     "sourceQueueStillHeld": 1
+  },
+  "privateOutbox": {
+    "savedInputs": 2,
+    "nativeQueueEmptyAfterContinue": true,
+    "heldThroughDeniedPermission": true,
+    "freshPermissionBeforeEachRelease": true,
+    "literalContinueThenOriginalOrder": true,
+    "totalTurns": 5,
+    "crossOwnerReleaseWaitSeconds": [
+      8.24,
+      9.99
+    ]
   }
 }

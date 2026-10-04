@@ -259,6 +259,63 @@ def test_fork_before_consumed_turn_excludes_input_without_editing_source(native)
         "forkTurns": len(full_turns(peer, fork_id)), "sourceQueueStillHeld": 1}
 
 
+def test_private_outbox_controls_each_release_after_continue(native):
+    thread_id, _, active = consumed(native)
+    for index in range(2):
+        native.owner.queue_add(thread_id, f"Synthetic held task {index}", f"probe-outbox-{index}")
+    interrupt(native, thread_id, active)
+    peer = native.client()
+    saved = peer.queue_items(thread_id)
+    assert len(saved) == 2
+    for item in saved:
+        assert peer.queue_delete(thread_id, item["id"]) is True
+    assert not peer.queue_items(thread_id)
+    continuation = peer.queue_add(thread_id, "Continue", "probe-outbox-continue")["queuedSubmission"]
+    native.service.allowed = True
+    native.service.fail_inference = False
+    native.owner.request("thread/queue/start", {"threadId": thread_id,
+        "queuedSubmissionId": continuation["id"]})
+    wait(lambda: native.owner.latest_turn(thread_id)["status"] == "completed")
+    assert not peer.queue_items(thread_id)
+    assert native.service.user_messages[-1] == "Continue"
+    count = native.service.inference_count
+    native.service.allowed = False
+    native.service.fail_inference = True
+    assert peer.rate_limits()["ordinaryUsageAllowed"] is False
+    time.sleep(0.3)
+    assert native.service.inference_count == count and len(saved) == 2
+    native.service.allowed = True
+    native.service.fail_inference = False
+    release_waits = []
+    for index, item in enumerate(saved):
+        assert peer.rate_limits()["ordinaryUsageAllowed"] is True
+        previous = native.owner.latest_turn(thread_id)["id"]
+        peer.request("thread/queue/add", {"threadId": thread_id, "input": item["input"],
+            "clientUserMessageId": f"probe-outbox-replay-{index}"})
+        start = time.monotonic()
+        try:
+            # A foreign owner's write is discovered by the ten-second watcher,
+            # then still needs time to start, complete and persist its turn.
+            wait(lambda: native.owner.latest_turn(thread_id)["id"] != previous and
+                native.owner.latest_turn(thread_id)["status"] == "completed", seconds=20)
+        except AssertionError:
+            RESULTS["privateOutboxIncomplete"] = {"releaseIndex": index,
+                "waitSeconds": round(time.monotonic() - start, 2),
+                "inferenceCount": native.service.inference_count,
+                "queueCount": len(peer.queue_items(thread_id)),
+                "latestStatus": native.owner.latest_turn(thread_id)["status"],
+                "runtimeStatus": native.owner.thread_read(thread_id)["status"]["type"]}
+            raise
+        release_waits.append(round(time.monotonic() - start, 2))
+        assert not peer.queue_items(thread_id)
+    assert native.service.user_messages[-3:] == ["Continue", "Synthetic held task 0", "Synthetic held task 1"]
+    assert len(native.turns(thread_id)) == 5
+    RESULTS["privateOutbox"] = {"savedInputs": 2, "nativeQueueEmptyAfterContinue": True,
+        "heldThroughDeniedPermission": True, "freshPermissionBeforeEachRelease": True,
+        "literalContinueThenOriginalOrder": True, "totalTurns": 5,
+        "crossOwnerReleaseWaitSeconds": release_waits}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--codex", type=Path, required=True)
