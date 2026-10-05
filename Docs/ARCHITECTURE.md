@@ -67,13 +67,15 @@ Manual progress, active work, missing chats, archive or scope changes invalidate
 
 The verified API has no compare-and-swap precondition against a turn revision. A narrow race remains between final revalidation and queue acceptance. We minimize it and remove observable stale queued work, without claiming unavailable atomicity.
 
-Queue deletion acknowledges storage removal, not cancellation of input already selected by another server owner. Native probes confirmed accepted peer deletions followed by consumption. The dispatch lock is process-local. Stale cleanup cannot undo an already-selected turn; queue holding must not infer safe replay from peer deletion acknowledgement or a single immediate history-absence check. [Queue interception evidence](Audits/2026-10-04-03/AUDIT.md) owns measured timing and transport limits.
+Queue deletion acknowledges storage removal, not cancellation of input already selected by another server owner. Native probes confirmed accepted peer deletions followed by consumption. The dispatch lock is process-local. Stale cleanup cannot undo an already-selected turn; queue holding must not infer safe replay from peer deletion acknowledgement or a single immediate history-absence check. [Queue interception evidence](Audits/History/2026-10-04-03/AUDIT.md) owns measured timing and transport limits.
 
 Reset timestamps and percentages never authorize dispatch. Exhausted-window resets are only sleep hints and diagnostics. Dispatch runs oldest-first, with another account-permission read between chats.
 
 The supervisor never answers approvals, security prompts, tool elicitations or user-input requests. Active threads are not eligible for new obligations.
 
 ## Optional owner-supported holding
+
+The runtime connects only to the managed daemon; it does not change normal client transports. Installed-client [connection probes](Audits/2026-10-05/AUDIT.md) establish possible Desktop/extension adapter paths, not shipped integrations. Normal CLI's local composer queue never reaches the server queue while waiting, so server ownership alone cannot protect it. Keep transport ownership, input location and dispatch control as separate requirements.
 
 `queue_holding` defaults to false. Each selected active chat loaded on the connected native server may get an exclusive initialized connection, exact-thread resume subscription and queue-change listener. At most 16 observers run concurrently. NotLoaded/foreign owners, stdin/stdout clients, idle input and pre-subscription boundaries have no interception fallback. Full-history user-message client IDs validate identity before capture; textual similarity is never delivery proof. An approval/input request, including one buffered during an RPC, disconnects the observer without answering. Observers end with the active turn or a stop/configuration/compatibility change. Stop aborts established reads and has one total deadline of three RPC deadlines plus two seconds, covering connection/handshake/initialization without multiplying by observer count.
 

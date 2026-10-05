@@ -24,10 +24,12 @@ These sanitized records are Git-tracked and suitable for public sharing, but exc
 
 - [Workflow](WORKFLOW.md): environment ownership, checkpoint import/export and source transport boundaries
 - [Audits](Audits/README.md): dated audit evidence, rotation and retention
-- [Queue interception investigation](Audits/2026-10-04-03/AUDIT.md): timing, cross-owner deletion races, encrypted recovery and transport boundaries
+- [Real client integration investigation](Audits/2026-10-05/AUDIT.md): Desktop/extension connection proofs, actual CLI composer limits and a loaded-quota recovery defect
 - [ChatGPT manifest](../CHAT-MANIFEST.md) and [Codex manifest](../CODEX-MANIFEST.md): checkpoint ownership and local verification provenance
 
 ## Historical records
+
+- [Queue interception investigation, 4 October 2026](Audits/History/2026-10-04-03/AUDIT.md): timing, cross-owner deletion races, encrypted recovery and transport boundaries
 
 - [Queue control investigation, 4 October 2026](Audits/History/2026-10-04-02/AUDIT.md): history identity, owner cancellation, selected queue start and recovery forks
 - [Recovery availability investigation, 4 October 2026](Audits/History/2026-10-04/AUDIT.md): internal quota-read failure, queued-turn evidence and safe retry boundary

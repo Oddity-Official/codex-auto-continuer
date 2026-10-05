@@ -4,6 +4,8 @@ CAC 0.6.0, 5 October 2026. Native Windows 11 x86_64, PowerShell 7 and project CP
 
 ## Compatibility certification
 
+The [5 October real-client investigation](Audits/2026-10-05/AUDIT.md) adds isolated installed Desktop and current extension connection proofs, not queue-holding acceptance passes. Actual CLI terminal input exposed a client-local queue, shared-owner provenance caveat and CAC's loaded quota `systemError` deferral. A direct native Continue diagnostic completed, but automatic recovery did not pass. Application code and installed binaries are unchanged; release gates below remain dated unchanged-source evidence.
+
 | Check | Exact scope | Result |
 | --- | --- | --- |
 | `scripts/verify-windows.ps1` | Application/workflow regressions, native transport/dialog/menu checks, encryption safety, compileall, version | 255 passed in 30.77 seconds; CAC 0.6.0 |
@@ -60,7 +62,7 @@ On 4 October 2026, the [separate queue-control investigation](Audits/History/202
 
 These are investigation probes, not newly enabled product behavior or a certification of a queue-holding feature. CAC runtime code, release binaries and the installed prompt remain unchanged. No production chat, credential, account allowance or Codex installation was used or modified by the fixtures. The native application gate above is unchanged-source evidence from the release, not a fresh full-suite run for this audit-only change.
 
-The [interception follow-up](Audits/2026-10-04-03/AUDIT.md) ran 420 measured races: 13 scenarios in 74.09 seconds (120 trials plus offline reconciliation), a 100-trial quota-boundary follow-up in 42.26 seconds, a 100-trial delayed-deletion boundary follow-up in 46.52 seconds and a 100-trial encrypted quota-boundary follow-up in 46.41 seconds. Established owner listeners caught all 50 inputs in each targeted follow-up. Peer polling caught 5/50 at the quota boundary, 2/50 with a 25ms deletion delay and 3/50 with DPAPI encryption before deletion. Accepted peer deletions still resulted in consumption in 20/50, 2/50 and 5/50 respectively. Both idle groups captured 0/10. These are observed fixture counts, not guaranteed interception rates.
+The [interception follow-up](Audits/History/2026-10-04-03/AUDIT.md) ran 420 measured races: 13 scenarios in 74.09 seconds (120 trials plus offline reconciliation), a 100-trial quota-boundary follow-up in 42.26 seconds, a 100-trial delayed-deletion boundary follow-up in 46.52 seconds and a 100-trial encrypted quota-boundary follow-up in 46.41 seconds. Established owner listeners caught all 50 inputs in each targeted follow-up. Peer polling caught 5/50 at the quota boundary, 2/50 with a 25ms deletion delay and 3/50 with DPAPI encryption before deletion. Accepted peer deletions still resulted in consumption in 20/50, 2/50 and 5/50 respectively. Both idle groups captured 0/10. These are observed fixture counts, not guaranteed interception rates.
 
 Six native/encrypted durability and transport scenarios passed in 10.38 seconds. Fresh subprocesses decrypted synthetic DPAPI journals; deletion/replay acknowledgement loss reconciled without duplicate input; corruption failed; a native image snapshot survived encrypted round-tripping and queue restoration. A stdio owner exposed notifications to its own connection, not to the peer. Neither full conversation persistence nor installed client-composer interception was tested or enabled.
 

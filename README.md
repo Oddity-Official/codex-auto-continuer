@@ -65,6 +65,8 @@ The queue has no verified atomic turn precondition or idempotent-send guarantee.
 
 Optional `Queue Holding` keeps queued follow-ups out of an already observed active owner's queue, sends the unchanged saved `Continue` after a quota failure, then releases requests individually after completed turns and fresh usage checks. It is off by default. Separate owners, stdin/stdout clients, idle input and unobserved boundaries are not protected. Status reports coverage; the tray offers private input review and explicit recovery controls. See [queue holding](Docs/USER-GUIDE.md#optional-queue-holding).
 
+Enabling it alone does not protect normal Desktop/extension composers; client connection adapters are not shipped. Normal CLI's Tab queue is client-local and invisible to this server-queue holder. The [installed-client investigation](Docs/Audits/2026-10-05/AUDIT.md) records connection proofs and outstanding acceptance checks, including a loaded quota `systemError` recovery deferral.
+
 Held input and attachments are an explicit privacy exception: only this opt-in feature stores their canonical payload, encrypted locally for the Windows account and bound to the Codex home/account. No full conversation archive, telemetry bodies or diagnostic uploads are created. A used encrypted journal is not portable to another person's account; share the clean release instead.
 
 There is no remote analytics or diagnostic upload. The [signed updater](Docs/UPDATES.md) requests GitHub releases every 6 hours without sending chat data. Set `auto_update = false` for manual updates. The repository is private during testing; public sharing will not require a GitHub login. Codex's own network traffic and telemetry are separate.
