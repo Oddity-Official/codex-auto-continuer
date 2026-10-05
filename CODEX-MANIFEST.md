@@ -10,7 +10,11 @@ All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba0
 
 ## CAC 0.5.2 local work
 
-- Completed the user-authorized isolated queue-control investigation: 7 native probes passed in 44.39 seconds. Full history preserves consumed queue client identity; owner interruption pauses the queue; owner selected-start prioritizes literal Continue. A synthetic outbox also held inputs through renewed denied permission and released them one at a time after fresh permission checks. Cross-owner interruption/start and in-place removal were rejected. A before-turn recovery fork works but changes thread identity. No production queue mode, durable private journal, prompt wrapper, installed binary or runtime change was made. Dated evidence is in `Docs/Audits/2026-10-04-02/`.
+- Completed 420 measured native interception races and six durability/transport probes. Same-owner listeners caught all 50 inputs in each targeted active-turn run, including encryption; peer polling missed most boundary inputs and sometimes returned accepted deletion despite consumption. Idle inputs escaped both methods. DPAPI fresh-process recovery, corruption rejection, client-ID replay reconciliation and image snapshot restoration passed. The audit records all settings, failed fixture checks and limits; no production queue holder or runtime change was introduced.
+- Consolidated the approved dark menu/status brief in `Docs/PRODUCT.md`, including updater placement, right-edge state markers, compact percentages, pending-layer icons, actionable status and live-title privacy. It remains unimplemented in release 0.5.2. Updated research/architecture boundaries, rotated the previous queue audit through the managed helper and refreshed documentation navigation.
+- Final investigation evidence is in `Docs/Audits/2026-10-04-03/`. The five native commands passed 25 pytest scenarios; both helpers compile; 110 documentation links and focused privacy/whitespace checks passed; no fixture processes remain. Source checks and handoff cover the probe/docs changes, not a newly built binary or fresh full application gate. The installed app and saved Continue prompt were not changed.
+
+- Completed the user-authorized isolated queue-control investigation: 7 native probes passed in 44.39 seconds. Full history preserves consumed queue client identity; owner interruption pauses the queue; owner selected-start prioritizes literal Continue. A synthetic outbox also held inputs through renewed denied permission and released them one at a time after fresh permission checks. Cross-owner interruption/start and in-place removal were rejected. A before-turn recovery fork works but changes thread identity. No production queue mode, durable private journal, prompt wrapper, installed binary or runtime change was made. Dated evidence is in `Docs/Audits/History/2026-10-04-02/`.
 
 - Investigated the red status against private metadata and session lifecycle. An internal read-only quota RPC error stopped monitoring before reset; the pending obligation remained durable. Restart restored monitoring. Queued follow-ups failed with structured quota errors but did not erase the obligation.
 - Retry only internal account-usage read errors, preserving state and withholding current permission. Retain pending count, last scan, compatibility and safe method/code in status; other contract/request/mutation errors still fail diagnostically. Check For Updates now sits immediately above About.
@@ -117,8 +121,8 @@ Limits remain explicit: current stable is also 0.160.0, so real different-releas
 
 ## Artifacts
 
-Portable: `dist/codex-auto-continuer-0.5.1-windows-x86_64.zip`, the exact published GitHub asset, SHA-256 `a4b0718fb062b35fd0284be2cfccadf041e5c544f02c2b3558b40ccdd365df62`.
+Portable: published `codex-auto-continuer-0.5.2-windows-x86_64.zip`, SHA-256 `cff3e30e9d2087f88793837248ce3ead8fb96be2d6fe9da775fdb57d5774f24d`. No binary rebuild was needed for the investigation and brief.
 
-Optional wheel: `dist/codex_auto_continuer-0.5.1-py3-none-any.whl`, the exact published GitHub asset, SHA-256 `c063648868050cd1cfb04a5d3b3b383d8c6991143a8e5455d1b00b84784d1ea4`.
+Optional wheel: published `codex_auto_continuer-0.5.2-py3-none-any.whl`, SHA-256 `49e5b0f269e293067b582b16135e043c228a3070b959a49e19ca707717f884bc`.
 
 Stable source transport: `codex-auto-continuer-codex-handoff.zip`. It includes useful public development records and audit state with per-file hashes and Git provenance, excluding runtime data, App, dependencies, build output and secrets. Packaging runs retention and transport validation.

@@ -40,7 +40,23 @@ A second connection to the actual owner can interrupt the active turn. Its remai
 
 The installed schema and server do not provide `thread/rollback`, `turn/delete` or `item/delete`; tested calls were rejected without changing history. Current general documentation's deprecated rollback description does not establish availability on this build. An interrupted input remains in history. A verified `thread/fork` with `beforeTurnId` excludes that input in a new thread without changing the original. It does not restore filesystem state or preserve the original thread identity.
 
-Full settings, initial fixture limitations, sanitized results and reproduction are in the [queue-control audit](Audits/2026-10-04-02/AUDIT.md). No queue interception, replay, fork or cancellation mode is enabled in CAC. The saved continuation prompt remains the dispatch input without a recovery-instruction wrapper.
+Full settings, initial fixture limitations, sanitized results and reproduction are in the [queue-control audit](Audits/History/2026-10-04-02/AUDIT.md). No queue interception, replay, fork or cancellation mode is enabled in CAC. The saved continuation prompt remains the dispatch input without a recovery-instruction wrapper.
+
+The [interception investigation](Audits/2026-10-04-03/AUDIT.md) measured 420 timing trials on the same native build. Established same-owner event listeners captured active-turn inputs much more reliably than separate-owner polling. Neither captured inputs queued while already idle. In the 50-trial quota-boundary follow-up, peer polling missed 45 inputs; 20 were consumed despite an accepted deletion. With actual DPAPI encryption before persistence/deletion, owner events captured 50/50 and peer polling captured 3/50; five peer deletions were accepted despite consumption. The dispatch mutex is process-local: shared queue storage does not create cross-owner atomic removal-before-start. A successful peer deletion plus an immediate empty history is not proof that consumption cannot still complete.
+
+A stdio-owner fixture delivered queue notifications only to its attached owner connection. The peer could poll and delete while busy but could not resume the owned chat to subscribe. The inspected server selects one local transport, not a second stdio-owner control socket. This is a verified protocol/transport boundary, not a fresh installed Desktop or VS Code composer test.
+
+Six durability probes established fresh-process Windows DPAPI decryption, corruption rejection, recovery before deletion and after lost deletion acknowledgement, exact client-ID correlation after a lost replay acknowledgement, and native local-image snapshot round-tripping. They use disposable synthetic records, not a production encrypted outbox. No whole conversation needs to be stored for the held-input approach.
+
+### Queue-holding implementation boundary
+
+An optional proactive active-turn holder is feasible where CAC has a verified owner-side connection. Notifications alone are not a dispatch barrier; idle input and disconnection still have explicit limits. Do not advertise universal native-composer interception based on the current peer-only recovery path. A reliable all-client guarantee requires supported owner integration/pre-dispatch gating, or inputs entering a CAC-owned outbox before they reach Codex. Faster peer polling is not a substitute.
+
+A production holder must persist exact input, ordering and identity before deletion; bind records to their original home/account/thread; and reconcile removal and replay phases after restart. Encrypt held bodies locally, keep bodies out of logs/status files/exports and explain account-bound portability limits. Retain unclear records without blind replay. Treat absence from a single history read as inconclusive during active or incompletely persisted work. Do not assume `clientUserMessageId` makes enqueue idempotent.
+
+Release held inputs individually after fresh ordinary-usage permission. Send only the unchanged saved continuation prompt after a genuine quota stop. Normal completion needs no extra Continue. Manual progress, owner loss, cancellation, stop/exit and restoring native queues require explicit policies that preserve held user inputs independently of stale recovery obligations. Held items also need a visible local management affordance because removing them from the native queue removes the client's normal edit/delete controls. Any missed input is identified by client ID, not deleted from history or silently replayed.
+
+The investigation establishes these constraints, not a production feature or a new automatic cancellation/history-removal policy. The [approved UI brief](PRODUCT.md#approved-tray-and-status-refinement) remains a separate presentation change.
 
 The supported scope is local interactive CLI, VS Code and Desktop visible to one native Codex home/account. Executor and sub-agent sessions are explicitly excluded by the user.
 

@@ -1,0 +1,45 @@
+{
+  "saved-before-delete": {
+    "freshProcessDecrypted": true,
+    "inputRoundTripExact": true,
+    "originalStillQueued": true,
+    "finalConsumedMatches": 1,
+    "corruptionRejected": true,
+    "duplicateReplay": false
+  },
+  "delete-not-sent": {
+    "freshProcessDecrypted": true,
+    "inputRoundTripExact": true,
+    "originalStillQueued": true,
+    "finalConsumedMatches": 1,
+    "corruptionRejected": true,
+    "duplicateReplay": false
+  },
+  "delete-accepted-ack-lost": {
+    "freshProcessDecrypted": true,
+    "inputRoundTripExact": true,
+    "originalStillQueued": false,
+    "finalConsumedMatches": 1,
+    "corruptionRejected": true,
+    "duplicateReplay": false
+  },
+  "lostReplayAck": {
+    "sameTextTurns": 2,
+    "matchingClientIds": 1,
+    "automaticRetry": false,
+    "literalContinue": true
+  },
+  "attachment": {
+    "nativeSnapshotEmbedsImage": true,
+    "encryptedFreshProcessRoundTrip": true,
+    "restoredQueueInputExact": true,
+    "attachmentInference": false
+  },
+  "stdioOwner": {
+    "ownerQueueNotification": true,
+    "peerQueueNotification": false,
+    "peerResumeRejectedActiveWriter": true,
+    "peerPolledAndRemovedWhileBusy": true,
+    "sameOwnerTransport": "Exclusive child stdin/stdout, not an additional local socket"
+  }
+}

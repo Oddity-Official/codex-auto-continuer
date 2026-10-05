@@ -67,6 +67,8 @@ Manual progress, active work, missing chats, archive or scope changes invalidate
 
 The verified API has no compare-and-swap precondition against a turn revision. A narrow race remains between final revalidation and queue acceptance. We minimize it and remove observable stale queued work, without claiming unavailable atomicity.
 
+Queue deletion acknowledges storage removal, not cancellation of input already selected by another server owner. Native probes confirmed accepted peer deletions followed by consumption. The dispatch lock is process-local. Stale cleanup cannot undo an already-selected turn; future user-input holding must not infer safe replay from deletion acknowledgement or a single immediate history-absence check. [Queue interception evidence](Audits/2026-10-04-03/AUDIT.md) owns measured timing and transport limits.
+
 Reset timestamps and percentages never authorize dispatch. Exhausted-window resets are only sleep hints and diagnostics. Dispatch runs oldest-first, with another account-permission read between chats.
 
 The supervisor never answers approvals, security prompts, tool elicitations or user-input requests. Active threads are not eligible for new obligations.

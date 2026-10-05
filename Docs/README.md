@@ -10,6 +10,7 @@
 ## Technical owners
 
 - [Product contract](PRODUCT.md): goals, required behavior and non-goals
+- [Approved tray and status brief](PRODUCT.md#approved-tray-and-status-refinement): consolidated presentation requirements, not implemented in 0.5.2
 - [Architecture](ARCHITECTURE.md): runtime, app-server integration, state machine and safety behavior
 - [Compatibility](COMPATIBILITY.md): Balanced and Strict policies, exact certificates and scheduled upstream checks
 - [Updates](UPDATES.md): signed stable CAC releases, private-repository authentication and code-only rollback
@@ -23,11 +24,12 @@ These sanitized records are Git-tracked and suitable for public sharing, but exc
 
 - [Workflow](WORKFLOW.md): environment ownership, checkpoint import/export and source transport boundaries
 - [Audits](Audits/README.md): dated audit evidence, rotation and retention
-- [Queue control investigation](Audits/2026-10-04-02/AUDIT.md): history identity, owner cancellation, selected queue start and recovery forks
+- [Queue interception investigation](Audits/2026-10-04-03/AUDIT.md): timing, cross-owner deletion races, encrypted recovery and transport boundaries
 - [ChatGPT manifest](../CHAT-MANIFEST.md) and [Codex manifest](../CODEX-MANIFEST.md): checkpoint ownership and local verification provenance
 
 ## Historical records
 
+- [Queue control investigation, 4 October 2026](Audits/History/2026-10-04-02/AUDIT.md): history identity, owner cancellation, selected queue start and recovery forks
 - [Recovery availability investigation, 4 October 2026](Audits/History/2026-10-04/AUDIT.md): internal quota-read failure, queued-turn evidence and safe retry boundary
 - [Native 0.5.1 verification, 4 October 2026](History/2026-10-04-native-0.5.1-validation.md)
 
