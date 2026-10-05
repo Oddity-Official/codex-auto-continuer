@@ -9,8 +9,9 @@ CAC 0.6.0, 5 October 2026. Native Windows 11 x86_64, PowerShell 7 and project CP
 | `scripts/verify-windows.ps1` | Application/workflow regressions, native transport/dialog/menu checks, encryption safety, compileall, version | 255 passed in 30.77 seconds; CAC 0.6.0 |
 | `scripts/verify-continuation.ps1 -CodexPath .data/ci-official-baseline/package/bin/codex.exe` | Official native Codex, separate-writer recovery, usage outage, managed lifecycle and owner holding | 17 passed in 107.73 seconds |
 | Source-export/Git privacy canaries | Portable data, root encrypted journal, settings, logs and environment files | 2 focused tests passed in 3.89 seconds |
-| Initial `scripts/verify-portable.py` candidate | Frozen EXEs, all 583 manifest files, lean package, hot reload/repair, stale-error tray autostart and encrypted input review | Passed before the transport cancellation correction below; zero Codex connections and zero user-chat dispatches |
-| Publication privacy inventory | 32 reachable commits, 424 distinct blobs, 159 working files, current ZIP/wheel and preceding source handoff | No configured matches, tracked runtime data, private author emails or compiled personal paths; both EXEs and 482 bytecode modules inspected |
+| Published `scripts/verify-portable.py` build | Downloaded GitHub EXEs, all 584 manifest files, lean package, hot reload/repair, stale-error tray autostart and encrypted input review | Passed; zero Codex connections and zero user-chat dispatches |
+| Publication privacy inventory through implementation | 35 reachable commits, 474 distinct blobs, 159 working files, published ZIP/wheel and refreshed 160-file source handoff | No configured matches, tracked runtime data, private author emails or compiled personal paths; both EXEs and 484 bytecode modules inspected |
+| `scripts/verify-update.py --baseline-archive ...0.5.2...zip --private` | Actual signed GitHub 0.5.2-to-0.6.0 upgrade and code-only rollback with synthetic encrypted held input | Completed, then rolled back; all four protected data files and newer state preserved, all 581 baseline code hashes restored; zero user Codex connections |
 | Documentation and audit retention | Local Markdown file targets and managed cleanup | 110 links checked, zero failures; zero deletion targets |
 
 The certified official Codex CLI/managed binary is 0.160.0, SHA-256 `fdda5fa3cf3fb3d000b876720742857676293e4315e4b045fae6f8bd7e866d1d`. The expanded consumer contract is `cb3619a99adfd918d93056553b525dab17b462d4a27a21f5ebbfced3f1bbedf5`, including full-history client IDs, canonical input and queue/turn notifications. The exact 0.6.0 certificate passed the real native gate.
@@ -24,6 +25,19 @@ An intermediate native run passed recovery assertions but failed managed-daemon 
 The first hosted release gate failed before publication: observer cancellation raced the initial socket timeout update, which was outside the transport-error boundary. Deadline updates now normalize closed-socket errors, with a deterministic abort-before-read regression. The focused transport suite passed all six tests; the full local gates above include this correction. The prior candidate's frozen results do not certify the corrected binary.
 
 The next hosted attempt passed the Windows gate but hit GitHub's unauthenticated API rate limit before downloading the native baseline. CI now authenticates only the release-metadata request; binary downloads remain token-free and checksum/size-verified. Both authenticated and unauthenticated download regressions pass, including absence of the synthetic token from output and saved metadata. The final Windows gate includes these helper tests; runtime recovery code is unchanged by this CI repair.
+
+## Published 0.6.0 and installation
+
+The private [0.6.0 release](https://github.com/Oddity-Official/codex-auto-continuer/releases/tag/v0.6.0) was built from `b90773fba2a28a3244ccbb16b3575f45bbfee460`. Hosted Windows, native compatibility, documentation and [signed release](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37278107648) workflows passed. The release workflow includes the frozen UX check before signing/publication. The downloaded artifact passed the local frozen check and real signed upgrade/rollback above.
+
+| Published artifact | Bytes | SHA-256 |
+| --- | --- | --- |
+| Windows ZIP | 20,230,829 | `6ce0b0d734540f436a4f5e8784da2f3e720e205d035d2f3968dd318730635a27` |
+| Source wheel | 118,298 | `3208b4ca551d5521b339c1ffd4d736213b0ebfd58feebf50dc1675a4daaecadb` |
+
+The actual installed App upgraded from 0.5.2 through the signed updater; its durable job reached `completed`. CLI, tray and manifest report 0.6.0. All 584 installed code hashes match the published manifest. Settings, saved prompt and durable state hashes are unchanged. The new monitor reports monitoring, certified compatibility and zero pending work. Queue holding remains off by default; no production input was captured for this verification. The Windows login shortcut still points to the deployed tray and its exact settings path. The startup fix is verified by actual ready-callback and frozen stale-error launch tests, not by a fresh OS login.
+
+No manual mouse/keyboard validation, natural usage-reset experiment or universal installed-client queue capture is claimed. The saved dark tray/status brief is not part of 0.6.0. Scoped cleanup of one old ignored synthetic failed-test directory was rejected by the host; it is excluded from Git, releases and source handoffs. Final native fixtures completed their own cleanup normally.
 
 ## Prior 0.5.2 certification
 
