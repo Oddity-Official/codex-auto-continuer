@@ -93,6 +93,7 @@ jobs:
           & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m','pip','install','--timeout','30','.[dev]') -TimeoutSeconds 180
       - name: Fetch official complete packages and verify checksums
         env:
+          GH_TOKEN: ${{ github.token }}
           CLI_VERSION: ${{ matrix.cli }}
           DAEMON_VERSION: ${{ matrix.daemon }}
         run: |

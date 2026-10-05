@@ -38,6 +38,8 @@ jobs:
       - name: Windows safety gate
         run: ./scripts/verify-windows.ps1
       - name: Official native baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('scripts/download-probe-codex.py','--version','0.160.0','--destination','.data/codex') -TimeoutSeconds 240
           $download = Get-Content -LiteralPath '.data/codex/download.json' -Raw | ConvertFrom-Json

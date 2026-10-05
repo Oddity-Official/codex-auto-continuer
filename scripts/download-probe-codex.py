@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import tarfile
 import time
@@ -49,8 +50,10 @@ def main():
         destination == stage or destination.exists()):
         raise SystemExit("Destination must be a new directory inside this checkout's .data staging area.")
     tag = "latest" if args.version == "latest" else "tags/rust-v" + args.version
-    request = urllib.request.Request("https://api.github.com/repos/openai/codex/releases/" + tag,
-        headers={"User-Agent": "CAC-compatibility-probe", "Accept": "application/vnd.github+json"})
+    headers = {"User-Agent": "CAC-compatibility-probe", "Accept": "application/vnd.github+json"}
+    if token := os.environ.get("GH_TOKEN"):
+        headers["Authorization"] = "Bearer " + token
+    request = urllib.request.Request("https://api.github.com/repos/openai/codex/releases/" + tag, headers=headers)
     with urllib.request.urlopen(request, timeout=20) as response:
         release = json.load(response)
     version = release["tag_name"].removeprefix("rust-v")

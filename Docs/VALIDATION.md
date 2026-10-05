@@ -6,7 +6,7 @@ CAC 0.6.0, 5 October 2026. Native Windows 11 x86_64, PowerShell 7 and project CP
 
 | Check | Exact scope | Result |
 | --- | --- | --- |
-| `scripts/verify-windows.ps1` | Application/workflow regressions, native transport/dialog/menu checks, encryption safety, compileall, version | 253 passed in 34.61 seconds; CAC 0.6.0 |
+| `scripts/verify-windows.ps1` | Application/workflow regressions, native transport/dialog/menu checks, encryption safety, compileall, version | 255 passed in 30.77 seconds; CAC 0.6.0 |
 | `scripts/verify-continuation.ps1 -CodexPath .data/ci-official-baseline/package/bin/codex.exe` | Official native Codex, separate-writer recovery, usage outage, managed lifecycle and owner holding | 17 passed in 107.73 seconds |
 | Source-export/Git privacy canaries | Portable data, root encrypted journal, settings, logs and environment files | 2 focused tests passed in 3.89 seconds |
 | Initial `scripts/verify-portable.py` candidate | Frozen EXEs, all 583 manifest files, lean package, hot reload/repair, stale-error tray autostart and encrypted input review | Passed before the transport cancellation correction below; zero Codex connections and zero user-chat dispatches |
@@ -22,6 +22,8 @@ Focused regressions cover corrupt/mismatched encryption, failed fsync without in
 An intermediate native run passed recovery assertions but failed managed-daemon cleanup with a Windows socket-directory sharing lock. The fixture previously treated the lifecycle response as sufficient cleanup readiness. It now inventories the isolated daemon's descendants before stopping and waits for actual process exit before directory removal. The affected case then passed; the final full native gate above passed. This repair does not bypass assertions, patch Codex or retry failed recovery behavior.
 
 The first hosted release gate failed before publication: observer cancellation raced the initial socket timeout update, which was outside the transport-error boundary. Deadline updates now normalize closed-socket errors, with a deterministic abort-before-read regression. The focused transport suite passed all six tests; the full local gates above include this correction. The prior candidate's frozen results do not certify the corrected binary.
+
+The next hosted attempt passed the Windows gate but hit GitHub's unauthenticated API rate limit before downloading the native baseline. CI now authenticates only the release-metadata request; binary downloads remain token-free and checksum/size-verified. Both authenticated and unauthenticated download regressions pass, including absence of the synthetic token from output and saved metadata. The final Windows gate includes these helper tests; runtime recovery code is unchanged by this CI repair.
 
 ## Prior 0.5.2 certification
 
