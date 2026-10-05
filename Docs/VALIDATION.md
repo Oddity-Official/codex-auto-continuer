@@ -40,6 +40,23 @@ The first hosted release gate failed before publication: observer cancellation r
 
 The next hosted attempt passed the Windows gate but hit GitHub's unauthenticated API rate limit before downloading the native baseline. CI now authenticates only the release-metadata request; binary downloads remain token-free and checksum/size-verified. Both authenticated and unauthenticated download regressions pass, including absence of the synthetic token from output and saved metadata. The final Windows gate includes these helper tests; runtime recovery code is unchanged by this CI repair.
 
+## Published 0.6.1 and installation
+
+The private [0.6.1 release](https://github.com/Oddity-Official/codex-auto-continuer/releases/tag/v0.6.1) was built from `7e87281d5d5b2167db9fbada56e9a8cd9dce5439`. Hosted documentation, Windows build, compatibility and [signed release](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37353792572) workflows passed. One duplicate pending publication run was cancelled before it could publish again. The release job passed the standard-user native gate and frozen check before signing.
+
+| Published artifact | Bytes | SHA-256 |
+| --- | --- | --- |
+| Windows ZIP | 20,229,923 | `2ebd8206603df1203494110532c94e5e53bb0ad7b0d18aadf6a1f9a1ed7520ab` |
+| Source wheel | 118,435 | `59603e5b449cc15050c90584d7e558e730436098050027e1f11fc81be561bc1c` |
+
+The exact downloaded GitHub ZIP passed `scripts/verify-portable.py`: all 584 packaged file hashes, lean contents, hot reload/repair, exclusive controls, stale-failure tray autostart and encrypted review. No Codex connection or user-chat dispatch occurred. All 33 wheel package files match local source content; 27 text files differ only by the hosted checkout's CRLF conversion. An initial raw-byte comparison rejected that difference before its cause was verified. Binary assets match byte-for-byte. The ZIP contains no probe dependencies, developer records, runtime data or configured private-profile canaries.
+
+The signed `scripts/verify-update.py --baseline-archive ...0.6.0...zip --private` probe completed the actual GitHub 0.6.0-to-0.6.1 upgrade and code-only rollback. Settings, prompt, state and encrypted held input were preserved. Newer runtime state remained after rollback, all 584 baseline code hashes were restored, and no user Codex connection occurred.
+
+The actual App then upgraded through its existing signed updater. The durable job reached `completed`. CLI, tray and installed manifest report 0.6.1; all 584 installed hashes match the published manifest. Before/after settings, saved Continue and state hashes are identical. Monitoring is active, compatibility is certified and pending count is zero. Holding stays off; All clients, Detailed local logging and automatic authenticated updates retain their settings. The existing login shortcut still points to the exact deployed tray and settings path. This is not a fresh OS-login test.
+
+Real GUI composer tests and their failed observation/setup boundaries are recorded in the current audit. The approved dark UI brief remains unimplemented. No universal queue-holding coverage or natural production quota reset is inferred from the release checks.
+
 ## Published 0.6.0 and installation
 
 The private [0.6.0 release](https://github.com/Oddity-Official/codex-auto-continuer/releases/tag/v0.6.0) was built from `b90773fba2a28a3244ccbb16b3575f45bbfee460`. Hosted Windows, native compatibility, documentation and [signed release](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37278107648) workflows passed. The release workflow includes the frozen UX check before signing/publication. The downloaded artifact passed the local frozen check and real signed upgrade/rollback above.
