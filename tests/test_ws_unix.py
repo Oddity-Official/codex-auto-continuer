@@ -95,6 +95,21 @@ def test_handshake_preserves_prefetched_frame(unix_path, unix_listener):
         thread.join(timeout=2); listener.close()
 
 
+def test_aborted_socket_before_read_normalizes_deadline_error():
+    a, b = socket.socketpair()
+    a.settimeout(3)
+    ws = UnixWebSocket(a)
+    try:
+        ws.begin_request()
+        ws.abort()
+        with pytest.raises(TransportError, match="deadline"):
+            ws.recv_text()
+        assert b.recv(10) == b""
+    finally:
+        ws.close()
+        b.close()
+
+
 def test_abort_wakes_an_observer_blocked_read_without_a_close_frame():
     a, b = socket.socketpair()
     a.settimeout(3)

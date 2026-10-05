@@ -41,7 +41,10 @@ class UnixWebSocket:
             remaining = self._deadline - time.monotonic()
             if remaining <= 0:
                 raise TransportError("Codex app-server exceeded the total RPC deadline.")
-            self._sock.settimeout(remaining)
+            try:
+                self._sock.settimeout(remaining)
+            except OSError as exc:
+                raise TransportError("Codex app-server socket is unavailable while setting its deadline.") from exc
 
     @classmethod
     def connect(cls, path: Path, timeout: float) -> "UnixWebSocket":

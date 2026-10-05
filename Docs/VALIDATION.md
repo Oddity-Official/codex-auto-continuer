@@ -6,10 +6,10 @@ CAC 0.6.0, 5 October 2026. Native Windows 11 x86_64, PowerShell 7 and project CP
 
 | Check | Exact scope | Result |
 | --- | --- | --- |
-| `scripts/verify-windows.ps1` | Application/workflow regressions, native transport/dialog/menu checks, encryption safety, compileall, version | 252 passed in 39.87 seconds; CAC 0.6.0 |
-| `scripts/verify-continuation.ps1 -CodexPath .data/ci-official-baseline/package/bin/codex.exe` | Official native Codex, separate-writer recovery, usage outage, managed lifecycle and owner holding | 17 passed in 108.04 seconds |
+| `scripts/verify-windows.ps1` | Application/workflow regressions, native transport/dialog/menu checks, encryption safety, compileall, version | 253 passed in 34.61 seconds; CAC 0.6.0 |
+| `scripts/verify-continuation.ps1 -CodexPath .data/ci-official-baseline/package/bin/codex.exe` | Official native Codex, separate-writer recovery, usage outage, managed lifecycle and owner holding | 17 passed in 107.73 seconds |
 | Source-export/Git privacy canaries | Portable data, root encrypted journal, settings, logs and environment files | 2 focused tests passed in 3.89 seconds |
-| `scripts/verify-portable.py` | Frozen EXEs, all 583 manifest files, lean package, hot reload/repair, stale-error tray autostart and encrypted input review | Passed; zero Codex connections and zero user-chat dispatches |
+| Initial `scripts/verify-portable.py` candidate | Frozen EXEs, all 583 manifest files, lean package, hot reload/repair, stale-error tray autostart and encrypted input review | Passed before the transport cancellation correction below; zero Codex connections and zero user-chat dispatches |
 | Publication privacy inventory | 32 reachable commits, 424 distinct blobs, 159 working files, current ZIP/wheel and preceding source handoff | No configured matches, tracked runtime data, private author emails or compiled personal paths; both EXEs and 482 bytecode modules inspected |
 | Documentation and audit retention | Local Markdown file targets and managed cleanup | 110 links checked, zero failures; zero deletion targets |
 
@@ -20,6 +20,8 @@ Owner holding tests use production interception/journal/replay code, unmodified 
 Focused regressions cover corrupt/mismatched encryption, failed fsync without input deletion, uncertain removal despite absent history, explicit review, manual progress, quota rechecks, no parallel replay, duplicate client identity, disabled/empty journals without Codex connections and blocked-reader abort. The real tray ready callback starts despite historical failed status, avoids duplicate monitoring and honors explicit no-monitor mode. The frozen probe separately exercises a stale-error GUI launch. None of these constitutes a fresh Windows login or universal composer coverage.
 
 An intermediate native run passed recovery assertions but failed managed-daemon cleanup with a Windows socket-directory sharing lock. The fixture previously treated the lifecycle response as sufficient cleanup readiness. It now inventories the isolated daemon's descendants before stopping and waits for actual process exit before directory removal. The affected case then passed; the final full native gate above passed. This repair does not bypass assertions, patch Codex or retry failed recovery behavior.
+
+The first hosted release gate failed before publication: observer cancellation raced the initial socket timeout update, which was outside the transport-error boundary. Deadline updates now normalize closed-socket errors, with a deterministic abort-before-read regression. The focused transport suite passed all six tests; the full local gates above include this correction. The prior candidate's frozen results do not certify the corrected binary.
 
 ## Prior 0.5.2 certification
 
