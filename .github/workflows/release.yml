@@ -42,11 +42,15 @@ jobs:
           & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('scripts/download-probe-codex.py','--version','0.160.0','--destination','.data/codex') -TimeoutSeconds 240
           $download = Get-Content -LiteralPath '.data/codex/download.json' -Raw | ConvertFrom-Json
           $binary = Join-Path "$PWD/.data/codex" $download.binary
-          & ./scripts/run-standard-user-ci.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m','pytest','integration/test_continuation.py','integration/test_compatibility.py','-q','-s','--tb=short','--codex-executable',$binary) -TimeoutSeconds 300
+          & ./scripts/run-standard-user-ci.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m','pytest','integration/test_continuation.py','integration/test_compatibility.py','integration/test_holding.py','-q','-s','--tb=short','--codex-executable',$binary) -TimeoutSeconds 300
       - name: Build portable ZIP and wheel
         run: |
           ./scripts/build-portable.ps1
           & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m','pip','wheel','--timeout','30','--no-deps','--no-build-isolation','--wheel-dir','dist','.') -TimeoutSeconds 120
+      - name: Verify frozen UX and private holding modules
+        # This probe uses only disposable settings/control files and no Codex.
+        run: |
+          & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('scripts/verify-portable.py') -TimeoutSeconds 180
       - name: Sign exact portable package
         env:
           CAC_RELEASE_SIGNING_KEY: ${{ secrets.CAC_RELEASE_SIGNING_KEY }}

@@ -72,7 +72,15 @@ def main():
     obligation = Obligation.create("synthetic-chat", "synthetic-failed-turn", time.time(), None)
     obligation.phase = "uncertain"
     save_state(settings.parent / "state.json", State(obligations=[obligation]))
-    protected = {name: (settings.parent / name).read_bytes() for name in ("settings.toml", "continue-prompt.md", "state.json")}
+    from codex_auto_continuer.holding_journal import Journal
+    journal = Journal(settings.parent / "held-inputs.dpapi")
+    with journal.transaction("a" * 64) as raw:
+        raw["threads"] = {"synthetic-chat": {"authorizedTurnId": "synthetic-failed-turn", "recoveryIds": [], "paused": ""}}
+        raw["records"] = [{"id": "synthetic-input", "threadId": "synthetic-chat", "clientUserMessageId": "synthetic-client",
+            "anchorTurnId": "synthetic-failed-turn", "phase": "held", "releasedQueueId": None,
+            "input": [{"type": "text", "text": "PRIVATE_UPDATE_CANARY", "text_elements": []}]}]
+        journal.save(raw)
+    protected = {name: (settings.parent / name).read_bytes() for name in ("settings.toml", "continue-prompt.md", "state.json", "held-inputs.dpapi")}
     original_version = command(cli, "--version", env=env).decode().strip()
     original_manifest = parse_json((app / "RELEASE-MANIFEST.json").read_bytes())
     original_local = os.environ.get("LOCALAPPDATA")
@@ -114,6 +122,7 @@ def main():
         assert command(cli, "--version", env=env).decode().strip() == original_version
         assert (settings.parent / "state.json").read_bytes() == newer_state
         assert (settings.parent / "continue-prompt.md").read_bytes() == protected["continue-prompt.md"]
+        assert (settings.parent / "held-inputs.dpapi").read_bytes() == protected["held-inputs.dpapi"]
         for name, entry in original_manifest["files"].items():
             assert hashlib.sha256((app / name).read_bytes()).hexdigest() == entry["sha256"]
         print(json.dumps({"baseline": original_version, "updated": result["version"], "update": "completed", "rollback": "rolled_back",

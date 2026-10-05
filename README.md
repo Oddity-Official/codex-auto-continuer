@@ -13,7 +13,7 @@ This is an independent tool, not an OpenAI product. It uses experimental local C
 
 You need Windows 11 x86_64 and a signed-in native Codex installation. The release bundles Python and tray dependencies; users do not need Python, PowerShell 7, WSL or administrator rights. Startup management can use Windows' built-in PowerShell.
 
-CAC 0.5.2 certifies the official Windows Codex 0.160.0 CLI/daemon build. Default Balanced mode also permits unknown stable builds after identity, schema and runtime checks, with an untested notice. Strict mode requires an exact recovery certificate. Status explains the evidence; real contract/identity failures block writes and preserve pending work. [Compatibility](Docs/COMPATIBILITY.md) owns policy and daily upstream probes.
+CAC 0.6.0 certifies the official Windows Codex 0.160.0 CLI/daemon build. Default Balanced mode also permits unknown stable builds after identity, schema and runtime checks, with an untested notice. Strict mode requires an exact recovery certificate. Status explains the evidence; real contract/identity failures block writes and preserve pending work. [Compatibility](Docs/COMPATIBILITY.md) owns policy and daily upstream probes.
 
 CAC finds a native `codex.exe` on `PATH`, in the standard Desktop installation, or behind the npm launcher. Set `codex_executable` in settings for another absolute native EXE path. CAC never updates, pins or downgrades your Codex installation.
 
@@ -63,13 +63,17 @@ The queue has no verified atomic turn precondition or idempotent-send guarantee.
 
 ## Local telemetry and privacy
 
+Optional `Queue Holding` keeps queued follow-ups out of an already observed active owner's queue, sends the unchanged saved `Continue` after a quota failure, then releases requests individually after completed turns and fresh usage checks. It is off by default. Separate owners, stdin/stdout clients, idle input and unobserved boundaries are not protected. Status reports coverage; the tray offers private input review and explicit recovery controls. See [queue holding](Docs/USER-GUIDE.md#optional-queue-holding).
+
+Held input and attachments are an explicit privacy exception: only this opt-in feature stores their canonical payload, encrypted locally for the Windows account and bound to the Codex home/account. No full conversation archive, telemetry bodies or diagnostic uploads are created. A used encrypted journal is not portable to another person's account; share the clean release instead.
+
 There is no remote analytics or diagnostic upload. The [signed updater](Docs/UPDATES.md) requests GitHub releases every 6 hours without sending chat data. Set `auto_update = false` for manual updates. The repository is private during testing; public sharing will not require a GitHub login. Codex's own network traffic and telemetry are separate.
 
 Beside the EXEs, `data/` holds settings, prompt, pending state, local status and compact JSONL logs. Logs retain quota failures, recovery decisions, dispatch results, subsequent-turn observations and RPC timings so a later investigation can follow an entire recovery.
 
 Private mode omits names and paths and uses keyed identifiers. Detailed mode retains real identifiers, chat names and paths. Neither records conversation bodies, prompt text, credentials, raw RPC payloads or exception locals. Each stream defaults to 8 MiB plus three gzip backups. `diagnostic_trace` adds allowlisted request summaries. Settings comments explain retention and tracing.
 
-Files are not encrypted. Switching to Private affects future events, not old detailed logs. Private logging does not anonymize pending state or user-authored settings and prompts. Share the clean release ZIP, not a used `data/` folder. See [safe reporting](SECURITY.md) before attaching diagnostics.
+Ordinary logs and state are not encrypted; the optional held-input journal is encrypted separately. Switching to Private affects future events, not old detailed logs. Private logging does not anonymize pending state or user-authored settings and prompts. Share the clean release ZIP, not a used `data/` folder. See [safe reporting](SECURITY.md) before attaching diagnostics.
 
 Small per-user coordination files prevent competing portable copies. A pip-installed CLI controls the last registered app copy. Source checkouts use `.data/runtime`; portable EXEs use adjacent `data`. A clean release starts with Private logging and no obligations.
 

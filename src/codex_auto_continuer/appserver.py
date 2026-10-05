@@ -41,11 +41,13 @@ class AppServerClient:
         self.server_requests: deque[dict[str, Any]] = deque(maxlen=64)
         self.thread_subscriptions: set[str] = set()
         self.user_agent: str | None = None
+        self.socket_path: Path | None = None
 
     @classmethod
     def connect(cls, socket_path: Path, timeout: float) -> "AppServerClient":
         client = cls(UnixWebSocket.connect(socket_path, timeout))
         try:
+            client.socket_path = socket_path.resolve()
             client._initialize()
             return client
         except BaseException:
@@ -205,17 +207,66 @@ class AppServerClient:
         return result
 
     def queue_add(self, thread_id: str, prompt: str, client_user_message_id: str) -> dict[str, Any]:
+        return self.queue_add_input(thread_id, [{"type": "text", "text": prompt, "text_elements": []}], client_user_message_id)
+
+    def queue_add_input(self, thread_id: str, input: list[dict], client_user_message_id: str) -> dict[str, Any]:
         return self._expect_object(
             "thread/queue/add",
             self.request(
                 "thread/queue/add",
                 {
                     "threadId": thread_id,
-                    "input": [{"type": "text", "text": prompt, "text_elements": []}],
+                    "input": input,
                     "clientUserMessageId": client_user_message_id,
                 },
             ),
         )
+
+    def next_notification(self, timeout: float = 0.1) -> dict | None:
+        """Exclusive-connection reader. Never answer approvals or user-input requests."""
+        if self.server_requests:
+            return self.server_requests.popleft()
+        if self.notifications:
+            return self.notifications.popleft()
+        if not self._ws.message_ready(timeout):
+            return None
+        self._ws.begin_request()
+        try:
+            incoming = json.loads(self._ws.recv_text())
+        except json.JSONDecodeError as exc:
+            raise ProtocolError("Codex emitted an invalid notification.") from exc
+        if not isinstance(incoming, dict) or not isinstance(incoming.get("method"), str):
+            raise ProtocolError("Unexpected response on the exclusive notification connection.")
+        if "id" in incoming:
+            emit("rpc.server_request_ignored", method=incoming["method"])
+        else:
+            emit("rpc.notification", method=incoming["method"],
+                 **notification_summary(incoming["method"], incoming.get("params")))
+        return incoming
+
+    def full_turns(self, thread_id: str) -> list[dict]:
+        turns, cursor, seen, identities = [], None, set(), set()
+        for _ in range(100):
+            result = self._expect_object("thread/turns/list", self.request("thread/turns/list",
+                {"threadId": thread_id, "limit": 100, "sortDirection": "asc", "itemsView": "full", "cursor": cursor}))
+            data = result.get("data")
+            if not isinstance(data, list) or any(not isinstance(t, dict) or not isinstance(t.get("items"), list)
+                or not isinstance(t.get("id"), str) or not t["id"]
+                or t.get("status") not in {"inProgress", "completed", "failed", "interrupted"}
+                or any(not isinstance(i, dict) for i in t["items"]) for t in data):
+                raise ProtocolError("Codex full turn history omitted items.")
+            for item in data:
+                if item["id"] in identities:
+                    raise ProtocolError("Codex full history repeated a turn identity.")
+                identities.add(item["id"])
+            turns.extend(data)
+            cursor = result.get("nextCursor")
+            if cursor is None:
+                return turns
+            if not isinstance(cursor, str) or not cursor or cursor in seen:
+                raise ProtocolError("Codex full turn history has an invalid pagination cursor.")
+            seen.add(cursor)
+        raise ProtocolError("Full history exceeds the bounded holding lookup. Inputs remain held for review.")
 
     def queue_list_page(self, thread_id: str, cursor: str | None = None) -> dict[str, Any]:
         return self._expect_object(

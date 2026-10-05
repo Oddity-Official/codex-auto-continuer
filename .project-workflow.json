@@ -15,7 +15,7 @@
   "exclude_directories": ["App", "data", ".cac-updates"],
   "exclude_files": [
     "settings.toml", "continue-prompt.md", "state.json", "runtime-status.json",
-    "telemetry.key", "owner.json", "update-status.json", "notifications.json", "tray-ready.json"
+    "telemetry.key", "held-inputs.dpapi", "owner.json", "update-status.json", "notifications.json", "tray-ready.json"
   ],
   "windows_python": "3.13"
 }

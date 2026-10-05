@@ -30,6 +30,8 @@ def test_request_ignores_notifications_and_never_answers_server_request():
     assert len(ws.sent) == 1
     assert client.server_requests[0]["id"] == 99
     assert client.notifications[0]["method"] == "thread/status/changed"
+    assert client.next_notification()["id"] == 99  # Observer must see buffered input requests too.
+    assert len(ws.sent) == 1
 
 
 def test_rpc_error_is_precise():
@@ -50,12 +52,12 @@ def test_wrong_response_id_fails():
         client.request("x", {})
 
 
-def test_initialize_failure_closes_transport(monkeypatch):
+def test_initialize_failure_closes_transport(monkeypatch, tmp_path):
     from codex_auto_continuer.ws_unix import UnixWebSocket
     ws = FakeWS([{"id": 1, "error": {"code": -1, "message": "unsupported"}}])
     monkeypatch.setattr(UnixWebSocket, "connect", lambda *_: ws)
     with pytest.raises(RpcError):
-        AppServerClient.connect(None, 1)
+        AppServerClient.connect(tmp_path / "fixture.sock", 1)
     assert ws.closed
 
 

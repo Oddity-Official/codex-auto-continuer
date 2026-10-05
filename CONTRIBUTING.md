@@ -48,12 +48,13 @@ Source data lives in `.data/runtime`. A tray launch starts real monitoring. Use 
 ```powershell
 pwsh -NoProfile -File scripts/build-portable.ps1
 & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m', 'pip', 'wheel', '--timeout', '30', '--no-deps', '--no-build-isolation', '--wheel-dir', 'dist', '.') -TimeoutSeconds 120
-Get-FileHash -LiteralPath 'dist/codex-auto-continuer-0.5.0-windows-x86_64.zip' -Algorithm SHA256
+& ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('scripts/verify-portable.py') -TimeoutSeconds 180
+Get-FileHash -LiteralPath 'dist/codex-auto-continuer-0.6.0-windows-x86_64.zip' -Algorithm SHA256
 ```
 
 The builder stages a fresh one-folder release, renders the SVG icon, bundles runtime licenses and pystray's corresponding source, and checks every manifest hash and ZIP CRC. It never copies an installed app or its data. Build-only tools and developer records do not ship. Unsigned EXEs may trigger Windows reputation warnings.
 
-Before publishing, run the native gate and the retained frozen-release probe described in [verification](Docs/VALIDATION.md). Publish the clean versioned ZIP and its SHA-256, with the wheel only if wanted. Do not upload `App/`, `.data/`, a used `data/` folder or a ZIP made from a deployed app. CI artifacts are build results, not automatically approved releases.
+Before publishing, run the native gate and `scripts/verify-portable.py` as shown above. It checks the actual frozen package, including stale-status tray autostart and explicit encrypted-input review, in a disposable account-data location without Codex connections. Publish the clean versioned ZIP and its SHA-256, with the wheel only if wanted. Do not upload `App/`, `.data/`, a used `data/` folder or a ZIP made from a deployed app. CI artifacts are build results, not automatically approved releases.
 
 Windows verification runs on pushes and pull requests with read-only permissions, no retained checkout credentials and commit-pinned actions. It needs no Codex login or signing secret. The separate [release workflow](Docs/UPDATES.md#publishing) runs from tags or manual dispatch, has publication permissions, and uses an Ed25519 signing secret only in its signing step. Never publish runtime data or developer staging.
 

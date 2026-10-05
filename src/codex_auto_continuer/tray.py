@@ -58,6 +58,8 @@ class TrayController:
         self._update_busy = False
         self._installing = False
         self._notices = set()
+        self._held_records = ()
+        self._held_stamp = None
         notice_file = config_file.parent / "notifications.json"
         if notice_file.exists():
             try:
@@ -121,6 +123,26 @@ class TrayController:
                 if label == "update":
                     self._installing = True
                 output = self.command(*arguments)
+                if label == "held-manage":
+                    identity = {"threadId" if arguments[1] == "resume" else "queuedSubmissionId": arguments[2]}
+                    telemetry.emit("holding.reviewed", operation=arguments[1], **identity)
+                if label == "held-input":
+                    record = json.loads(output)[0]
+                    parts = [p.get("text", "")[:8000] if p.get("type") == "text" else
+                             f"[{p.get('type', 'Unknown')} attachment/input retained]" for p in record["input"]]
+                    preview = "\n\n".join(parts)
+                    suffix = "\n\nPreview truncated. Use held list INPUT-ID --show-input in the CLI for full text." if len(preview) > 4000 else ""
+                    self.dialogs.show("held-input", preview[:4000] + suffix, title="CAC private held input")
+                if label == "held-view":
+                    records = json.loads(output)
+                    body = "No requests are held." if not records else "\n\n".join(
+                        f"Input: {r['id']}\nThread: {r['threadId']}\nPhase: {r['phase']}" for r in records[:20])
+                    if len(records) > 20:
+                        body += f"\n\nShowing 20 of {len(records)} requests. CLI held list shows all."
+                    body += ("\n\nHeld bodies are encrypted for this Windows account. CLI: held list --show-input. "
+                             "Use held resume THREAD after reviewing newer progress; held discard INPUT discards confirmed unsent requests. "
+                             "For unconfirmed requests, inspect Codex history and queue before explicit held confirm-unsent/confirm-consumed INPUT --confirm.")
+                    self.dialogs.show("held", body, title="CAC held requests")
                 if label in {"update", "auto-update"}:
                     result = json.loads(output)
                     if result.get("status") == "staged":
@@ -213,6 +235,17 @@ class TrayController:
                 self.notify_once("update:" + str(updates.get("job")), updates.get("reason", "CAC update was rolled back. Select Status and inspect the recovery journal; runtime data was preserved."))
         self._last_phase = self.state
 
+    def refresh_held(self):
+        from .holding_journal import Journal
+        journal = Journal(self.config_file.parent / "held-inputs.dpapi")
+        stamp = journal.path.stat().st_mtime_ns if journal.path.exists() else None
+        if stamp == self._held_stamp:
+            return
+        raw = journal.read()
+        self._held_records = tuple({key: r[key] for key in ("id", "threadId", "phase")}
+                                  for r in (raw or {}).get("records", []))
+        self._held_stamp = stamp
+
     def notify_once(self, key, body):
         fingerprint = hashlib.sha256(key.encode()).hexdigest()
         with self._guard:
@@ -270,6 +303,10 @@ class TrayController:
                  f"\nCLI: {compatibility.get('cli_version', 'Unknown')}; daemon: {compatibility.get('app_server_version', 'Unknown')}"
                  f"\nQueue writes: {'Allowed' if compatibility.get('dispatch_allowed') else 'Blocked/not checked'}"
                  f"\n{compatibility.get('reason', '')}")
+        holding = self.snapshot.get("holding") or {}
+        body += (f"\n\nQueue holding: {'On' if self.cfg.queue_holding else 'Off'}"
+                 f"\nHeld requests: {holding.get('held', 'Unknown')}"
+                 f"\nObserved active owner chats: {holding.get('observedActive', 0)}")
         for warning in self.snapshot.get("warnings", []):
             body += "\n\n" + warning["message"]
         try:
@@ -304,6 +341,28 @@ class TrayController:
         self.dialogs.show("reset", "Restore default settings?\n\nThe selected prompt, pending continuations, logs and Windows login shortcut stay unchanged. Future logging returns to Private mode.",
                           confirm=True, then=lambda: self.enqueue("reset", "restore-defaults", "--prompt-file", self.cfg.prompt_file))
 
+    def toggle_holding(self):
+        value = "off" if self.cfg.queue_holding else "on"
+        self.dialogs.show("holding-consent", "Optional owner-supported queue holding\n\n"
+            "Captures queued requests only while CAC is already observing an active chat on its connected owner. "
+            "Other owners (including stdin/stdout), idle input and unobserved boundaries are not covered. Standard quota recovery is unchanged.\n\n"
+            "Full held input, including attachments, is stored locally encrypted for your Windows account. "
+            "No bodies enter telemetry or uploads. Keep this data until delivered or explicitly discarded. "
+            "Disabling/stopping preserves held requests rather than blindly replaying them.\n\n"
+            f"Turn queue holding {value}?", confirm=True,
+            then=lambda: self.enqueue("holding", "holding", value))
+
+    def manage_held(self, action, identity):
+        descriptions = {
+            "resume": "Resume this thread's held requests after reviewing its latest progress? CAC still waits for a completed turn, current usage permission and an empty native queue.",
+            "discard": "Permanently discard this confirmed, unsent held request? This does not remove anything from Codex history.",
+            "confirm-unsent": "Have you verified that this input is absent from BOTH Codex history and its native queue? An incorrect answer can duplicate your request. Mark it unsent, then separately approve resuming the thread?",
+            "confirm-consumed": "Have you verified that Codex already consumed this exact input? Remove the private recovery copy? Remaining requests still require review.",
+        }
+        arguments = ("held", action, identity) + (("--confirm",) if action.startswith("confirm-") else ())
+        self.dialogs.show("held-manage", descriptions[action] + "\n\nExact identity: " + identity,
+            title="CAC held request review", confirm=True, then=lambda: self.enqueue("held-manage", *arguments))
+
     def about(self):
         self.dialogs.show("about", f"Codex Auto Continuer {__version__}\n\nContinues exact local Codex chats after usage recovers.\nLocal diagnostics; no analytics uploads or credential logging.\n\nIndependent tool, not an OpenAI product. MIT license.",
                           title=f"About CAC {__version__}")
@@ -311,6 +370,11 @@ class TrayController:
     def watch(self):
         while not self.done.wait(1):
             self.refresh()
+            try:
+                self.refresh_held()
+            except Exception as exc:
+                telemetry.failure("tray.held_read_failed", exc)
+                self._held_records = ()
             if self.cfg.auto_update and not self.busy and (not self._last_update_check or time.monotonic() - self._last_update_check > self.cfg.update_check_hours * 3600):
                 self._last_update_check = time.monotonic()
                 self.check_updates(automatic=True)
@@ -325,6 +389,23 @@ class TrayController:
         client_items = [Item(label, client_action(value),
                              checked=lambda item, value=value: value in self.cfg.clients, enabled=available)
                         for value, label in (("vscode", "VS Code"), ("cli", "CLI"), ("desktop", "Desktop"))]
+        def held_items():
+            def manage_action(verb, identity):
+                return lambda icon, item: self.manage_held(verb, identity)
+            result = [Item("Enable Owner-Supported Holding", lambda icon, item: self.toggle_holding(),
+                           checked=lambda item: self.cfg.queue_holding, enabled=available),
+                      Item("Read Held Requests", action("held-view", "held", "list"), enabled=available)]
+            for index, record in enumerate(self._held_records[:20], 1):
+                identity, thread_id, state = record["id"], record["threadId"], record["phase"]
+                controls = [Item("View Private Input", action("held-input", "held", "list", identity, "--show-input"), enabled=available),
+                    Item("Resume After Review", manage_action("resume", thread_id), enabled=available)]
+                if state == "held":
+                    controls.append(Item("Discard Unsent Input", manage_action("discard", identity), enabled=available))
+                elif state in {"saved", "uncertain", "release_requested"}:
+                    for verb, label in (("confirm-unsent", "Confirm Not Consumed"), ("confirm-consumed", "Confirm Consumed")):
+                        controls.append(Item(label, manage_action(verb, identity), enabled=available))
+                result.append(Item(f"Request {index}: {state.replace('_', ' ')}", Menu(*controls)))
+            return iter(result)
         return Menu(
             Item(lambda item: f"Status: {self.status_label()}", lambda icon, item: self.show_status(), default=True),
             Menu.SEPARATOR,
@@ -342,6 +423,7 @@ class TrayController:
                 Item("Detailed", lambda icon, item: self.privacy("detailed"), checked=lambda item: self.cfg.detailed_telemetry, radio=True),
                 Item("Private", lambda icon, item: self.privacy("private"), checked=lambda item: not self.cfg.detailed_telemetry, radio=True))),
             Item("Restore Defaults", lambda icon, item: self.restore_defaults()),
+            Item("Queue Holding", Menu(held_items)),
             Menu.SEPARATOR,
             Item("Check For Updates", lambda icon, item: self.check_updates(), enabled=lambda item: not self._update_busy),
             Item(f"About CAC {__version__}", lambda icon, item: self.about()),
@@ -366,7 +448,9 @@ def run_tray(config_file: Path, *, start_monitor=True) -> int:
                 threading.Thread(target=controller.worker, name="CAC-controls", daemon=True).start()
                 threading.Thread(target=controller.watch, name="CAC-status", daemon=True).start()
                 controller.refresh()
-                if start_monitor and not controller.problem:
+                # Historical status is not a launch veto. The start command validates
+                # current settings and reports real failures without discarding work.
+                if start_monitor and not controller.running:
                     controller.enqueue("start", "start")
             try:
                 controller.icon.run(setup=ready)

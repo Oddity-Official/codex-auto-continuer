@@ -42,6 +42,7 @@ class CycleResult:
     next_reset_at: float | None = None
     compatibility: dict | None = None
     warnings: list[dict] = field(default_factory=list)
+    holding: dict | None = None
 
 
 class Supervisor:
@@ -64,10 +65,12 @@ class Supervisor:
         self.state: State = load_state(state_file)
         self.client: AppServerClient | None = None
         self.codex_bin: str | None = None
+        self.managed_binary: Path | None = None
         self._cli_version: str | None = None
         self.compatibility = Compatibility()
         self.compatibility_gate = CompatibilityGate(state_file.parent / "compatibility-cache")
         self.read_problem: dict | None = None
+        self.holding = None
 
     def connect(self) -> None:
         if self.client is not None:
@@ -77,6 +80,7 @@ class Supervisor:
         daemon = ensure_daemon(codex_bin, self.config.codex_command_timeout_seconds, self.config.auto_start_daemon)
         client = AppServerClient.connect(daemon.socket_path, self.config.rpc_timeout_seconds)
         self.codex_bin = codex_bin
+        self.managed_binary = daemon.managed_codex_path
         self._cli_version = cli_version
         self.client = client
         self.compatibility = self.compatibility_gate.recheck(codex_bin, client.user_agent, self.config.codex_command_timeout_seconds, self.config.compatibility_policy)
@@ -96,6 +100,11 @@ class Supervisor:
             raise CompatibilityBlocked(self.compatibility.reason)
 
     def close(self) -> None:
+        if self.holding is not None:
+            self.holding.close()
+        self._disconnect()
+
+    def _disconnect(self) -> None:
         client, self.client = self.client, None
         if client is not None:
             client.close()
@@ -125,7 +134,7 @@ class Supervisor:
         def wait(seconds: float) -> None:
             remaining = seconds
             while remaining > 0 and not stop_requested():
-                if wake_requested():
+                if wake_requested() or (self.holding is not None and self.holding.changed.is_set()):
                     return
                 step = min(1.0, remaining)
                 self.sleep(step)
@@ -155,7 +164,14 @@ class Supervisor:
                         settings_failed = False
                 if reload_settings:
                     self.prompt_file = self.state_file.parent / self.config.prompt_file
-                if not self.config.clients and not self.state.obligations and not self.state.observations:
+                locally_idle = not self.config.clients and not self.state.obligations and not self.state.observations
+                if locally_idle and (self.state_file.parent / "held-inputs.dpapi").exists():
+                    from .holding_journal import Journal
+                    saved = Journal(self.state_file.parent / "held-inputs.dpapi").read()
+                    locally_idle = not (saved and saved["records"])
+                if locally_idle:
+                    if self.holding is not None:
+                        self.holding.close()
                     result = CycleResult()
                     begin_cycle()
                     emit("cycle.completed", **result.__dict__, observations=0)
@@ -178,9 +194,9 @@ class Supervisor:
                     result.ordinary_usage_allowed,
                 )
                 delay = self._next_sleep_seconds(result)
-                # Every cycle uses a fresh client. This guarantees a thread/resume subscription
-                # cannot linger and receive approval or requestUserInput traffic while sleeping.
-                self.close()
+                # Normal recovery connections stay short-lived. Explicit holding observers
+                # live only through their active turn and disconnect on any input request.
+                self._disconnect()
                 wait(delay)
             except CompatibilityBlocked:
                 if self.on_cycle:
@@ -236,6 +252,28 @@ class Supervisor:
         threads = self._recent_threads(now)
         result.scanned_threads = len(threads)
         by_id = {thread["id"]: thread for thread in threads}
+        held_blocked = set()
+        if self.config.queue_holding or (self.state_file.parent / "held-inputs.dpapi").exists():
+            from .holding import Holding
+            if self.holding is None:
+                self.holding = Holding(self.state_file.parent)
+            if self.compatibility.dispatch_allowed:
+                self._check_dispatch_compatibility()
+            self.holding.update(client, threads, enabled=self.config.queue_holding,
+                allowed=self.compatibility.dispatch_allowed, binary=self.managed_binary,
+                timeout=self.config.rpc_timeout_seconds)
+            try:
+                held_blocked = self.holding.reconcile(client,
+                    permission=limits.ordinary_usage_allowed is True, in_scope=self._scope_accepts,
+                    guard=self._check_dispatch_compatibility)
+            except RpcError as exc:
+                if exc.is_unavailable_quota_read():
+                    raise
+                self.holding.global_problem = "Queue holding could not validate the owner contract. Inputs are preserved; inspect local telemetry."
+                failure("holding.reconciliation_failed", exc)
+            except (ConfigurationError, ProtocolError) as exc:
+                self.holding.global_problem = "Private held inputs need repair or owner verification. Preserve the journal and inspect local telemetry."
+                failure("holding.reconciliation_failed", exc)
 
         # Resolve existing obligations first. Manual progress always wins, even before reset.
         for obligation in list(self.state.obligations):
@@ -274,8 +312,11 @@ class Supervisor:
                 emit("obligation.detected", threadId=thread_id, failedTurnId=turn_id,
                      completedAt=completed, detectedAt=now, resetAt=limits.next_reset_at)
 
-        if limits.ordinary_usage_allowed is True and self.compatibility.dispatch_allowed:
+        if (limits.ordinary_usage_allowed is True and self.compatibility.dispatch_allowed
+            and not (self.holding is not None and self.holding.blocks_dispatch())):
             for obligation in sorted(list(self.state.obligations), key=lambda item: item.detected_at):
+                if obligation.thread_id in held_blocked:
+                    continue
                 try:
                     dispatched = self._dispatch_if_still_valid(obligation, now)
                 except SubmissionUncertain:
@@ -300,6 +341,9 @@ class Supervisor:
             LOG.warning("Codex did not verify ordinary usage availability; pending obligations will not dispatch.")
 
         result.pending = len(self.state.obligations)
+        if self.holding is not None:
+            result.holding = self.holding.report()
+            result.warnings.extend(result.holding["warnings"])
         emit("cycle.completed", **result.__dict__, observations=len(self.state.observations))
         return result
 
@@ -452,9 +496,13 @@ class Supervisor:
             save_state(self.state_file, self.state)
             return False
         if status_type == "systemError":
-            emit("dispatch.deferred", threadId=obligation.thread_id, reason="runtime_system_error")
-            LOG.warning("Thread %s is in systemError; leaving obligation pending.", obligation.thread_id)
-            return False
+            if self.holding is not None and self.holding.permits_quota_recovery(client, obligation.thread_id, obligation.failed_turn_id):
+                status_type = "idle"
+                emit("dispatch.held_owner_quota_recovery", threadId=obligation.thread_id)
+            else:
+                emit("dispatch.deferred", threadId=obligation.thread_id, reason="runtime_system_error")
+                LOG.warning("Thread %s is in systemError; leaving obligation pending.", obligation.thread_id)
+                return False
         if status_type != "idle":
             raise ProtocolError(f"Thread {obligation.thread_id} is in unsupported dispatch state {status_type!r}.")
 
@@ -472,6 +520,8 @@ class Supervisor:
 
         prompt = read_prompt(self.prompt_file)
         emit("prompt.loaded", sha256=hashlib.sha256(prompt.encode()).hexdigest(), characters=len(prompt), path=str(self.prompt_file))
+        if self.holding is not None:
+            self.holding.protect_recovery(obligation.thread_id, obligation.client_user_message_id)
         obligation.phase = "dispatching"
         obligation.phase_changed_at = now
         obligation.queued_submission_id = None
@@ -576,6 +626,9 @@ class Supervisor:
         )
 
     def _next_sleep_seconds(self, result: CycleResult) -> float:
+        if (result.holding and result.holding["enabled"] and result.holding["held"]
+            and not result.holding["needsAttention"] and result.ordinary_usage_allowed is True):
+            return 1.0
         delay = max(1.0, self.config.poll_seconds)
         if result.pending and result.ordinary_usage_allowed is False and result.next_reset_at is not None:
             remaining = result.next_reset_at - self.clock()

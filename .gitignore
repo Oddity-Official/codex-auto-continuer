@@ -19,6 +19,7 @@
 /notifications.json
 /tray-ready.json
 /telemetry.key
+/held-inputs.dpapi
 /owner.json
 .env
 .env.*

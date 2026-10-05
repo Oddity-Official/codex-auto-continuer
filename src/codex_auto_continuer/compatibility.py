@@ -21,7 +21,8 @@ _CONSTRAINTS = {"type", "enum", "const", "minimum", "maximum", "exclusiveMinimum
                 "dependencies", "not", "if", "then", "else", "contains", "patternProperties"}
 THREAD = {key: None for key in ("id", "updatedAt", "status", "source", "originator", "archived")}
 TURN = {key: None for key in ("id", "status", "completedAt", "error")}
-QUEUE = {"id": None, "clientUserMessageId": None}
+TURN["items"] = {"$type": "userMessage", "type": None, "clientId": None}
+QUEUE = {"id": None, "clientUserMessageId": None, "input": None}
 WINDOWS = {key: {"usedPercent": None, "resetsAt": None} for key in ("primary", "secondary")}
 # Only fields read or sent by CAC. New unrelated endpoints/optional fields do not change this contract.
 METHODS = {
@@ -32,7 +33,7 @@ METHODS = {
     "thread/turns/list": ("ThreadTurnsList", dict.fromkeys(("threadId", "cursor", "limit", "sortDirection", "itemsView")), {"data": TURN, "nextCursor": None}),
     "account/rateLimits/read": ("GetAccountRateLimits", {}, {"ordinaryUsageAllowed": None, "rateLimits": WINDOWS, "rateLimitsByLimitId": WINDOWS}),
     "thread/resume": ("ThreadResume", {"threadId": None, "excludeTurns": None}, {"thread": THREAD}),
-    "thread/queue/add": ("ThreadQueueAdd", {"threadId": None, "input": {"$type": "text", "type": None, "text": None, "text_elements": None}, "clientUserMessageId": None}, {"queuedSubmission": QUEUE}),
+    "thread/queue/add": ("ThreadQueueAdd", {"threadId": None, "input": None, "clientUserMessageId": None}, {"queuedSubmission": QUEUE}),
     "thread/queue/list": ("ThreadQueueList", {"threadId": None, "cursor": None, "limit": None}, {"data": QUEUE, "nextCursor": None}),
     "thread/queue/delete": ("ThreadQueueDelete", {"threadId": None, "queuedSubmissionId": None}, {"deleted": None}),
 }
@@ -91,6 +92,11 @@ def schema_contract(directory: Path) -> dict:
                 response = document
             out[method] = {"request": _project(params, requests, sent, request=True),
                            "response": _project(response, document, received)}
+        notifications = json.loads((directory / "ServerNotification.json").read_text(encoding="utf-8"))
+        selected = {entry["properties"]["method"]["enum"][0]: entry for entry in notifications["oneOf"]}
+        for method in ("thread/queue/changed", "turn/completed"):
+            out["thread/queue/list"][method] = _project(selected[method]["properties"]["params"], notifications,
+                {"threadId": None, **({"turn": TURN} if method == "turn/completed" else {})})
         return out
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise ProtocolError("Codex experimental schema is missing a required CAC method or field.") from exc

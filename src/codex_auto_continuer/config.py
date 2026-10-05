@@ -33,6 +33,7 @@ class Config:
     reconnect_backoff_seconds: float = setting(5.0, "Seconds before retrying a lost local Codex connection.")
     dispatch_recovery_seconds: float = setting(15.0, "Seconds to reconcile an uncertain send before isolating that chat; never blindly resend.")
     compatibility_policy: str = setting("balanced", "balanced permits schema-verified stable Codex builds; strict requires exact-build certification.")
+    queue_holding: bool = setting(False, "Opt-in: encrypt and hold queued inputs on controllable active owners. Unsupported/idle owners are not protected; stopping preserves held inputs.")
     auto_update: bool = setting(True, "Automatically install signed stable CAC releases in portable builds; never updates Codex.")
     update_use_github_cli_auth: bool = setting(False, "Use your existing gh login for private releases; token stays in memory and is never logged or bundled.")
     update_check_hours: float = setting(6.0, "Hours between GitHub release checks; checks do not upload local diagnostics.")
@@ -180,6 +181,10 @@ def validate_config(cfg: Config) -> Config:
         raise ConfigurationError("compatibility_policy must be balanced or strict.")
     if type(cfg.auto_update) is not bool:
         raise ConfigurationError("auto_update must be true or false.")
+    if type(cfg.queue_holding) is not bool:
+        raise ConfigurationError("queue_holding must be true or false.")
+    if cfg.queue_holding and os.name != "nt":
+        raise ConfigurationError("queue_holding requires native Windows account encryption.")
     if type(cfg.update_use_github_cli_auth) is not bool:
         raise ConfigurationError("update_use_github_cli_auth must be true or false.")
     if not 1 <= cfg.update_check_hours <= 168:

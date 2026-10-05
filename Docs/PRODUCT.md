@@ -18,7 +18,7 @@ Continue existing local interactive Codex tasks after account usage recovers, wi
 - provide a concise native tray menu for everyday controls, local last-scan status, responsive repair actions, owned dialogs and graceful quit; retain diagnostic commands in the CLI
 - use annotated TOML overrides, built-in defaults when absent, comment-preserving edits and validated hot reload at cycle boundaries
 - ship a portable Windows x86_64 folder containing GUI and console EXEs, dependencies, notices and a checksum manifest
-- support optional per-user Windows login launch without administrator rights or WSL
+- support optional per-user Windows login launch and automatic monitoring start without administrator rights or WSL; historical failures must not veto a fresh start
 - keep runtime data beside the app or source checkout; coordinate one supervisor and one tray across app copies
 - write bounded local metadata telemetry with private defaults and explicit detailed mode
 - never store conversation bodies, credentials, raw request payloads or exception locals in telemetry
@@ -26,6 +26,7 @@ Continue existing local interactive Codex tasks after account usage recovers, wi
 - block diagnostically on unsupported identity, protocol drift or unreadable prompts; isolate ambiguous sends without retries while other safe chats continue
 - default to Balanced compatibility for schema-verified stable Codex builds; offer Strict exact-build certification and deduplicated warnings
 - update portable CAC from signed stable GitHub releases at cycle boundaries, preserving runtime data and a recoverable code backup
+- offer off-by-default owner-supported holding: encrypted queued inputs, explicit coverage warnings, unchanged Continue, individual release after successful completion and fresh usage permission, and review controls for uncertainty or manual progress
 
 ## Non-goals
 
@@ -39,7 +40,7 @@ Continue existing local interactive Codex tasks after account usage recovers, wi
 
 ## Supported release
 
-Version 0.5.2 targets Windows 11 x86_64. Balanced mode permits unknown stable builds only after identity, schema and runtime checks; Strict mode additionally requires an exact recovery certificate. [Compatibility](COMPATIBILITY.md) owns that policy. [Updates](UPDATES.md) owns signed CAC releases and rollback. The portable release bundles Python, a short guide and dependency notices, not developer docs or audit history. Source development uses Python 3.13 and PowerShell 7. Current results and limits belong to [VALIDATION.md](VALIDATION.md).
+Version 0.6.0 targets Windows 11 x86_64. Balanced mode permits unknown stable builds only after identity, schema and runtime checks; Strict mode additionally requires an exact recovery certificate. [Compatibility](COMPATIBILITY.md) owns that policy. [Updates](UPDATES.md) owns signed CAC releases and rollback. The portable release bundles Python, a short guide and dependency notices, not developer docs or audit history. Source development uses Python 3.13 and PowerShell 7. Current results and limits belong to [VALIDATION.md](VALIDATION.md).
 
 ## Approved tray and status refinement
 

@@ -99,6 +99,47 @@ def test_tray_menu_actions_match_cli_controls(tmp_path, monkeypatch):
         items[label](None)
         assert opened[-1] == command
     assert not {"Scan now", "Run one cycle", "Initialize missing files", "Restart monitoring"} & set(items)
+    controller._held_records = ({"id": "q1", "threadId": "t1", "phase": "held"},
+                                {"id": "q2", "threadId": "t2", "phase": "uncertain"})
+    reviewed = []
+    monkeypatch.setattr(controller, "manage_held", lambda *args: reviewed.append(args))
+    held_items = list(items["Queue Holding"].submenu.items)
+    first = {item.text: item for item in held_items[2].submenu.items}
+    second = {item.text: item for item in held_items[3].submenu.items}
+    first["Resume After Review"](None)
+    first["Discard Unsent Input"](None)
+    second["Confirm Not Consumed"](None)
+    second["Confirm Consumed"](None)
+    assert reviewed == [("resume", "t1"), ("discard", "q1"), ("confirm-unsent", "q2"), ("confirm-consumed", "q2")]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows tray launch")
+@pytest.mark.parametrize("running,no_monitor,expected", [(False, False, [("start",)]),
+    (True, False, []), (False, True, [])])
+def test_tray_launch_starts_despite_historical_failed_status(tmp_path, monkeypatch, running, no_monitor, expected):
+    from codex_auto_continuer import tray, windows_tray
+    actions = []
+
+    class Icon:
+        def __init__(self, *args, menu, **kwargs):
+            self.menu = menu
+
+        def run(self, setup):
+            setup(self)
+
+    def refresh(controller):
+        controller.problem = "Monitoring stopped during the previous login"
+        controller.state = "failed"
+        controller.running = running
+
+    monkeypatch.setattr(windows_tray, "TrayIcon", Icon)
+    monkeypatch.setattr(tray, "control_dir", lambda: tmp_path / "control")
+    monkeypatch.setattr(tray.TrayController, "refresh", refresh)
+    monkeypatch.setattr(tray.TrayController, "enqueue", lambda self, label, *args: actions.append(args))
+    monkeypatch.setattr(tray.TrayController, "worker", lambda self: None)
+    monkeypatch.setattr(tray.TrayController, "watch", lambda self: None)
+    assert tray.run_tray(tmp_path / "settings.toml", start_monitor=not no_monitor) == 0
+    assert actions == expected
 
 
 def test_installed_cli_uses_registered_app_config_and_never_guesses_after_move(tmp_path, monkeypatch):

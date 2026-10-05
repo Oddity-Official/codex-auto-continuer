@@ -61,6 +61,13 @@ def _parser() -> argparse.ArgumentParser:
     reset.add_argument("--prompt-file", help=argparse.SUPPRESS)
     policy = sub.add_parser("compatibility", help="Select balanced or strict Codex compatibility policy.")
     policy.add_argument("value", choices=["balanced", "strict"])
+    holding = sub.add_parser("holding", help="Enable/disable optional active-owner queue holding; disabling preserves held inputs.")
+    holding.add_argument("value", choices=["on", "off"])
+    held = sub.add_parser("held", help="Inspect or explicitly manage encrypted held requests. No bodies are logged.")
+    held.add_argument("action", choices=["list", "resume", "discard", "confirm-unsent", "confirm-consumed"])
+    held.add_argument("identity", nargs="?", help="Exact thread ID for resume; exact held input ID for other actions.")
+    held.add_argument("--show-input", action="store_true", help="Explicitly decrypt and print held input bodies to this terminal.")
+    held.add_argument("--confirm", action="store_true", help="Confirm review of Codex history AND native queue before resolving an unconfirmed input.")
     update = sub.add_parser("update", help="Check/install signed stable portable CAC releases, or recover an interrupted update.")
     update.add_argument("action", choices=["check", "stage", "apply", "install", "recover"])
     update.add_argument("job", type=Path, nargs="?", help="Owned job.json path, required only for recover.")
@@ -111,6 +118,7 @@ def _status(config_path: Path, live: bool = False) -> int:
         "startupInstalled": startup_path().exists() if os.name == "nt" else False,
         "deliveryObservations": len(state.observations),
         "warnings": snapshot.get("warnings", []),
+        "queueHolding": snapshot.get("holding"),
     }
     from .updates import update_status
     output["updates"] = update_status(config_path)
@@ -315,6 +323,27 @@ def main(argv: list[str] | None = None) -> int:
             return _update_setting(args.config, detailed_telemetry=args.value == "detailed")
         if command == "compatibility":
             return _update_setting(args.config, compatibility_policy=args.value)
+        if command == "holding":
+            return _update_setting(args.config, queue_holding=args.value == "on")
+        if command == "held":
+            from .holding_journal import Journal
+            journal = Journal(args.config.parent / "held-inputs.dpapi")
+            if args.action == "list":
+                raw = journal.read()
+                fields = ("id", "threadId", "phase", "clientUserMessageId") + (("input",) if args.show_input else ())
+                records = (raw or {}).get("records", [])
+                if args.identity is not None:
+                    records = [r for r in records if r["id"] == args.identity]
+                    if not records:
+                        raise ConfigurationError("That request is no longer held. Refresh Held Requests.")
+                print(json.dumps([{k: r[k] for k in fields} for r in records], indent=2, ensure_ascii=True))
+            else:
+                if args.identity is None or args.show_input:
+                    raise ConfigurationError("Management requires an exact identity, not --show-input.")
+                if args.action.startswith("confirm-") and not args.confirm:
+                    raise ConfigurationError("Inspect the original chat AND its native queue, then pass --confirm. Incorrect resolution can duplicate a request.")
+                print(json.dumps(journal.manage(args.action, args.identity), indent=2))
+            return 0
         if command == "restore-defaults":
             if is_running(lock_path()):
                 _check_owner(args.config)
@@ -349,11 +378,15 @@ def main(argv: list[str] | None = None) -> int:
                 compatibility = result.compatibility or {}
                 if compatibility and not compatibility.get("dispatch_allowed"):
                     current_phase = "failed"
+                holding_problem = (result.holding or {}).get("needsAttention")
+                if holding_problem:
+                    current_phase = "failed"
                 _snapshot(args.config, phase=current_phase, **last_result, lastScan=dict(last_result),
                           lastScanAt=last_scan_at, scanRequestId=completed_scan,
-                          reason=compatibility.get("reason") if current_phase == "failed" else None)
+                          reason=("Queue holding needs attention. Read Held Requests and Status; inputs are preserved."
+                                  if holding_problem else compatibility.get("reason") if current_phase == "failed" else None))
             def settings_stamp():
-                paths = (args.config, prompt_path(cfg, args.config))
+                paths = (args.config, prompt_path(cfg, args.config), args.config.parent / "held-inputs.dpapi")
                 signatures = []
                 for path in paths:
                     try:

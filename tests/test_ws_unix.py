@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from codex_auto_continuer.errors import ProtocolError
+from codex_auto_continuer.errors import TransportError
 from codex_auto_continuer.ws_unix import UnixWebSocket, _GUID
 
 
@@ -92,3 +93,30 @@ def test_handshake_preserves_prefetched_frame(unix_path, unix_listener):
         ws.close()
     finally:
         thread.join(timeout=2); listener.close()
+
+
+def test_abort_wakes_an_observer_blocked_read_without_a_close_frame():
+    a, b = socket.socketpair()
+    a.settimeout(3)
+    ws = UnixWebSocket(a)
+    entered = threading.Event()
+    errors = []
+    def read():
+        ws.begin_request()
+        entered.set()
+        try:
+            ws.recv_text()
+        except TransportError:
+            errors.append("closed")
+    worker = threading.Thread(target=read)
+    worker.start()
+    try:
+        assert entered.wait(1)
+        ws.abort()
+        worker.join(1)
+        assert not worker.is_alive() and errors == ["closed"]
+        assert b.recv(10) == b""  # Abort does not race a frame write with the read.
+    finally:
+        ws.close()
+        b.close()
+        worker.join(4)

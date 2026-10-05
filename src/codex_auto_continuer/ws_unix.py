@@ -4,6 +4,7 @@ import base64
 import hashlib
 import os
 import socket
+import select
 import struct
 import time
 from pathlib import Path
@@ -26,6 +27,14 @@ class UnixWebSocket:
 
     def begin_request(self) -> None:
         self._deadline = None if self._timeout is None else time.monotonic() + self._timeout
+
+    def message_ready(self, timeout: float) -> bool:
+        if self._prefetched:
+            return True
+        try:
+            return bool(select.select([self._sock], [], [], timeout)[0])
+        except (OSError, ValueError) as exc:
+            raise TransportError("Codex notification connection is unavailable.") from exc
 
     def _apply_timeout(self) -> None:
         if self._deadline is not None:
@@ -231,4 +240,14 @@ class UnixWebSocket:
             pass
         finally:
             self._closed = True
+            self._sock.close()
+
+    def abort(self) -> None:
+        """Wake an exclusive observer's blocking read without racing a close frame."""
+        self._closed = True
+        try:
+            self._sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        finally:
             self._sock.close()

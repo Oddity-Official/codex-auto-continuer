@@ -117,7 +117,7 @@ jobs:
         id: behavior
         continue-on-error: true
         run: |
-          & ./scripts/run-standard-user-ci.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m','pytest','integration/test_continuation.py','integration/test_compatibility.py','-q','-s','--tb=short','--codex-executable',$env:CAC_PROBE_CLI,'--daemon-executable',$env:CAC_PROBE_DAEMON,'--junitxml=.data/reports/native.xml') -TimeoutSeconds 300
+          & ./scripts/run-standard-user-ci.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m','pytest','integration/test_continuation.py','integration/test_compatibility.py','integration/test_holding.py','-q','-s','--tb=short','--codex-executable',$env:CAC_PROBE_CLI,'--daemon-executable',$env:CAC_PROBE_DAEMON,'--junitxml=.data/reports/native.xml') -TimeoutSeconds 300
       - name: Require both checks
         env:
           SCHEMA_RESULT: ${{ steps.schema.outcome }}

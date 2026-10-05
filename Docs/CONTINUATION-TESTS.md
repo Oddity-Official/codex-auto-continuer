@@ -16,6 +16,8 @@ This is a separate integration gate. The regular Windows/CI gate does not need C
 
 ## What is real
 
+Owner-supported holding adds native scenarios for successful completion, quota failure with unchanged Continue, encrypted engine restart, ordered release, lost accepted replay acknowledgement, foreign-owner coverage and real approval routing. Only the original fixture client answers the approval; CAC's observer disconnects without answering. Holding/recovery use production code, unmodified Codex and synthetic local account/model service responses. These scenarios do not certify universal client-composer interception or fresh Windows login. The regular Windows gate separately covers corrupt/account-mismatched journals, failed durable writes, unconfirmed removal, explicit resolution, manual progress, fresh quota denial and singular replay intent.
+
 The successful chain is:
 
 ```text

@@ -10,7 +10,7 @@
 ## Technical owners
 
 - [Product contract](PRODUCT.md): goals, required behavior and non-goals
-- [Approved tray and status brief](PRODUCT.md#approved-tray-and-status-refinement): consolidated presentation requirements, not implemented in 0.5.2
+- [Approved tray and status brief](PRODUCT.md#approved-tray-and-status-refinement): consolidated presentation requirements, not implemented in 0.6.0
 - [Architecture](ARCHITECTURE.md): runtime, app-server integration, state machine and safety behavior
 - [Compatibility](COMPATIBILITY.md): Balanced and Strict policies, exact certificates and scheduled upstream checks
 - [Updates](UPDATES.md): signed stable CAC releases, private-repository authentication and code-only rollback

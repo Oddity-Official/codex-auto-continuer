@@ -2,11 +2,21 @@
 
 ChatGPT base checkpoint: v001
 
-Updated: 2026-10-04
+Updated: 2026-10-05
 
 ## Imported base
 
 All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba04` preserves v001 and its original checksum manifest. ChatGPT's manifest is unchanged. The stale imported checksum file is not retained as a current-source checksum; each new transport owns its generated manifest.
+
+## CAC 0.6.0 local work
+
+- Implemented off-by-default owner-supported queue holding with explicit partial-coverage notices, active exact-owner listeners, account/home-bound DPAPI input journals, durable mutation intents, unchanged saved Continue and individual release after authoritative usage and successful completion. No peer-capture fallback, prompt wrapper, full conversation archive or blind uncertain retry exists.
+- Added CLI and tray consent, metadata/body review, confirmed-unsent discard, explicit uncertainty resolution and resume-after-review. Stop/disable/defaults preserve held data. Normal quota-only recovery and existing privacy behavior remain authoritative; encrypted held input is the explicit opt-in storage exception. Source/Git boundaries exclude the journal.
+- Fixed login launch: historical failed status no longer suppresses a fresh monitoring start. Existing running ownership and explicit no-monitor still prevent duplicate/unwanted launch; current validation failures remain visible. The startup shortcut's normal tray path is unchanged.
+- Reduced capture contention by moving slow history/release RPCs outside the encrypted journal lock, avoided unchanged-journal writes and added bounded observer cancellation. Empty disabled journals do not force Codex connections. Full-history/client/input/notification contracts and exact 0.6.0 certification are updated.
+- Added real native owner holding, encrypted engine restart, image snapshot replay after source deletion, lost acknowledgement and approval-routing regressions. The Windows gate passed 252 tests in 39.87 seconds; the complete native gate passed 17 in 108.04 seconds. Fixed a verified managed-fixture process-exit cleanup gap rather than masking the failed cleanup. Current artifact, privacy and deployment evidence is owned by Docs/VALIDATION.md.
+- Promoted the reusable frozen UX probe to scripts/verify-portable.py with actual stale-error GUI autostart and explicit encrypted review checks. CI release/candidate jobs run it; native CI includes holding. The approved dark menu/status brief stays saved in Docs/PRODUCT.md, not implemented in this release.
+- Recorded the reusable historical-status/startup-authority lesson in the separate local shared-support repository; that repository is not part of CAC's public source or binary dependencies. ChatGPT's manifest remains unchanged.
 
 ## CAC 0.5.2 local work
 

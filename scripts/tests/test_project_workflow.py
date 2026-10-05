@@ -101,7 +101,7 @@ def test_source_export_excludes_portable_data_settings_and_env_variants(project)
     (project / workflow.CONFIG).write_text(json.dumps(config), encoding="utf-8")
     private_names = ["data/state.json", "data/telemetry.jsonl", "settings.toml",
                      "continue-prompt.md", "telemetry.jsonl.9.gz", "updates.jsonl.9.gz", "update-status.json",
-                     "notifications.json", "tray-ready.json", ".cac-updates/job/recovery.json", ".env.local", "nested/.env.production"]
+                     "notifications.json", "tray-ready.json", "held-inputs.dpapi", ".cac-updates/job/recovery.json", ".env.local", "nested/.env.production"]
     for name in private_names:
         path = project / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -117,7 +117,7 @@ def test_git_ignores_runtime_and_env_files_but_keeps_public_sources(project):
     shutil.copyfile(SCRIPTS.parent / ".gitignore", project / ".gitignore")
     private_names = ["data/state.json", "App/data/settings.toml", ".data/runtime/telemetry.jsonl",
                      "settings.toml", "continue-prompt.md", "telemetry.jsonl.1.gz",
-                     "updates.jsonl.1.gz", "update-status.json", "notifications.json", "tray-ready.json",
+                     "updates.jsonl.1.gz", "update-status.json", "notifications.json", "tray-ready.json", "held-inputs.dpapi",
                      ".cac-updates/job/recovery.json", ".env.local", "nested/.env.production"]
     result = subprocess.run(["git", "-C", str(project), "check-ignore", "-z", "--stdin"],
                             input="\0".join(private_names + ["src/tool.py", "Docs/README.md"]).encode(),

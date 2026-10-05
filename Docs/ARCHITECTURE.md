@@ -28,7 +28,7 @@ The Win32 tray adapter builds the native menu on the UI thread immediately befor
 8. For `notLoaded`, resume and verify the exact returned thread ID. Accept only the verified -32600 active-writer error naming this exact thread as evidence of a separate owner.
 9. Re-read the exact thread/turn and quota after ownership handling. Read the current Markdown prompt, validate it and log only its hash and length.
 10. Save dispatch intent before `thread/queue/add`. Require the returned queue ID and matching deterministic client message ID.
-11. Reconcile the queue and latest turn on later cycles. Close each connection before sleeping, so a resume subscription cannot become a sleeping approval/input subscriber.
+11. Reconcile the queue and latest turn on later cycles. Close ordinary recovery connections before sleeping, so a resume subscription cannot become a sleeping approval/input subscriber. The opt-in active-owner holding subscriptions below are the explicit exception.
 
 No UI automation or model-switching path exists. Each RPC has a total deadline that notifications, pings and fragmented frames cannot extend.
 
@@ -67,11 +67,28 @@ Manual progress, active work, missing chats, archive or scope changes invalidate
 
 The verified API has no compare-and-swap precondition against a turn revision. A narrow race remains between final revalidation and queue acceptance. We minimize it and remove observable stale queued work, without claiming unavailable atomicity.
 
-Queue deletion acknowledges storage removal, not cancellation of input already selected by another server owner. Native probes confirmed accepted peer deletions followed by consumption. The dispatch lock is process-local. Stale cleanup cannot undo an already-selected turn; future user-input holding must not infer safe replay from deletion acknowledgement or a single immediate history-absence check. [Queue interception evidence](Audits/2026-10-04-03/AUDIT.md) owns measured timing and transport limits.
+Queue deletion acknowledges storage removal, not cancellation of input already selected by another server owner. Native probes confirmed accepted peer deletions followed by consumption. The dispatch lock is process-local. Stale cleanup cannot undo an already-selected turn; queue holding must not infer safe replay from peer deletion acknowledgement or a single immediate history-absence check. [Queue interception evidence](Audits/2026-10-04-03/AUDIT.md) owns measured timing and transport limits.
 
 Reset timestamps and percentages never authorize dispatch. Exhausted-window resets are only sleep hints and diagnostics. Dispatch runs oldest-first, with another account-permission read between chats.
 
 The supervisor never answers approvals, security prompts, tool elicitations or user-input requests. Active threads are not eligible for new obligations.
+
+## Optional owner-supported holding
+
+`queue_holding` defaults to false. Each selected active chat loaded on the connected native server may get an exclusive initialized connection, exact-thread resume subscription and queue-change listener. At most 16 observers run concurrently. NotLoaded/foreign owners, stdin/stdout clients, idle input and pre-subscription boundaries have no interception fallback. Full-history user-message client IDs validate identity before capture; textual similarity is never delivery proof. An approval/input request, including one buffered during an RPC, disconnects the observer without answering. Observers end with the active turn or a stop/configuration/compatibility change. Stop aborts established reads and has one total deadline of three RPC deadlines plus two seconds, covering connection/handshake/initialization without multiplying by observer count.
+
+Capture first saves the canonical queued payload to a Windows-account DPAPI-encrypted, home/account-bound journal, flushes/syncs it and atomically replaces the file. Only then does it delete through this same owner. The journal uses a separate OS lock and bounded size/count. Authentication tokens are not persisted. Full conversation history is read transiently only for reconciliation; it is not archived. Native embedded image snapshots are retained as canonical input. Queued reference paths keep their original semantics.
+
+```text
+saved -> held -> release_requested -> submitted -> exact client-ID consumption + terminal completion
+   \-> uncertain                            \-> unconfirmed (no blind retry)
+```
+
+Saved intent with no deletion acknowledgement does not prove an unsent input, even if an immediate history read finds nothing. Ambiguous capture/release stays durable for automatic identity reconciliation or explicit user review. Duplicate client IDs, newer/manual progress, missing owners, unreadable encryption or account drift prevent unsafe replay. Confirm-unsent/confirm-consumed are deliberate human resolutions, not inferred retries; remaining work requires separate resume approval. Discard is restricted to confirmed unsent held input.
+
+The canonical continuation engine remains authoritative for usage failures. Its deterministic message IDs are protected from holding. A captured owner's known failed quota turn may report systemError; only verified held inputs anchored to that exact turn (or its known recovery) permit the normal quota recovery queue path. Other system errors retain their existing block. The prompt remains exactly the saved Markdown, normally Continue. Held requests release individually only after an authorized successful terminal turn, fresh ordinary usage permission, exact idle owner, selected scope and an empty native queue. Failed released work returns to the normal quota-only recovery engine; unrelated failure remains held for review.
+
+Compatibility checks include full-history client identity, canonical UserInput contracts and queue/turn notification shapes. Established observers use a mutation grant tied to the managed executable's file identity and initialized server identity; full daemon/schema checks run at cycle boundaries and immediately before replay. History and release RPCs run outside the journal lock so they cannot starve a capture window. Unchanged journals are not rewritten, avoiding spurious hot-reload scans. Stop, disable, scope changes and defaults preserve held inputs, never blindly restore them to Codex's queue. Metadata counts/warnings enter status and telemetry; bodies are revealed only by explicit local review.
 
 ## Data location and single instance
 
@@ -81,7 +98,7 @@ Small global control files remain under the per-user state directory: supervisor
 
 The supervisor takes its OS lock before loading state and initializing telemetry. A conflicting command cannot overwrite an active runtime snapshot. `start` checks the owner, launches a hidden process and waits up to 10 seconds for its lock. `stop` waits up to 60 seconds for the current cycle to finish. Sleep/reconnect waits check stop/scan requests every second.
 
-A description-owned native Startup shortcut targets the GUI EXE, or pythonw for a source install, with an absolute config path and no batch shell. Windows Shell creates it through bounded PowerShell. It refuses unmanaged or link/reparse targets. Moving a deployment requires reinstalling the shortcut.
+A description-owned native Startup shortcut targets the GUI EXE, or pythonw for a source install, with an absolute config path and no batch shell. Windows Shell creates it through bounded PowerShell. It refuses unmanaged or link/reparse targets. Tray readiness queues a fresh start unless monitoring is already running or --no-monitor is explicit. Old persisted failure status is diagnostic, not a launch veto. Invalid current settings still fail clearly. Moving a deployment requires reinstalling the shortcut.
 
 ## Local telemetry
 
@@ -89,7 +106,7 @@ The supervisor writes `telemetry.jsonl`; the tray writes `tray.jsonl`; update ch
 
 RPC summaries are allowlisted, never raw payload dumps. Errors retain classes, numeric RPC codes, timings and stack module/function/line locations. Detailed mode enables actual identifiers, names and paths, not arbitrary exception text or conversation content.
 
-Private mode omits personal metadata and uses HMAC-SHA256 keyed pseudonyms for thread, turn and queue IDs. The key persists locally for correlation. State still needs real identifiers; privacy applies to telemetry, not the whole data folder. Files are not encrypted.
+Private mode omits personal metadata and uses HMAC-SHA256 keyed pseudonyms for thread, turn and queue IDs. The key persists locally for correlation. Ordinary state still needs real identifiers; privacy applies to telemetry, not the whole data folder. Ordinary state/logs are not encrypted; the opt-in held-input journal is encrypted separately.
 
 Routine RPC requests are suppressed unless `diagnostic_trace` is enabled. Responses contribute per-method counts, total and maximum duration to each cycle summary. Relevant discovery, quota and metadata events log only changes, with a bounded 4096-entry cache. Queue add/delete/resume, dispatch and error events remain explicit. Trace increases detail, not personal-data access; Private/Detailed remains a separate formatter policy.
 

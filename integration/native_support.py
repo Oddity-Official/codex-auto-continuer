@@ -39,6 +39,8 @@ class Service:
         self.user = USER
         self.reset_at = int(time.time()) - 60
         self.fail_inference = True
+        self.output_item = None
+        self.tool_names = []
         self.fail_usage = False
         self.requests = []
         self.user_messages = []
@@ -152,6 +154,7 @@ class Service:
                     self.reply(404, {"error": "Unexpected fixture route"})
                     return
                 request = json.loads(raw)
+                service.tool_names = [t.get("name") for t in request.get("tools", []) if isinstance(t, dict)]
                 messages = [item for item in request.get("input", []) if item.get("role") == "user"]
                 texts = [part.get("text", "") for item in messages[-1:] for part in item.get("content", [])]
                 with service.lock:
@@ -163,7 +166,7 @@ class Service:
                 response_id = f"fixture-response-{service.inference_count}"
                 events = [
                     {"type": "response.created", "response": {"id": response_id}},
-                    {"type": "response.output_item.done", "item": {"type": "message", "role": "assistant",
+                    {"type": "response.output_item.done", "item": service.output_item or {"type": "message", "role": "assistant",
                         "id": "fixture-message", "content": [{"type": "output_text", "text": "CAC_FIXTURE_OK"}]}},
                     {"type": "response.completed", "response": {"id": response_id, "usage": {
                         "input_tokens": 1, "output_tokens": 1, "total_tokens": 2,
@@ -310,9 +313,29 @@ class NativeFixture:
         settings.write_text(json.dumps({"remoteControlEnabled": False, "shutdownGraceSeconds": 0,
             "updater": {"autoUpdateEnabled": False, "updateIntervalMinutes": 120}}), encoding="utf-8")
         def stop():
+            marker = settings.parent / "daemon.pid"
+            pids = []
+            if marker.exists():
+                pid = json.loads(marker.read_text(encoding="utf-8"))["pid"]
+                assert type(pid) is int and pid > 0
+                # The lifecycle response can precede child exit and directory release.
+                script = ("$all = @(Get-CimInstance Win32_Process); $owned = @(" + str(pid) + "); "
+                    "do { $more = @($all | Where-Object { $_.ParentProcessId -in $owned -and $_.ProcessId -notin $owned } | "
+                    "Select-Object -ExpandProperty ProcessId); $owned += $more } while ($more.Count); "
+                    "ConvertTo-Json -InputObject @($owned) -Compress")
+                result = subprocess.run(["powershell", "-NoProfile", "-Command", script], capture_output=True,
+                    timeout=10, check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                pids = json.loads(result.stdout)
             result = _run(self.binary, ["app-server", "daemon", "stop"], 15, env=self.env)
             if (self.home / "app-server-daemon/app-server.pid").exists():
                 assert result.returncode == 0, "Isolated managed daemon did not stop cleanly: " + result.stderr.replace(str(self.home), "<fixture>")
+            if pids:
+                from codex_auto_continuer.update_install import process_path
+                deadline = time.monotonic() + 5
+                while any(process_path(pid) is not None for pid in pids):
+                    if time.monotonic() >= deadline:
+                        raise AssertionError("Isolated daemon/children did not exit before fixture cleanup")
+                    time.sleep(0.02)
         self.stack.callback(stop)
         if self.daemon_binary != self.binary:
             import shutil
