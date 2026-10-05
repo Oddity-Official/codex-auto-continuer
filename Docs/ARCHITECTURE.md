@@ -26,7 +26,7 @@ The Win32 tray adapter builds the native menu on the UI thread immediately befor
 6. Persist the exact thread/turn obligation before dispatch.
 7. Require `ordinaryUsageAllowed == true`, then revalidate the exact thread and latest failed turn.
 8. For `notLoaded`, resume and verify the exact returned thread ID. Accept only the verified -32600 active-writer error naming this exact thread as evidence of a separate owner.
-9. Re-read the exact thread/turn and quota after ownership handling. Read the current Markdown prompt, validate it and log only its hash and length.
+9. A loaded `systemError` permits quota recovery only after validating the exact latest completed `usageLimitExceeded` turn against the durable obligation. It never authorizes generic error recovery. Re-read the exact thread/turn and quota after ownership handling. Read the current Markdown prompt, validate it and log only its hash and length.
 10. Save dispatch intent before `thread/queue/add`. Require the returned queue ID and matching deterministic client message ID.
 11. Reconcile the queue and latest turn on later cycles. Close ordinary recovery connections before sleeping, so a resume subscription cannot become a sleeping approval/input subscriber. The opt-in active-owner holding subscriptions below are the explicit exception.
 
@@ -60,6 +60,8 @@ Submitted deliveries also create durable observations. These survive removal of 
 A subsequent turn is not proof that our message caused it: a user can advance the chat concurrently. Telemetry labels it `delivery.subsequent_turn`, not guaranteed delivery success. Missing or archived chats end observations.
 
 State writes flush and sync a temporary file before atomic replacement. Invalid versions, identities, duplicate records or queue ownership fail closed. Schema changes are deliberate, not silent data-loss migrations.
+
+OS instance locks acquire ownership before touching PID metadata, including an empty file. On Windows, writing a placeholder before the byte-range lock races another owner's PID rewrite and can raise PermissionError instead of reporting ordinary contention. Lock-file contents are advisory; the OS lock is the authority.
 
 ## Stale cancellation and quota policy
 

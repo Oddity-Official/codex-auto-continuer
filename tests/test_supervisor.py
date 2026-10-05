@@ -190,11 +190,35 @@ def test_unloaded_thread_resumes_exact_thread_before_queue(tmp_path: Path):
     assert c.resume_calls==["t"] and c.added
 
 
-def test_system_error_is_not_dispatched(tmp_path: Path):
+@pytest.mark.parametrize("allowed", [False, None, True])
+def test_loaded_quota_system_error_recovers_only_with_permission(tmp_path: Path, allowed):
     ob=Obligation.create("t","turn-1",900,None); save_state(tmp_path/"state.json",State(obligations=[ob]))
-    c=FakeClient([thread(status="systemError")], {"t":failed_turn()}, allowed=True)
+    c=FakeClient([thread(status="systemError")], {"t":failed_turn()}, allowed=allowed)
     s=supervisor(tmp_path,c); r=s.run_cycle()
-    assert r.pending==1 and not c.added
+    assert r.pending == 1
+    assert r.dispatched == (1 if allowed is True else 0)
+    assert len(c.added) == r.dispatched
+
+
+def test_system_error_with_newer_nonquota_failure_cancels_recovery(tmp_path):
+    ob = Obligation.create("t", "turn-1", 900, None)
+    save_state(tmp_path / "state.json", State(obligations=[ob]))
+    newer = failed_turn("turn-2")
+    newer["error"]["codexErrorInfo"] = "httpConnectionFailed"
+    client = FakeClient([thread(status="systemError")], {"t": newer}, allowed=True)
+    result = supervisor(tmp_path, client).run_cycle()
+    assert result.cancelled == 1 and result.pending == 0 and not client.added
+
+
+def test_existing_quota_obligation_requires_terminal_timestamp(tmp_path):
+    ob = Obligation.create("t", "turn-1", 900, None)
+    save_state(tmp_path / "state.json", State(obligations=[ob]))
+    incomplete = failed_turn()
+    incomplete["completedAt"] = None
+    client = FakeClient([thread(status="systemError")], {"t": incomplete}, allowed=True)
+    with pytest.raises(ProtocolError, match="completedAt"):
+        supervisor(tmp_path, client).run_cycle()
+    assert not client.added and load_state(tmp_path / "state.json").obligations
 
 
 def test_two_threads_dispatch_sequentially_and_recheck_limits(tmp_path: Path):

@@ -21,7 +21,11 @@ class StdioBridge {
     }
 
     static async Task Run() {
-        using (var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(60)))
+        int seconds = 60;
+        string configured = Environment.GetEnvironmentVariable("CAC_BRIDGE_TIMEOUT_SECONDS");
+        if (configured != null && (!int.TryParse(configured, out seconds) || seconds < 1 || seconds > 480))
+            throw new InvalidDataException("Invalid bounded bridge lifetime");
+        using (var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(seconds)))
         using (var ws = new ClientWebSocket()) {
             ws.Options.Proxy = null;
             await ws.ConnectAsync(new Uri(Environment.GetEnvironmentVariable("CAC_OWNER_WS_URL")), cancel.Token);

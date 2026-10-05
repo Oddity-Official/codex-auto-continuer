@@ -454,6 +454,7 @@ class Supervisor:
                  phase=obligation.phase, latestTurn=turn_summary(turn), reason="latest_turn_changed")
             LOG.info("Cancelling stale obligation thread=%s failedTurn=%s latest=%s", obligation.thread_id, obligation.failed_turn_id, turn_id)
             return False
+        _required_timestamp(turn, "completedAt", "quota recovery thread/turns/list")
         return True
 
     def _dispatch_if_still_valid(self, obligation: Obligation, now: float) -> bool:
@@ -496,13 +497,12 @@ class Supervisor:
             save_state(self.state_file, self.state)
             return False
         if status_type == "systemError":
-            if self.holding is not None and self.holding.permits_quota_recovery(client, obligation.thread_id, obligation.failed_turn_id):
-                status_type = "idle"
-                emit("dispatch.held_owner_quota_recovery", threadId=obligation.thread_id)
-            else:
-                emit("dispatch.deferred", threadId=obligation.thread_id, reason="runtime_system_error")
-                LOG.warning("Thread %s is in systemError; leaving obligation pending.", obligation.thread_id)
-                return False
+            # Loaded native owners use systemError for quota failures too.
+            # The exact terminal quota turn was validated above and is checked
+            # again immediately before the send; the status alone grants nothing.
+            status_type = "idle"
+            emit("dispatch.loaded_quota_recovery", threadId=obligation.thread_id,
+                 failedTurnId=obligation.failed_turn_id)
         if status_type != "idle":
             raise ProtocolError(f"Thread {obligation.thread_id} is in unsupported dispatch state {status_type!r}.")
 

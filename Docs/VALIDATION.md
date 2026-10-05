@@ -1,10 +1,22 @@
 # Verification
 
-CAC 0.6.0, 5 October 2026. Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Imported checkpoint: v001. Prior version results below remain dated artifact evidence, not checks of changed code.
+CAC 0.6.1, 5 October 2026. Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Imported checkpoint: v001. Prior version results below remain dated artifact evidence, not checks of changed code.
 
 ## Compatibility certification
 
-The [5 October real-client investigation](Audits/2026-10-05/AUDIT.md) adds isolated installed Desktop and current extension connection proofs, not queue-holding acceptance passes. Actual CLI terminal input exposed a client-local queue, shared-owner provenance caveat and CAC's loaded quota `systemError` deferral. A direct native Continue diagnostic completed, but automatic recovery did not pass. Application code and installed binaries are unchanged; release gates below remain dated unchanged-source evidence.
+The [5 October real-client investigation](Audits/2026-10-05/AUDIT.md) reproduced and repaired loaded quota `systemError` deferral. Actual CLI composer recovery passed with one completed Continue and three duplicate-free scans. The CLI's queued follow-up remains client-local and unprotected. Normal Desktop composer/history tests accepted two follow-ups exactly once; timed polling did not capture pre-consumption queue IDs. Isolated Desktop and current VS Code composer tests reached Windows setup barriers. None of these results certifies all-client queue holding.
+
+| Current source check | Exact scope | Result |
+| --- | --- | --- |
+| `scripts/verify-windows.ps1` | Application/workflow regressions, native transport/dialog/menu checks, encryption safety, compileall and version after lock repair | 260 passed in 38.61 seconds; CAC 0.6.1 |
+| Actual CLI composer probe | ConPTY input, quota denial, loaded native owner, production CAC discovery and dispatch | Passed; one completed Continue and three duplicate-free scans; zero held client-local inputs |
+| Focused lock/holding regressions | Empty PID rewrite under a held Windows lock, process exclusion and private holding safety | 12 passed in 0.86 seconds |
+| Repeated native successful-turn holding | 20 independently started processes after the deterministic lock repair; 30-second per-trial and 150-second outer bounds | All 20 passed; encrypted capture, restart, image snapshot and ordered release |
+| `scripts/verify-continuation.ps1` | Official native Codex, exact loaded quota recovery, separate-writer recovery, usage outage, managed lifecycle/restart and owner holding | 18 passed in 110.23 seconds; exact 0.6.1 certificate verified |
+| Local 0.6.1 `scripts/verify-portable.py` | All 583 packaged files, checksums, lean package, reload/repair, exclusive controls, tray autostart and encrypted review | Passed; zero Codex connections and user-chat dispatches |
+| Documentation/privacy boundary | Helper compileall, local Markdown targets, configured profile/identity canaries, Git exclusions and audit retention | 117 links, zero failures; no configured private-profile matches; zero retention deletion targets |
+
+The preceding 0.6.0 source repair passed all 18 native integration tests in 109.22 seconds. The first versioned gate then exposed an intermittent Windows pre-lock write race: 17 passed, one failed in 117.62 seconds. Publication stopped. A deterministic regression failed with the same PermissionError before repair and passed afterward. Diagnostic repetitions established the cause; failed runs remain in the audit. The final native gate above passed. The following release checks are prior 0.6.0 evidence, not a frozen check of 0.6.1.
 
 | Check | Exact scope | Result |
 | --- | --- | --- |

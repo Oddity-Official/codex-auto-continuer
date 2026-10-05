@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from codex_auto_continuer.instance_lock import SingleInstanceLock, is_running
+from codex_auto_continuer.errors import AlreadyRunningError
 
 
 def test_lock_is_reusable(tmp_path: Path):
@@ -24,6 +25,17 @@ def test_running_status_uses_os_lock_not_stale_pid(tmp_path):
     with SingleInstanceLock(path):
         assert is_running(path)
     assert not is_running(path)
+
+
+def test_empty_pid_rewrite_window_still_reports_lock_contention(tmp_path):
+    with SingleInstanceLock(tmp_path / "x.lock") as owner:
+        # Reproduce the gap between truncating PID metadata and writing it.
+        owner._file.seek(0)
+        owner._file.truncate()
+        contender = SingleInstanceLock(owner.path)
+        with pytest.raises(AlreadyRunningError):
+            contender.acquire()
+        assert contender._file is None
 
 
 def test_second_process_cannot_acquire(tmp_path: Path):

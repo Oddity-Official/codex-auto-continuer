@@ -10,7 +10,7 @@
 ## Technical owners
 
 - [Product contract](PRODUCT.md): goals, required behavior and non-goals
-- [Approved tray and status brief](PRODUCT.md#approved-tray-and-status-refinement): consolidated presentation requirements, not implemented in 0.6.0
+- [Approved tray and status brief](PRODUCT.md#approved-tray-and-status-refinement): consolidated presentation requirements, not implemented in 0.6.1
 - [Architecture](ARCHITECTURE.md): runtime, app-server integration, state machine and safety behavior
 - [Compatibility](COMPATIBILITY.md): Balanced and Strict policies, exact certificates and scheduled upstream checks
 - [Updates](UPDATES.md): signed stable CAC releases, private-repository authentication and code-only rollback
@@ -24,7 +24,7 @@ These sanitized records are Git-tracked and suitable for public sharing, but exc
 
 - [Workflow](WORKFLOW.md): environment ownership, checkpoint import/export and source transport boundaries
 - [Audits](Audits/README.md): dated audit evidence, rotation and retention
-- [Real client integration investigation](Audits/2026-10-05/AUDIT.md): Desktop/extension connection proofs, actual CLI composer limits and a loaded-quota recovery defect
+- [Real client integration investigation](Audits/2026-10-05/AUDIT.md): connection proofs, actual CLI recovery repair, Desktop composer evidence and remaining holding limits
 - [ChatGPT manifest](../CHAT-MANIFEST.md) and [Codex manifest](../CODEX-MANIFEST.md): checkpoint ownership and local verification provenance
 
 ## Historical records

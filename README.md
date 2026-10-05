@@ -13,7 +13,7 @@ This is an independent tool, not an OpenAI product. It uses experimental local C
 
 You need Windows 11 x86_64 and a signed-in native Codex installation. The release bundles Python and tray dependencies; users do not need Python, PowerShell 7, WSL or administrator rights. Startup management can use Windows' built-in PowerShell.
 
-CAC 0.6.0 certifies the official Windows Codex 0.160.0 CLI/daemon build. Default Balanced mode also permits unknown stable builds after identity, schema and runtime checks, with an untested notice. Strict mode requires an exact recovery certificate. Status explains the evidence; real contract/identity failures block writes and preserve pending work. [Compatibility](Docs/COMPATIBILITY.md) owns policy and daily upstream probes.
+CAC 0.6.1 certifies the official Windows Codex 0.160.0 CLI/daemon build. Default Balanced mode also permits unknown stable builds after identity, schema and runtime checks, with an untested notice. Strict mode requires an exact recovery certificate. Status explains the evidence; real contract/identity failures block writes and preserve pending work. [Compatibility](Docs/COMPATIBILITY.md) owns policy and daily upstream probes.
 
 CAC finds a native `codex.exe` on `PATH`, in the standard Desktop installation, or behind the npm launcher. Set `codex_executable` in settings for another absolute native EXE path. CAC never updates, pins or downgrades your Codex installation.
 

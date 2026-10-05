@@ -41,13 +41,14 @@ class GatedService(native_support.Service):
         super().__exit__(*args)
 
 
-def wait_for(predicate, seconds=8):
+def wait_for(predicate, seconds=8, diagnostic=None):
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         if predicate():
             return
         time.sleep(0.03)
-    raise AssertionError("Holding state did not settle before its deadline")
+    detail = f": {diagnostic()}" if diagnostic is not None else ""
+    raise AssertionError("Holding state did not settle before its deadline" + detail)
 
 
 @pytest.mark.parametrize("quota,lost_release_ack", [(False, False), (True, False), (False, True)])
@@ -78,7 +79,13 @@ def test_native_holder_restart_continue_then_ordered_inputs(codex_binary, monkey
                 input.append({"type": "localImage", "path": str(image)})
             native.owner.queue_add_input(identity, input, f"holding-fixture-{index}")
         wait_for(lambda: len((supervisor.holding.journal.read() or {}).get("records", [])) == 2
-            and all(r["phase"] == "held" for r in supervisor.holding.journal.read()["records"]))
+            and all(r["phase"] == "held" for r in supervisor.holding.journal.read()["records"]),
+            diagnostic=lambda: {"holding": supervisor.holding.report(),
+                "phases": [r["phase"] for r in (supervisor.holding.journal.read() or {}).get("records", [])],
+                "watcherAlive": watcher.thread.is_alive(), "serviceErrors": native.service.errors,
+                "observerFailures": [e for e in native.events() if e["event"] == "holding.observer_failed"],
+                "ownerStatus": native.owner.thread_read(identity)["status"]["type"],
+                "queued": len(native.owner.queue_items(identity))})
         assert not native.owner.queue_items(identity)
         ciphertext = supervisor.holding.journal.path.read_bytes()
         assert b"PRIVATE_SYNTHETIC" not in ciphertext

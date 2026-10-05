@@ -16,6 +16,8 @@ This is a separate integration gate. The regular Windows/CI gate does not need C
 
 ## What is real
 
+The loaded-owner regression exercises native `systemError` after a completed quota failure with holding disabled. CAC records the obligation while usage is denied, submits one literal Continue only after permission is true, observes completion and sends no duplicate over three later scans. Focused regressions reject missing completion timestamps and newer non-quota failures. The [actual CLI composer probe](Audits/2026-10-05/AUDIT.md) separately exercises this repair through real terminal input.
+
 Owner-supported holding adds native scenarios for successful completion, quota failure with unchanged Continue, encrypted engine restart, ordered release, lost accepted replay acknowledgement, foreign-owner coverage and real approval routing. Only the original fixture client answers the approval; CAC's observer disconnects without answering. Holding/recovery use production code, unmodified Codex and synthetic local account/model service responses. These scenarios do not certify universal client-composer interception or fresh Windows login. The regular Windows gate separately covers corrupt/account-mismatched journals, failed durable writes, unconfirmed removal, explicit resolution, manual progress, fresh quota denial and singular replay intent.
 
 The successful chain is:

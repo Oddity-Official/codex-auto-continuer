@@ -222,3 +222,25 @@ def test_native_uncertain_queue_never_blindly_resends(native, accepted):
         assert native.service.inference_count == 1
         assert load_state(supervisor.state_file).obligations[0].phase == "uncertain"
         assert not native.service.errors
+
+
+def test_loaded_quota_owner_recovers_without_held_input(native):
+    thread_id, failed = native.start_thread()
+    native.assert_quota_failure(failed)
+    supervisor = native.supervisor()
+    supervisor.client.close()
+    supervisor.client = native.client(native.owner_socket)
+    assert supervisor.client.thread_read(thread_id)["status"]["type"] == "systemError"
+    assert supervisor.run_cycle().pending == 1
+    assert supervisor.holding is None
+    assert native.service.user_messages == ["Fixture initial task"]
+    native.service.allowed = True
+    native.service.fail_inference = False
+    assert supervisor.run_cycle().dispatched == 1
+    assert native.wait_turn(thread_id, after=failed["id"])["status"] == "completed"
+    assert native.service.user_messages == ["Fixture initial task", "Continue"]
+    for _ in range(3):
+        assert supervisor.run_cycle().dispatched == 0
+    assert not supervisor.state.obligations
+    assert not supervisor.client.queue_items(thread_id)
+    assert any(event["event"] == "dispatch.loaded_quota_recovery" for event in native.events())

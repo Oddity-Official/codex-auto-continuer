@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codex-auto-continuer"
-version = "0.6.0"
+version = "0.6.1"
 description = "Windows-native supervisor that resumes Codex threads after verified usage-limit recovery"
 readme = "README.md"
 license = "MIT"
@@ -13,7 +13,7 @@ requires-python = ">=3.13"
 dependencies = ["tomlkit>=0.13,<1", "cryptography>=48,<49", "pystray==0.19.5; sys_platform == 'win32'", "Pillow>=10,<13; sys_platform == 'win32'"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "pywinpty==3.0.2; sys_platform == 'win32'"]
 build = ["PyInstaller>=6.20,<7", "resvg-py==0.5.0"]
 
 [project.scripts]

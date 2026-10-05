@@ -19,8 +19,8 @@ class SingleInstanceLock:
         fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o600)
         f = os.fdopen(fd, "r+b", buffering=0)
         try:
-            if f.seek(0, os.SEEK_END) == 0:
-                f.write(b"0")
+            # Lock the byte range before writing, including when it is past EOF.
+            # A current owner may be rewriting PID metadata in an empty file.
             f.seek(0)
             if os.name == "nt":
                 import msvcrt

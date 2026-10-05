@@ -8,6 +8,16 @@ Updated: 2026-10-05
 
 All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba04` preserves v001 and its original checksum manifest. ChatGPT's manifest is unchanged. The stale imported checksum file is not retained as a current-source checksum; each new transport owns its generated manifest.
 
+## CAC 0.6.1 local work
+
+- Repaired loaded quota `systemError` recovery without requiring held input. Exact latest failed-turn identity, completion timestamp, authoritative permission, pre-send revalidation and uncertainty guards remain mandatory. Removed the obsolete holding-only permission method. Meaningful focused regressions and a native loaded-owner case cover the failure.
+- The actual CLI ConPTY probe now verifies production CAC dispatch rather than injecting a policy-bypass diagnostic. One Continue completed after permission returned; three scans sent no duplicate. Its local composer queue still escaped server holding. Shared-owner CLI-only provenance remains an acceptance gap.
+- Used Computer Use on isolated installed clients and one user-authorized projectless normal Desktop chat. The normal chat used GPT-6 Luna Extra High, no tools/files/browsing, four completed turns and two uniquely identified follow-ups consumed exactly once. It was archived; original chat view and new-chat model preference were restored. Timed read-only queue capture did not pass. This is not quota/interception certification.
+- Fresh Desktop and current VS Code composer profiles hit Windows setup barriers, even with read-only fixture policy. No security setup prompt was answered or readiness bypassed. Desktop initiated sandbox setup during onboarding; two protected ignored fixture directories remain after denied cleanup. No probe process remains. Actual IDs, profiles, screenshots and private results are excluded from source/release artifacts.
+- Final Windows source gate after lock repair: 260 passed in 38.61 seconds, compileall and 0.6.1 version passed. Versioned native certification, signed release and deployment are recorded in Docs/VALIDATION.md. The existing dark UI brief remains saved, not implemented. ChatGPT's manifest is unchanged.
+- The first versioned native gate found an intermittent holding failure. Diagnostic probes traced it to a pre-lock placeholder write racing a Windows lock owner's empty PID rewrite. A deterministic regression reproduced PermissionError; acquiring the OS lock before writing fixes the cause. Focused locks/holding: 12 passed in 0.86 seconds. Final post-repair gates and repetitions are recorded in Docs/VALIDATION.md; failed preliminary results remain in the audit.
+- Post-repair native gate: 18 passed in 110.23 seconds, exact 0.6.1 certificate verified. All 20 independent successful-turn holding repetitions passed. The final actual CLI composer rerun passed one Continue/three duplicate scans. Local 583-file frozen package, 117 Markdown links, helper compileall and configured publication-boundary checks passed. Managed retention found zero deletion targets. The reusable lock lesson was committed in the separate local support repository, not bundled with CAC.
+
 ## CAC 0.6.0 local work
 
 ### Installed-client investigation

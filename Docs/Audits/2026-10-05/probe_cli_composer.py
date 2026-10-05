@@ -1,8 +1,7 @@
 """Actual CLI Tab-queued input versus CAC's unchanged production connection.
 
 Only the service is synthetic. Initial and queued inputs use normal terminal
-input, never write RPC injection. After measuring CAC's failed recovery, one
-explicit native-queue diagnostic distinguishes server refusal from CAC policy.
+input, never write RPC injection. Recovery sends must come from CAC itself.
 All state and credentials are disposable; production connect is unchanged.
 """
 from __future__ import annotations
@@ -108,29 +107,26 @@ def main():
                 native.service.allowed = True
                 native.service.fail_inference = False
                 result = supervisor.run_cycle()
-                assert queued_on_server == captured == result.dispatched == 0
+                assert queued_on_server == captured == 0
+                assert result.dispatched == 1
                 assert pending == 1 and preview_seen
-                assert peer.thread_read(identity)["status"]["type"] == "systemError"
-                assert "Continue" not in native.service.user_messages
-                assert any(event.get("event") == "dispatch.deferred" and event.get("fields", {}).get("reason") == "runtime_system_error"
+                assert any(event.get("event") == "dispatch.loaded_quota_recovery"
                     for event in native.events())
-                # Explicit counterfactual, not a production recovery pass. The
-                # original TUI remains the real client on the same native owner.
-                before = peer.latest_turn(identity)["id"]
-                peer.queue_add(identity, "Continue", "cli-system-error-diagnostic")
-                wait(lambda: "Continue" in native.service.user_messages, 8, "Native diagnostic queue was not consumed")
-                wait(lambda: (turn := peer.latest_turn(identity)) and turn["id"] != before
-                    and turn["status"] == "completed", 8, "Native diagnostic Continue did not complete")
+                wait(lambda: "Continue" in native.service.user_messages, 8, "CAC Continue was not consumed")
+                wait(lambda: (turn := peer.latest_turn(identity)) and turn["status"] == "completed", 8,
+                    "CAC Continue did not complete")
+                for _ in range(3):
+                    assert supervisor.run_cycle().dispatched == 0
+                assert native.service.user_messages.count("Continue") == 1
                 print(json.dumps({"cliVersion": version, "productionConnectUnmodified": True,
                     "threadSource": threads[0]["source"], "threadOriginator": threads[0].get("originator"),
                     "sameOwnerWatcherReady": True, "composerInputViaConPTYTab": True,
                     "terminalInputVisible": preview_seen, "serverQueuedInputsBeforeFailure": queued_on_server,
                     "capturedInputs": captured, "quotaObligations": pending, "continuesDispatched": result.dispatched,
                     "localQueueDrainedBeforeUsageReturned": True,
-                    "latestQuotaError": "usageLimitExceeded", "statusBeforeDiagnostic": "systemError",
-                    "CACRecoveryAcceptance": "failed: runtime_system_error deferral",
-                    "explicitNativeQueueDiagnostic": "Continue accepted and completed; not a CAC recovery pass",
-                    "conclusion": "CLI composer queue is client-local; owner connection alone cannot hold it. CAC blocks this recoverable native quota state."}, indent=2))
+                    "latestQuotaError": "usageLimitExceeded", "duplicateCheckCycles": 3,
+                    "CACRecoveryAcceptance": "passed: one Continue accepted and completed",
+                    "conclusion": "CLI composer queue is client-local; owner connection alone cannot hold it. CAC recovers the loaded quota failure."}, indent=2))
             except BaseException:
                 terminal = re.sub(r"\x1b\[[0-9;?]*[ -/]*[@-~]", "", "".join(screen)).lower()
                 print(json.dumps({"terminalBytes": len(terminal), "trustPrompt": "trust" in terminal,

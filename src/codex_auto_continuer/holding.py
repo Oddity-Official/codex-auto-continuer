@@ -269,23 +269,6 @@ class Holding:
                 info["recoveryIds"] = [*info["recoveryIds"][-63:], client_id]
                 self.journal.save(raw)
 
-    def permits_quota_recovery(self, client, thread_id, failed_turn_id):
-        if not self.granted() or self.home is None:
-            return False
-        turns = client.full_turns(thread_id)
-        with self.journal.transaction(account_binding(self.home)) as raw:
-            info = raw["threads"].get(thread_id)
-            records = [r for r in raw["records"] if r["threadId"] == thread_id]
-            if not info or info["paused"] or not records or any(r["phase"] != "held" for r in records):
-                return False
-            latest = turns[-1] if turns else None
-            if not latest or latest["id"] != failed_turn_id or not terminal(latest):
-                return False
-            known = latest["id"] == info["authorizedTurnId"] or any(
-                key in info["recoveryIds"] and any(t["id"] == latest["id"] for t in values)
-                for key, values in metadata(turns).items())
-            return known and latest["status"] == "failed" and isinstance(latest.get("error"), dict) and latest["error"].get("codexErrorInfo") == "usageLimitExceeded"
-
     def reconcile(self, client, *, permission, in_scope, guard):
         if self.global_problem or not self.journal.path.exists():
             return set()
