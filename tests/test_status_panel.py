@@ -2,6 +2,23 @@ from __future__ import annotations
 
 import pytest
 
+
+def test_native_enter_opens_selected_thread_details_without_ending_the_panel():
+    import sys
+    if sys.platform != "win32":
+        pytest.skip("Native Windows message structure")
+    from ctypes import wintypes
+    from codex_auto_continuer.status_window import StatusWindow
+    panel = StatusWindow(lambda: {}, lambda ids: {}, lambda error: None)
+    panel.listbox = 123
+    opened = []
+    panel._details = lambda: opened.append(True)
+    msg = wintypes.MSG()
+    msg.hWnd, msg.message, msg.wParam = panel.listbox, 0x100, 13
+    assert panel._handle_key(msg) and opened == [True]
+    msg.hWnd = 456
+    assert not panel._handle_key(msg) and opened == [True]
+
 from codex_auto_continuer import config, telemetry
 from codex_auto_continuer.errors import AutoContinuerError
 from codex_auto_continuer.state import State, Obligation, save_state

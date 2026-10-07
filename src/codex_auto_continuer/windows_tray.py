@@ -51,7 +51,9 @@ class TrayIcon(Icon):
         @callback_type
         def render(hwnd, message, wparam, lparam, identity, data):
             if message in (0x2B, 0x2C, 0x120):
-                return self._message_handlers[message](wparam, lparam)
+                handled = self._message_handlers[message](wparam, lparam)
+                if handled:
+                    return handled
             return api.DefSubclassProc(hwnd, message, wparam, lparam)
         self._subclass = render
         if not api.SetWindowSubclass(self._menu_hwnd, render, 1, 0):
@@ -132,7 +134,11 @@ class TrayIcon(Icon):
                     canvas.fill((r.right - canvas.px(14), r.top + canvas.px(7), r.right - canvas.px(10),
                                  r.bottom - canvas.px(7)), ACCENT)
                 if row.submenu:
-                    canvas.text("›", (r.right - canvas.px(20), r.top, r.right - canvas.px(4), r.bottom), shade=fg, size=18)
+                    # Windows paints its native arrow after WM_DRAWITEM. Do not
+                    # add a second glyph; contrast its dark idle arrow explicitly.
+                    if not value.itemState & 1:
+                        canvas.rounded((r.right - canvas.px(17), r.top + canvas.px(7),
+                                        r.right - canvas.px(5), r.bottom - canvas.px(7)), MUTED, 2)
         finally:
             canvas.close()
         return 1
@@ -170,10 +176,12 @@ class TrayIcon(Icon):
                 from .windows_ui import bind, H, I, U
                 bind(user, "GetCursorPos", I, ctypes.POINTER(wintypes.POINT))
                 bind(user, "SetWindowPos", I, H, H, I, I, I, I, U)
+                bind(user, "IsWindowVisible", I, H)
                 point = wintypes.POINT()
                 user.GetCursorPos(ctypes.byref(point))
                 # Move the invisible menu owner, never another application's window.
-                user.SetWindowPos(self._menu_hwnd, None, point.x, point.y, 0, 0, 0x15)
+                if not user.IsWindowVisible(self._menu_hwnd):
+                    user.SetWindowPos(self._menu_hwnd, None, point.x, point.y, 0, 0, 0x15)
                 self._dpi = user.GetDpiForWindow(self._menu_hwnd) or 96
             super()._update_menu()
             return super()._on_notify(wparam, lparam)

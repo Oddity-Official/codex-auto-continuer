@@ -4,8 +4,6 @@ A portable Windows tray tool that continues the exact Codex chat stopped by a us
 
 This is an independent tool, not an OpenAI product. It uses experimental local Codex interfaces and stops with a diagnostic if their contract changes. See [verified behavior and limits](Docs/VALIDATION.md).
 
-The redesigned tray/status interface is a source candidate awaiting final interactive Windows checks and a new packaged release. The latest stable download is still the previously verified release.
-
 ## Launch and use
 
 1. Extract the [latest stable release](https://github.com/Oddity-Official/codex-auto-continuer/releases/latest) into a writable folder. Keep both EXEs and `_internal` together.
@@ -15,7 +13,7 @@ The redesigned tray/status interface is a source candidate awaiting final intera
 
 You need Windows 11 x86_64 and a signed-in native Codex installation. The release bundles Python and tray dependencies; users do not need Python, PowerShell 7, WSL or administrator rights. Startup management can use Windows' built-in PowerShell.
 
-CAC 0.6.1 certifies the official Windows Codex 0.160.0 CLI/daemon build. Default Balanced mode also permits unknown stable builds after identity, schema and runtime checks, with an untested notice. Strict mode requires an exact recovery certificate. Status explains the evidence; real contract/identity failures block writes and preserve pending work. [Compatibility](Docs/COMPATIBILITY.md) owns policy and daily upstream probes.
+CAC 0.7.0 certifies the official Windows Codex 0.160.0 CLI/daemon build. Default Balanced mode also permits unknown stable builds after identity, schema and runtime checks, with an untested notice. Strict mode requires an exact recovery certificate. Status explains the evidence; real contract/identity failures block writes and preserve pending work. [Compatibility](Docs/COMPATIBILITY.md) owns policy and daily upstream probes.
 
 CAC finds a native `codex.exe` on `PATH`, in the standard Desktop installation, or behind the npm launcher. Set `codex_executable` in settings for another absolute native EXE path. CAC never updates, pins or downgrades your Codex installation.
 

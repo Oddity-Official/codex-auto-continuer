@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import sys
+import ctypes
+import argparse
 import tempfile
 import threading
 import time
@@ -19,9 +21,14 @@ from codex_auto_continuer.windows_ui import user
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for flag in ("many", "empty", "menu", "unknown", "error"):
+        parser.add_argument("--" + flag, action="store_true")
+    parser.add_argument("--dpi", type=int, choices=(96, 144, 192))
+    args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="cac-ui-") as directory:
         controller = TrayController(Path(directory) / "settings.toml")
-        count = 9 if "--many" in sys.argv else 0 if "--empty" in sys.argv else 3
+        count = 9 if args.many else 0 if args.empty else 3
         obligations = [Obligation.create(f"fixture-{index}", f"failed-{index}", time.time(), None) for index in range(count)]
         save_state(controller.config_file.parent / "state.json", State(obligations=obligations))
         controller.snapshot = {"pending": count, "ordinary_usage_allowed": False, "lastScanAt": time.time(),
@@ -30,6 +37,11 @@ def main():
             "compatibility": {"status": "untested", "read_allowed": True, "dispatch_allowed": True}}
         controller.running = True
         controller.state = "waiting" if count else "monitoring"
+        if args.unknown:
+            controller.snapshot["usage"] = usage_snapshot({}, time.time())
+        if args.error:
+            controller.state = "failed"
+            controller.problem = "Synthetic compatibility block. Read Details for the exact build; pending work is preserved."
         controller.enqueue = lambda *args: print("Fixture action:", args, flush=True)
         controller.open = lambda *args: print("Fixture file action:", args, flush=True)
         controller.lookup_titles = lambda identities: {identity: (
@@ -40,14 +52,43 @@ def main():
         def failed(exc):
             errors.append(exc)
             print("UI ERROR:", repr(exc), flush=True)
-        panel = StatusWindow(controller.status_model, controller.lookup_titles, failed)
+        class PreviewPanel(StatusWindow):
+            def _details(self):
+                print("Fixture details opened", flush=True)
+                return super()._details()
+
+            def _proc(self, hwnd, message, wparam, lparam):
+                if message in (0x10, 0x111):
+                    print("Fixture window action:", hex(message), wparam, flush=True)
+                return super()._proc(hwnd, message, wparam, lparam)
+
+            def _apply(self, *values, **options):
+                if args.dpi:
+                    self.dpi, self.scale = args.dpi, args.dpi / 96
+                return super()._apply(*values, **options)
+        panel = PreviewPanel(controller.status_model, controller.lookup_titles, failed)
         controller.status_window = panel
         icon = TrayIcon("CACPreview", tray_image("waiting" if count else "monitoring", pending=count),
                         "CAC UI Preview", menu=controller.menu(), usage_provider=controller.usage)
         controller.icon = icon
-        if "--menu" in sys.argv:
+        if args.menu:
             from pystray._util import win32
-            panel._details = lambda: user.PostMessageW(icon._hwnd, win32.WM_NOTIFY, 0, win32.WM_RBUTTONUP)
+            # A visible owner lets window-scoped Computer Use target native menus.
+            # Rendering, callbacks and the tracking loop remain production code.
+            def preview_menu():
+                original = icon._hwnd, icon._menu_hwnd, icon._subclass
+                icon._hwnd = icon._menu_hwnd = panel.hwnd
+                icon._subclass = None
+                try:
+                    icon._on_notify(0, win32.WM_RBUTTONUP)
+                finally:
+                    from codex_auto_continuer.windows_ui import bind, H, P
+                    api = ctypes.WinDLL("comctl32")
+                    bind(api, "RemoveWindowSubclass", ctypes.c_int, H, H, P)
+                    if icon._subclass:
+                        api.RemoveWindowSubclass(panel.hwnd, ctypes.cast(icon._subclass, H), 1)
+                    icon._hwnd, icon._menu_hwnd, icon._subclass = original
+            panel._details = preview_menu
         def ready(unused):
             icon.visible = True
             panel.show()

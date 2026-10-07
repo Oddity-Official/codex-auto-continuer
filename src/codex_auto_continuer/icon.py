@@ -4,6 +4,20 @@ from functools import lru_cache
 from pathlib import Path
 
 
+def native_icon():
+    """Return an owned Windows HICON; the caller must destroy it on close."""
+    import ctypes
+    import tempfile
+    from pystray._util import win32
+    with tempfile.TemporaryDirectory(prefix="cac-icon-") as directory:
+        path = Path(directory) / "cac.ico"
+        tray_image("monitoring", size=32).save(path, format="ICO")
+        handle = win32.LoadImage(None, str(path), win32.IMAGE_ICON, 32, 32, win32.LR_LOADFROMFILE)
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    return handle
+
+
 @lru_cache(maxsize=20)
 def _image(color, pending):
     from PIL import Image

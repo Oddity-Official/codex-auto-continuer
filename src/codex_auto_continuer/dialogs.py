@@ -10,7 +10,8 @@ from collections.abc import Callable
 from . import telemetry
 
 
-def message(text: str, *, title: str = "Codex Auto Continuer", error: bool = False, confirm: bool = False) -> bool:
+def message(text: str, *, title: str = "Codex Auto Continuer", error: bool = False, confirm: bool = False,
+            owner: int | None = None) -> bool:
     api = ctypes.WinDLL("user32", use_last_error=True)
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel.GetModuleHandleW.argtypes = [ctypes.c_wchar_p]
@@ -25,8 +26,10 @@ def message(text: str, *, title: str = "Codex Auto Continuer", error: bool = Fal
     api.MessageBoxW.restype = ctypes.c_int
     # A dedicated STATIC owner uses Windows' window procedure, not pystray's
     # notification dispatcher, and belongs to this dialog's UI thread.
-    owner = api.CreateWindowExW(0, "STATIC", "CAC dialog owner", 0x80000000,
-                               0, 0, 0, 0, None, None, kernel.GetModuleHandleW(None), None)
+    created_owner = owner is None
+    if created_owner:
+        owner = api.CreateWindowExW(0, "STATIC", "CAC dialog owner", 0x80000000,
+                                   0, 0, 0, 0, None, None, kernel.GetModuleHandleW(None), None)
     if not owner:
         raise ctypes.WinError(ctypes.get_last_error())
     try:
@@ -36,7 +39,8 @@ def message(text: str, *, title: str = "Codex Auto Continuer", error: bool = Fal
             raise ctypes.WinError(ctypes.get_last_error())
         return result == 1 if confirm else True
     finally:
-        api.DestroyWindow(owner)
+        if created_owner:
+            api.DestroyWindow(owner)
 
 
 class Dialogs:

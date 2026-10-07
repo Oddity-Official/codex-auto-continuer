@@ -6,6 +6,13 @@ from codex_auto_continuer.presentation import (icon_state, state_label, usage_sn
     usage_windows, thread_title, pending_count, UsageWindow)
 
 
+def test_small_high_dpi_work_area_preserves_footer_and_scrolling():
+    from codex_auto_continuer.presentation import thread_list_capacity
+    assert thread_list_capacity(1040, 1, 348, 56) == 4
+    assert thread_list_capacity(1040, 2, 310, 48) == 2
+    assert thread_list_capacity(1040, 2, 358, 48) == 1
+
+
 def test_obligation_completion_between_snapshot_and_state_read_is_monitoring():
     snapshot = {"pending": 1, "waitingThreads": []}
     assert state_label("waiting", snapshot) == "Monitoring"

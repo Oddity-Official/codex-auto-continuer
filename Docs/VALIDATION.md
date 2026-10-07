@@ -2,22 +2,24 @@
 
 Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Imported checkpoint: v001. Prior release results below remain dated artifact evidence, not checks of changed code.
 
-## Source UI candidate, 7 October 2026
+## CAC 0.7.0 UI verification, 7 October 2026
 
-The dark owner-drawn native menu, status panel, pending-layer icons and transient-status warning repair are implemented in source. Queue holding is absent from the tray; its off-by-default experimental CLI engine and tests remain. The source still reports 0.6.1; this candidate is not a new published release. The installed 0.6.1 app and user data were not replaced.
+CAC 0.7.0 implements the dark native menu, compact status panel, pending-layer icons and transient-status warning repair. Queue holding is absent from the tray; its off-by-default experimental CLI engine and tests remain. Current publication and installation results are recorded below when complete.
 
 | Check | Exact scope | Result |
 | --- | --- | --- |
-| Non-interactive Windows suite | `pytest tests scripts/tests -q -k 'not about_dialog_closes'`; includes real hidden menu-owner callbacks, GDI pixels at 96/144/192 DPI, meters, privacy, recovery and workflow tests | 279 passed, 3 visible dialog cases deselected, 38.40 seconds |
-| Native Codex integration | `scripts/verify-continuation.ps1 -CodexPath .data/ci-official-baseline/package/bin/codex.exe`; isolated official 0.160.0, synthetic loopback account/model service | 18 passed, 110.44 seconds; exact recovery certificate verified |
+| Full native Windows gate | `scripts/verify-windows.ps1`; includes visible About close tests, actual hidden menu-owner callbacks, GDI pixels at 96/144/192 DPI, meters, privacy, recovery, encryption and workflow regressions | 284 passed, 45.50 seconds; compilation and 0.7.0 version passed |
+| Native Codex integration | `scripts/verify-continuation.ps1 -CodexPath .data/ci-official-baseline/package/bin/codex.exe`; isolated official 0.160.0, synthetic loopback account/model service | 18 passed, 112.14 seconds; exact 0.7.0 recovery certificate verified; subsequent changes were isolated to status/dialog presentation |
 | Source compilation and documentation | Application, tests, scripts and integration compilation; local Markdown targets | Results recorded in the [current audit](Audits/2026-10-07/AUDIT.md) |
 | Production telemetry review | Recent cycle/recovery/status metadata only, no public chat names, IDs or bodies | One acknowledged Continue followed by a completed turn; brief tray read failures with no corresponding supervisor stop |
-| Actual interactive acceptance | Final popup/submenu appearance, hover, keyboard, Close/Escape, taskbar edges and mixed-monitor DPI | Deferred at the user's request; preliminary status-panel viewing is not final acceptance |
-| Frozen candidate, signing, publication and deployment | New portable binary/release/update checks | Not performed; installed app remains unchanged |
+| Actual interactive source inspection | Computer Use on temporary synthetic CAC data, without Codex connections or real control writes | Dark popup and Clients submenu, native keyboard selection/traversal/dismissal, selected versus hover/disabled appearance, normal/empty/long-list panels, full-title Details, error/unknown quota and controlled 200% short-work-area layout inspected |
+| Final local frozen candidate | `scripts/verify-portable.py`; actual EXEs and isolated control/data paths | All 603 manifest files and UX checks passed; zero Codex connections or user-chat dispatches; ZIP identity in the audit |
 
 The first manual native invocation passed 14 cases and failed four: a relative executable path failed the absolute managed-binary identity guard, and three fixture cases referenced the obsolete icon filename. The fixture was corrected; the documented wrapper resolves the executable path. The final native result above passed without changing production identity guards.
 
-The full `verify-windows.ps1` gate is not claimed passed for this candidate: its three visible dialog tests and the requested interactive UI acceptance remain outstanding while the user is working. Do not publish or deploy on the basis of offscreen rendering alone.
+Interactive testing caught an Enter-key failure missed by the first 283-test gate: `ctypes.wintypes.MSG` uses `hWnd`, not `hwnd`. The corrected key handler has a regression using the actual Windows structure; the final gate above includes it. Details now uses the visible status window as its native owner. Failed source previews and the initial superseded portable check remain in the audit.
+
+The menu interaction fixture uses the production native HMENU renderer, callbacks and Windows tracking loop with a visible test owner. Computer Use cannot reliably target pystray's hidden shell-menu owner. Hidden-owner subclass/lifetime checks run separately in the native suite. Controlled 100/150/200% drawing is not a physical mixed-DPI monitor transition. Windows theme changes, high contrast and mixed-monitor transitions remain hands-on acceptance limits; no Windows privacy/security settings were changed. Native menu borders remain Windows chrome, not custom-painted dark borders.
 
 ## Compatibility certification
 

@@ -2487,7 +2487,7 @@
   },
   "certificates": [
     {
-      "cac_version": "0.6.1",
+      "cac_version": "0.7.0",
       "platform": "windows-x86_64",
       "cli_version": "0.160.0",
       "app_server_version": "0.160.0",
@@ -2496,7 +2496,7 @@
       "schema_sha256": "cb3619a99adfd918d93056553b525dab17b462d4a27a21f5ebbfced3f1bbedf5",
       "evidence": "Docs/VALIDATION.md#compatibility-certification",
       "suite": "native-recovery-owner-holding-v4",
-      "verified_on": "2026-10-05"
+      "verified_on": "2026-10-07"
     }
   ]
 }

@@ -40,7 +40,7 @@ Continue existing local interactive Codex tasks after account usage recovers, wi
 
 ## Supported release
 
-Version 0.6.1 targets Windows 11 x86_64. Balanced mode permits unknown stable builds only after identity, schema and runtime checks; Strict mode additionally requires an exact recovery certificate. [Compatibility](COMPATIBILITY.md) owns that policy. [Updates](UPDATES.md) owns signed CAC releases and rollback. The portable release bundles Python, a short guide and dependency notices, not developer docs or audit history. Source development uses Python 3.13 and PowerShell 7. Current results and limits belong to [VALIDATION.md](VALIDATION.md).
+Version 0.7.0 targets Windows 11 x86_64. Balanced mode permits unknown stable builds only after identity, schema and runtime checks; Strict mode additionally requires an exact recovery certificate. [Compatibility](COMPATIBILITY.md) owns that policy. [Updates](UPDATES.md) owns signed CAC releases and rollback. The portable release bundles Python, a short guide and dependency notices, not developer docs or audit history. Source development uses Python 3.13 and PowerShell 7. Current results and limits belong to [VALIDATION.md](VALIDATION.md).
 
 ## Approved tray and status refinement
 
@@ -48,11 +48,11 @@ This is the consolidated interface contract, approved on 4 October 2026 with lat
 
 ### Rendering approach
 
-Compare the current native menu, owner-drawn Win32 `HMENU` and a custom borderless popup before committing to an implementation. Start with a small owner-drawn Windows proof. Prefer the smallest documented approach that meets the complete brief without losing normal menu behavior.
+Use an owner-drawn Win32 `HMENU`: compact dark rows and custom header rendering inside the native Windows menu loop. The architecture owner records the alternatives and their interaction costs.
 
 The current pystray adapter owns the native menu for the whole tracking operation. Preserve that lifetime rule: background updates and callbacks must not replace a menu while Windows is tracking it.
 
-The proof must establish dark-only rows and submenus, no checkmark gutter, tight padding, persistent selected backgrounds, distinct hover styling, meters, custom header layout and readable disabled states. Check borders and submenu arrows too. Do not rely on undocumented theme hacks or silently compromise these requirements.
+Keep dark-only rows and submenus, no checkmark gutter, tight padding, persistent selected backgrounds, distinct hover styling, meters, custom header layout and readable disabled states. Check borders and submenu arrows too. Do not rely on undocumented theme hacks or silently compromise these requirements.
 
 If a custom popup is necessary, account for keyboard navigation, Enter and Escape, submenu navigation, mouse hover/click, outside-click dismissal, activation/focus, taskbar edges, multiple monitors, DPI, work-area clamping, disabled items and practical accessibility. Styling convenience alone does not justify interaction regressions.
 

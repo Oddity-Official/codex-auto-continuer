@@ -25,7 +25,7 @@ These sanitized records are Git-tracked and suitable for public sharing, but exc
 
 - [Workflow](WORKFLOW.md): environment ownership, checkpoint import/export and source transport boundaries
 - [Audits](Audits/README.md): dated audit evidence, rotation and retention
-- [Tray and telemetry investigation](Audits/2026-10-07/AUDIT.md): source candidate, notification evidence and deferred interactive checks
+- [Tray and telemetry investigation](Audits/2026-10-07/AUDIT.md): native UI acceptance, notification evidence and release checks
 - [Real client integration investigation](Audits/History/2026-10-05/AUDIT.md): connection proofs, actual CLI recovery repair, Desktop composer evidence and remaining holding limits
 - [ChatGPT manifest](../CHAT-MANIFEST.md) and [Codex manifest](../CODEX-MANIFEST.md): checkpoint ownership and local verification provenance
 

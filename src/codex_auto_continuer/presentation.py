@@ -119,3 +119,8 @@ def thread_title(name, *, available=True):
     if not available:
         return "Title Unavailable"
     return name if isinstance(name, str) and name.strip() else "Untitled Thread"
+
+
+def thread_list_capacity(work_height, scale, content_top, row_height):
+    # Reserve the footer, native frame and a small work-area margin.
+    return max(1, min(4, int((work_height / scale - content_top - 110) / row_height)))

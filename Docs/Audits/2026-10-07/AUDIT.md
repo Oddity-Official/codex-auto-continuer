@@ -72,3 +72,39 @@ When the user is ready, run [the synthetic preview](preview_ui.py) through the b
 The preview exits after 300 seconds, uses temporary fixture data, prints control actions instead of invoking real CAC controls, and never connects to Codex or changes login startup. Use `--empty` instead of `--many` for the empty waiting section. In `--menu` mode the status Details button opens the fixture's real native tray popup.
 
 Acceptance must cover final popup/submenus under Windows light and dark themes; hover versus selected versus disabled; Enter/Escape, keyboard/submenu navigation and outside-click dismissal; OK/X/Close; long titles and list-only scrolling; repeated opening and state changes; actual tray icon appearance; taskbar edges, work-area clamping and mixed-monitor DPI. Then run the full native gate and versioned frozen release/update/privacy checks before publication or installation.
+
+## Final UI pass and 0.7.0 candidate
+
+The user later authorized Computer Use while away. Work continued from source commit `d9db603`, without changing Codex clients or Windows security/privacy settings. The panel now has a prominent state heading, quiet aligned metadata, rounded side-by-side usage cards, borderless waiting rows and compact footer actions. Unchanged snapshots do not repaint; observation and hover tracking stop on close. Short high-DPI work areas reduce list capacity and compact spacing rather than pushing Close off-screen.
+
+Windows post-paints submenu arrows after owner drawing. Drawing our own arrow produced two glyphs. The adapter now leaves the native glyph intact and supplies a light idle backing; the native light hover glyph remains legible on the accent row. Native borders remain Windows chrome.
+
+### Interactive evidence
+
+Computer Use inspected actual native source windows with temporary synthetic state, authoritative fixture titles and 73/41-percent remaining quotas. Control writes print fixture actions; no model, real chat, account request or login change occurs. The visible-owner `--menu` host calls the production popup renderer, callbacks and Windows tracking loop. It exists because the tool could not activate pystray's hidden shell-menu owner reliably; it is not proof of clicking the real shell tray icon.
+
+| Case | Settings and outcome |
+| --- | --- |
+| Normal and empty status | Three waiting threads; zero waiting threads. Clear hierarchy, authoritative title, Untitled Thread fallback, clean ellipsis; empty section disappears and the window shrinks |
+| Bounded long list | `--many`, nine threads. Next scrolls only the list; the header/cards and window height remain stable |
+| Compact error/unknown | `--many --dpi 192 --error --unknown`. Controlled 200% application rendering on the existing work area, not a changed Windows DPI setting. Needs Attention, explicit Unavailable/Reset Unknown, one visible row, and accessible footer fit |
+| Freshness | Synthetic readings become Last Known after their freshness interval; meters mute rather than imply changing usage |
+| Native menu | Settled dark rows, Clients submenu, disabled Start, selected row/right-edge marker, distinct hover, compact meters and no left check gutter. `c`, Right, Left and Escape traverse/dismiss; an earlier native CLI submenu click printed its intended fixture action |
+| Full title and keyboard | Selected long title then Enter opens panel-owned Details with the full name and secondary ID/build diagnostics. Enter dismisses the modal; Close dismisses the panel. Escape also closes a source panel |
+
+The first keyboard inspection exposed `MSG.hwnd` instead of the actual `ctypes.wintypes.MSG.hWnd`. It raised AttributeError and ended the panel thread. A regression using the real Windows structure reproduces that boundary. The fixed handler and visible modal ownership passed the later live interaction. The Computer Use helper rejected an owned-modal accessibility index twice; refreshed keyboard activation dismissed it normally. No stale-coordinate retry or substitute UI automation was used.
+
+The first opening snapshot showed native fade transparency; a settled snapshot was opaque. No fade-animation patch was made. Current Windows theme and controlled scale rendering were inspected. Physical mixed-monitor DPI transitions, theme switching, high contrast, other taskbar edges, and direct hidden-shell-owner interaction remain hands-on limits. Computer Use policy prohibits changing security/privacy settings; telemetry options were not changed through automation. No Computer Use screenshot payload was saved in the repository.
+
+### Final local gates
+
+| Gate | Bound and result |
+| --- | --- |
+| Initial full Windows gate | 283 passed in 43.36 seconds; compilation/version passed. This precedes the Enter repair and does not certify it |
+| Final full Windows gate | Normal `scripts/verify-windows.ps1`, 180-second test bound: 284 passed in 45.50 seconds; compilation and CAC 0.7.0 passed |
+| Versioned native recovery | Official Codex 0.160.0, unchanged loopback fixtures, 240-second wrapper bound: 18 passed in 112.14 seconds; exact 0.7.0 certificate verified. Later code changes affect only status/dialog presentation |
+| Final frozen package | `scripts/verify-portable.py`, 180-second bound: all 603 manifest files and CRC/hash checks passed; implicit defaults, hot reload/repair, exclusive controls, correlated scan, stale-error tray start and encrypted review passed; zero Codex connections/user-chat sends |
+| Portable identity | Final local ZIP: 20,302,173 bytes; SHA-256 `4d485587378789155a8eb0a8e2497ed5bbf959c2afe63cbaf4607967c0c387cf`. Earlier candidate ZIPs are superseded, not published |
+| Documentation and retention | 128 local Markdown links, zero failures; managed cleanup found zero deletion targets |
+
+Publication, downloaded-artifact verification and deployment results follow separately. The exact hosted package may differ from the local build because hosted Python/dependency versions and checkout line endings differ; its own signed checksum is authoritative.

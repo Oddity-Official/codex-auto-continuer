@@ -28,6 +28,8 @@ bind(gdi, "SelectObject", H, H, H)
 bind(gdi, "CreateFontW", H, I, I, I, I, I, U, U, U, U, U, U, U, U, S)
 bind(gdi, "SetTextColor", U, H, U)
 bind(gdi, "SetBkMode", I, H, I)
+bind(gdi, "GetStockObject", H, I)
+bind(gdi, "RoundRect", I, H, I, I, I, I, I, I)
 bind(user, "FillRect", I, H, C.POINTER(R), H)
 bind(user, "DrawTextW", I, H, S, I, C.POINTER(R), U)
 bind(user, "GetDC", H, H)
@@ -45,6 +47,7 @@ SELECTED = "#253f3b"
 HOVER = "#365c52"
 ACCENT = "#72dfb0"
 LINE = "#343c49"
+SURFACE = "#20262e"
 
 
 def color(hex_value):
@@ -73,7 +76,18 @@ class Canvas:
         finally:
             gdi.DeleteObject(brush)
 
-    def text(self, text, rectangle, *, shade=TEXT, size=13, bold=False, wrap=False, measure=False):
+    def rounded(self, rectangle, shade, radius=8):
+        brush = gdi.CreateSolidBrush(color(shade))
+        previous_brush = gdi.SelectObject(self.dc, brush)
+        previous_pen = gdi.SelectObject(self.dc, gdi.GetStockObject(8))
+        try:
+            gdi.RoundRect(self.dc, *rectangle, self.px(radius * 2), self.px(radius * 2))
+        finally:
+            gdi.SelectObject(self.dc, previous_pen)
+            gdi.SelectObject(self.dc, previous_brush)
+            gdi.DeleteObject(brush)
+
+    def text(self, text, rectangle, *, shade=TEXT, size=13, bold=False, wrap=False, measure=False, align="left"):
         key = size, bold
         if key not in self.fonts:
             self.fonts[key] = gdi.CreateFontW(-self.px(size), 0, 0, 0, 600 if bold else 400,
@@ -83,6 +97,7 @@ class Canvas:
         gdi.SetBkMode(self.dc, 1)
         rect = R(*rectangle)
         flags = 0x800 | (0x10 if wrap else 0x20 | 4 | 0x8000)  # NOPREFIX, ellipsis or wrapping
+        flags |= {"left": 0, "center": 1, "right": 2}[align]
         if measure:
             flags = 0x400 | 0x20 | 0x800
         try:

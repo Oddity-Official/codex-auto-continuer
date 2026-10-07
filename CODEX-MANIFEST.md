@@ -8,7 +8,14 @@ Updated: 2026-10-07
 
 All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba04` preserves v001 and its original checksum manifest. ChatGPT's manifest is unchanged. The stale imported checksum file is not retained as a current-source checksum; each new transport owns its generated manifest.
 
-## Dark UI source candidate
+## CAC 0.7.0 UI release candidate
+
+- Refined the native panel into a prominent state heading, quiet metadata, two rounded usage cards and a borderless bounded waiting list. Footer actions remain visible on the controlled 200% short work area. Native menu interaction, selected markers, hover and disabled appearance were inspected through the visible-owner production HMENU fixture.
+- Corrected native post-painted submenu arrows without undocumented theme changes. Fixed the live Enter-key failure (`MSG.hWnd`, not `hwnd`) with an actual Windows-structure regression; Details now belongs to the visible status panel. Enter opens/dismisses Details and Close dismisses the panel in Computer Use.
+- Final full Windows gate: 284 passed in 45.50 seconds, compilation/version passed. Versioned official Codex gate: 18 passed in 112.14 seconds. Final local 603-file frozen UX package passed with zero Codex connections or user-chat sends. Exact commands, earlier failed previews and remaining physical theme/mixed-monitor/shell-owner limits are in the current audit and verification owner.
+- Version 0.7.0 has a reviewed exact baseline certificate. Queue controls remain absent from the tray, existing encrypted work remains intact, and ordinary recovery/privacy behavior is unchanged. Publication and deployment are recorded separately after their checks complete.
+
+### Initial source delivery
 
 - Implemented the approved compact dark tray/status interface with native owner-drawn HMENU and a Win32 status panel, live read-only authoritative names, remaining-capacity meters, right-edge selected markers, and twenty SVG-derived arrow/pending-layer icon variants. Names remain memory-only. Native popup border/submenu appearance and final interactive acceptance remain unverified.
 - Removed queue holding from the tray. Preserved the off-by-default experimental CLI engine, encrypted journals and native tests. Deferred actual client queue integration in the product owner document; no new interception capability is claimed.
