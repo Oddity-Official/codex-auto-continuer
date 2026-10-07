@@ -2,18 +2,25 @@
 import ctypes
 import importlib.util
 import os
+import shutil
+import subprocess
 from ctypes import wintypes
 from pathlib import Path
 
 import pytest
 
 
-@pytest.mark.skipif(os.name != "nt", reason="Native Windows directory sharing")
-def test_daemon_directory_requires_delete_sharing_before_cleanup(tmp_path):
+def native_support():
     module_path = Path(__file__).resolve().parents[1] / "integration/native_support.py"
     spec = importlib.util.spec_from_file_location("native_cleanup_fixture", module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Native Windows directory sharing")
+def test_daemon_directory_requires_delete_sharing_before_cleanup(tmp_path):
+    module = native_support()
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
         ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
@@ -29,3 +36,25 @@ def test_daemon_directory_requires_delete_sharing_before_cleanup(tmp_path):
         kernel.CloseHandle(handle)
     module.wait_directory_release(tmp_path, timeout=0)
     assert tmp_path.is_dir()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Native Windows process identity")
+def test_detached_cleanup_stops_only_executables_inside_private_home(tmp_path):
+    module = native_support()
+    original = Path(os.environ["SystemRoot"]) / "System32/cmd.exe"
+    owned = tmp_path / "cmd.exe"
+    shutil.copy2(original, owned)
+    processes = [subprocess.Popen([str(binary), "/d", "/q", "/k"], cwd=tmp_path,
+        stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        creationflags=subprocess.CREATE_NO_WINDOW) for binary in (owned, original)]
+    try:
+        assert all(process.poll() is None for process in processes)
+        assert module.stop_private_processes(tmp_path) == 1
+        assert processes[0].wait(timeout=5) == 0
+        assert processes[1].poll() is None, "An external executable must not be stopped"
+    finally:
+        for process in processes:
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=5)
+            process.stdin.close()

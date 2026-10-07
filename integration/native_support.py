@@ -59,6 +59,54 @@ def wait_directory_release(path: Path, timeout=5):
         time.sleep(0.02)
 
 
+def stop_private_processes(home: Path):
+    """Reap detached package processes no longer reachable through the daemon PID tree."""
+    if os.name != "nt":
+        return 0
+    import ctypes
+    from ctypes import wintypes
+    home = home.resolve()
+    script = ("$root = $env:CAC_FIXTURE_PROCESS_ROOT.TrimEnd('\\') + '\\'; "
+        "$owned = @(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and "
+        "$_.ExecutablePath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) } | "
+        "Select-Object -ExpandProperty ProcessId); ConvertTo-Json -InputObject $owned -Compress")
+    result = subprocess.run(["powershell", "-NoProfile", "-Command", script], capture_output=True,
+        timeout=10, check=True, creationflags=subprocess.CREATE_NO_WINDOW,
+        env=os.environ | {"CAC_FIXTURE_PROCESS_ROOT": str(home)})
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD,
+        wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
+    kernel.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+    kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    stopped = 0
+    for pid in json.loads(result.stdout):
+        handle = kernel.OpenProcess(0x1000 | 0x100000 | 1, False, pid)
+        if not handle:
+            if ctypes.get_last_error() == 87:
+                continue
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            if kernel.WaitForSingleObject(handle, 0) == 0:
+                continue
+            size = wintypes.DWORD(32768)
+            name = ctypes.create_unicode_buffer(size.value)
+            if not kernel.QueryFullProcessImageNameW(handle, 0, name, ctypes.byref(size)):
+                if kernel.WaitForSingleObject(handle, 0) == 0:
+                    continue
+                raise ctypes.WinError(ctypes.get_last_error())
+            if not Path(name.value).resolve().is_relative_to(home):
+                raise AssertionError("Detached fixture process identity changed; no process was stopped")
+            if not kernel.TerminateProcess(handle, 0) or kernel.WaitForSingleObject(handle, 5000) != 0:
+                raise AssertionError("Detached private fixture process did not stop within 5 seconds")
+            stopped += 1
+        finally:
+            kernel.CloseHandle(handle)
+    return stopped
+
+
 class Service:
     def __init__(self):
         self.allowed = False
@@ -364,6 +412,9 @@ class NativeFixture:
                     if time.monotonic() >= deadline:
                         raise AssertionError("Isolated daemon/children did not exit before fixture cleanup")
                     time.sleep(0.02)
+            stopped = stop_private_processes(self.home)
+            if stopped:
+                print(f"Reaped {stopped} detached private-package fixture process(es)")
             wait_directory_release(settings.parent / "workdir")
         self.stack.callback(stop)
         if self.daemon_binary != self.binary:
