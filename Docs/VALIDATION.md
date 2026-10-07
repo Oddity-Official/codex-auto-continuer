@@ -10,10 +10,12 @@ CAC 0.7.1 implements the dark native menu, compact status panel, pending-layer i
 | --- | --- | --- |
 | Full native Windows gate | `scripts/verify-windows.ps1`; includes visible About close tests, actual hidden menu-owner callbacks, GDI pixels at 96/144/192 DPI, UTF-16 titles, minimized-window restoration, meters, privacy, recovery, encryption, workflow and native cleanup regressions | 293 passed, 35.22 seconds; compilation and 0.7.1 version passed |
 | Native Codex integration | All continuation, compatibility and holding modules; isolated official 0.160.0/0.161.0 and mixed tuple, synthetic loopback account/model service | 18 passed for each tuple; exact results in the certification table |
+| Hosted compatibility | [Complete matrix](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37687559030), source `4305a36`; reviewed baseline/current/mixed schemas and native behavior | All three tuples passed 18 tests each; zero errors, failures or skips |
+| Hosted Windows build | [Windows verification and build](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37687559010), same source | Passed, including the clean-staged wheel builder |
 | Source compilation and documentation | Application, tests, scripts and integration compilation; local Markdown targets | Results recorded in the [current audit](Audits/2026-10-07/AUDIT.md) |
 | Production telemetry review | Recent cycle/recovery/status metadata only, no public chat names, IDs or bodies | One acknowledged Continue followed by a completed turn; brief tray read failures with no corresponding supervisor stop |
 | Actual interactive source inspection | Computer Use on temporary synthetic CAC data, without Codex connections or real control writes | Dark popup and Clients submenu, native keyboard selection/traversal/dismissal, selected versus hover/disabled appearance, normal/empty/long-list panels, full-title Details, error/unknown quota and controlled 200% short-work-area layout inspected |
-| Published 0.7.0 frozen package | `scripts/verify-portable.py`; downloaded signed EXEs and isolated control/data paths | All 604 manifest files and UX checks passed; zero Codex connections or user-chat dispatches. This precedes the two 0.7.1 presentation fixes |
+| Published 0.7.1 frozen package | `scripts/verify-portable.py`; downloaded signed EXEs and isolated control/data paths | All 604 manifest files and UX checks passed; zero Codex connections or user-chat dispatches |
 
 The first manual native invocation passed 14 cases and failed four: a relative executable path failed the absolute managed-binary identity guard, and three fixture cases referenced the obsolete icon filename. The fixture was corrected; the documented wrapper resolves the executable path. The final native result above passed without changing production identity guards.
 
@@ -33,9 +35,26 @@ Codex changed `CodexErrorInfo` from a closed `oneOf` to an open `anyOf` with unk
 | CLI 0.160.0 / daemon 0.161.0 | 18 passed in 112.43 seconds | Reviewed exact 0.7.1 mixed tuple; same complete native gate |
 | CLI 0.160.0 / daemon 0.160.0 | 18 passed in 113.74 seconds | Reviewed exact 0.7.1 baseline |
 
-Fixtures use checksum-verified official packages, isolated Codex homes, unchanged production recovery logic and synthetic loopback services. They make no real model/account requests. The 0.7.1 certificates were added only after these complete behavioral passes. The earlier 0.7.0 post-certificate connected-build checks passed for current/current and old/current, reporting Certified and permitted Strict dispatch. Hosted publication and downloaded-package checks are recorded separately.
+Fixtures use checksum-verified official packages, isolated Codex homes, unchanged production recovery logic and synthetic loopback services. They make no real model/account requests. The 0.7.1 certificates were added only after these complete behavioral passes. The post-certificate baseline/current connected-build check passed in 2.11 seconds, reporting Certified and Strict read/dispatch permission. Hosted publication and downloaded-package checks are recorded separately.
 
 The [5 October real-client investigation](Audits/History/2026-10-05/AUDIT.md) reproduced and repaired loaded quota `systemError` deferral. Actual CLI composer recovery passed with one completed Continue and three duplicate-free scans. The CLI's queued follow-up remains client-local and unprotected. Normal Desktop composer/history tests accepted two follow-ups exactly once; timed polling did not capture pre-consumption queue IDs. Isolated Desktop and current VS Code composer tests reached Windows setup barriers. None of these results certifies all-client queue holding.
+
+## Published 0.7.1 and installation
+
+The private [0.7.1 release](https://github.com/Oddity-Official/codex-auto-continuer/releases/tag/v0.7.1) was built from `dceae31d7065422354d249975fc56e23b72b9242`. The [signed release workflow](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37688154728) passed its Windows, official native, clean build and frozen-package gates before publication. Runtime/build source is unchanged from the complete hosted matrix above.
+
+| Downloaded artifact | Bytes | SHA-256 |
+| --- | --- | --- |
+| Windows ZIP | 20,376,015 | `835f6f4aa70484ec78cfb3268afbe52d9db0d3e2e4099a80912da94c456d4987` |
+| Source wheel | 240,341 | `557470599e2cdf048f4d1fd443347e63dd371b505f04c375aa657ff4948ccaef` |
+
+The downloaded ZIP passed CAC's Ed25519 signature, signed size/hash, CRC and all 604 declared file hashes before execution. Local frozen verification passed defaults, hot reload, invalid settings/prompt repair, exclusive controls, scan feedback, graceful stop, stale-error tray autostart and encrypted review. It made zero Codex connections or user-chat sends. The 61-entry wheel contains exactly 53 current runtime package files and twenty PNG variants; text matches source after checkout line-ending normalization. Both archives passed configured UTF-8/UTF-16 profile/key markers and package boundaries.
+
+The real signed 0.7.0-to-0.7.1 upgrade/rollback probe preserved settings, prompt, state and encrypted held input. It wrote newer state, rolled back code, retained that newer state and restored all 604 baseline code hashes. It used isolated synthetic data and made zero user Codex connections.
+
+The installed App updated through its signed updater. Its durable job completed with running-monitor intent preserved; no manual start was needed. All 604 installed code hashes match the published manifest. Settings, saved `Continue` and durable state are byte-identical. Tray and CLI report 0.7.1. A fresh live scan reports Certified CLI 0.160.0 / daemon 0.161.0, ordinary usage permitted, zero pending obligations and no warnings. All clients and Detailed local logging remain enabled; queue holding remains disabled. The exact owned login shortcut targets the installed GUI/settings with normal tray launch. This is not a fresh operating-system login test.
+
+Current releases and source exports exclude runtime data and configured private markers. The repository remains private. Two historical private commits contain former username canaries from an audit helper, not credentials or conversation bodies. Review or explicitly agree history cleanup before making the repository public; current-file scans do not certify sanitized Git history.
 
 | Published 0.6.1 source check (5 October) | Exact scope | Result |
 | --- | --- | --- |
