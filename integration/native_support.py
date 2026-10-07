@@ -31,6 +31,34 @@ USER = "cac-fixture-user"
 TOKEN = "cac-local-fixture-not-a-real-token"
 
 
+def wait_directory_release(path: Path, timeout=5):
+    """Require delete sharing before removing a detached daemon's working directory."""
+    if os.name != "nt" or not path.exists():
+        return
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+        ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    kernel.CreateFileW.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    deadline = time.monotonic() + timeout
+    while True:
+        # DELETE access tests existing handles' sharing without deleting anything.
+        handle = kernel.CreateFileW(str(path), 0x10000, 7, None, 3, 0x02000000, None)
+        if handle != ctypes.c_void_p(-1).value:
+            kernel.CloseHandle(handle)
+            return
+        error = ctypes.get_last_error()
+        if error in (2, 3):
+            return
+        if error != 32:
+            raise OSError(error, "Cannot verify isolated daemon workdir release")
+        if time.monotonic() >= deadline:
+            raise TimeoutError("Isolated daemon workdir still denies delete sharing after shutdown")
+        time.sleep(0.02)
+
+
 class Service:
     def __init__(self):
         self.allowed = False
@@ -336,6 +364,7 @@ class NativeFixture:
                     if time.monotonic() >= deadline:
                         raise AssertionError("Isolated daemon/children did not exit before fixture cleanup")
                     time.sleep(0.02)
+            wait_directory_release(settings.parent / "workdir")
         self.stack.callback(stop)
         if self.daemon_binary != self.binary:
             import shutil

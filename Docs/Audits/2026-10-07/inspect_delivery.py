@@ -7,7 +7,6 @@ import json
 import zipfile
 from pathlib import Path
 
-PROFILES = ("Oddity_PC", "ODDITY~1")
 FORBIDDEN = {"App", ".data", "data", ".venv", "node_modules", ".git", "build", "dist", "__pycache__"}
 TOKENS = (b"-----BEGIN PRIVATE KEY-----", b"-----BEGIN RSA PRIVATE KEY-----", b"-----BEGIN OPENSSH PRIVATE KEY-----")
 
@@ -16,8 +15,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("archive", type=Path)
     parser.add_argument("--source", action="store_true")
+    parser.add_argument("--private-marker", action="append", default=[],
+        help="Local-only private canary to reject; repeat for multiple values. Values are not printed.")
     args = parser.parse_args()
-    needles = [value.encode(encoding) for value in PROFILES for encoding in ("utf-8", "utf-16-le")]
+    needles = [value.encode(encoding) for value in args.private_marker for encoding in ("utf-8", "utf-16-le")]
     with zipfile.ZipFile(args.archive) as archive:
         assert archive.testzip() is None, "CRC failure"
         names = archive.namelist()
@@ -40,7 +41,8 @@ def main():
             assert sum("/assets/" in name and name.endswith(".png") for name in names) == 20
     print(json.dumps({"entries": len(names), "bytes": args.archive.stat().st_size,
         "sha256": hashlib.sha256(args.archive.read_bytes()).hexdigest(), "crc": "passed",
-        "configuredPrivateMarkers": "absent", "boundary": "source" if args.source else "release"}, indent=2))
+        "configuredPrivateMarkers": "absent" if needles else "not configured",
+        "boundary": "source" if args.source else "release"}, indent=2))
 
 
 if __name__ == "__main__":
