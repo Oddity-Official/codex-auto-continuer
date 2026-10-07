@@ -49,6 +49,18 @@ def test_packaged_certificate_matches_consumer_contract_and_current_application(
         assert certificate["schema_sha256"] == compatibility.contract_digest(record["contract"])
 
 
+def test_unknown_error_variants_do_not_block_but_quota_discriminator_drift_does():
+    from codex_auto_continuer.errors import ProtocolError
+    consumed = {"$literal": "usageLimitExceeded"}
+    known = {"type": "string", "enum": ["usageLimitExceeded", "other"]}
+    baseline = _project({"oneOf": [known]}, {}, consumed)
+    expanded = {"anyOf": [known, {"type": ["string", "object"]}]}
+    assert _project(expanded, {}, consumed) == baseline
+    with pytest.raises(ProtocolError, match="usage-limit discriminator"):
+        _project({"anyOf": [{"type": "string"}, {"enum": ["other"]}]}, {}, consumed)
+    assert _project(known | {"type": ["string", "null"]}, {}, consumed) != baseline
+
+
 def test_text_input_projection_does_not_depend_on_unrelated_input_variants():
     schema = {"oneOf": [{"properties": {"type": {"enum": ["text"]}, "text": {"type": "string"}}, "required": ["type", "text"]}]}
     fields = {"$type": "text", "type": None, "text": None}

@@ -23,6 +23,18 @@ The menu interaction fixture uses the production native HMENU renderer, callback
 
 ## Compatibility certification
 
+The final production-status check found that the managed daemon had independently updated to 0.161.0. CAC 0.6.1 blocked its read contract, then a later daemon-start command timeout ended monitoring. The initial 0.7.0 publication run was cancelled before upload. The hosted current/mixed compatibility matrix independently failed for the same projected error union.
+
+Codex changed `CodexErrorInfo` from a closed `oneOf` to an open `anyOf` with unknown string/object variants. The named `usageLimitExceeded` discriminator is unchanged. CAC now projects only that consumed explicit variant; it does not accept a generic-string schema as evidence or recover unknown errors. Both official schemas have consumer hash `4f4748360704a777305ba86fbcb0907c8bddab7d5c9063ba032c1899e9f83150`. Status reports actual compatibility failures as Blocked with their cause, not Not Checked.
+
+| 7 October tuple | Native behavioral gate | Certification |
+| --- | --- | --- |
+| CLI 0.161.0 / daemon 0.161.0 | 18 passed in 113.35 seconds | Reviewed exact tuple; schema and connected-build identity checked |
+| CLI 0.160.0 / daemon 0.161.0 | 18 passed in 109.19 seconds | Reviewed exact mixed tuple; same complete native gate |
+| CLI 0.160.0 / daemon 0.160.0 | 18 passed in 111.33 seconds | Reviewed exact baseline |
+
+Fixtures use checksum-verified official packages, isolated Codex homes, unchanged production recovery logic and synthetic loopback services. They make no real model/account requests. Separate post-certificate connected-build tests passed for current/current (1.61 seconds) and old/current (2.14 seconds), reporting Certified and permitted Strict dispatch. The final post-projection Windows gate passed 288 tests in 38.83 seconds, compilation and version. Hosted publication and downloaded-package checks are recorded separately.
+
 The [5 October real-client investigation](Audits/History/2026-10-05/AUDIT.md) reproduced and repaired loaded quota `systemError` deferral. Actual CLI composer recovery passed with one completed Continue and three duplicate-free scans. The CLI's queued follow-up remains client-local and unprotected. Normal Desktop composer/history tests accepted two follow-ups exactly once; timed polling did not capture pre-consumption queue IDs. Isolated Desktop and current VS Code composer tests reached Windows setup barriers. None of these results certifies all-client queue holding.
 
 | Published 0.6.1 source check (5 October) | Exact scope | Result |

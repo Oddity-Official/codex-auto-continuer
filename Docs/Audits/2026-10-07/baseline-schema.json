@@ -1,0 +1,11 @@
+{
+  "cac_version": "0.7.0",
+  "codex_version": "0.160.0",
+  "binary_sha256": "fdda5fa3cf3fb3d000b876720742857676293e4315e4b045fae6f8bd7e866d1d",
+  "schema_sha256": "4f4748360704a777305ba86fbcb0907c8bddab7d5c9063ba032c1899e9f83150",
+  "changed_methods": [
+    "thread/turns/list",
+    "thread/queue/list"
+  ],
+  "behavior_certified": false
+}

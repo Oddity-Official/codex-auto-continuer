@@ -303,13 +303,16 @@ class TrayController:
         when = datetime.fromtimestamp(stamp).astimezone().strftime("%I:%M:%S %p").lstrip("0") if stamp else "Not Scanned Yet"
         warnings = [warning["message"] for warning in snapshot.get("warnings", [])]
         update_issue = updates.get("reason", "") if updates.get("status") in {"failed", "rolled_back", "unavailable"} else ""
-        issue = state_problem or self.problem or snapshot.get("reason") or (warnings[0] if warnings else "") or update_issue
+        compatibility_issue = compatibility.get("reason", "") if compatibility and not compatibility.get("dispatch_allowed") else ""
+        issue = state_problem or compatibility_issue or self.problem or snapshot.get("reason") or (warnings[0] if warnings else "") or update_issue
+        explanations = dict.fromkeys(value for value in warnings + [issue, self.problem, snapshot.get("reason"), updates.get("reason")] if value)
         details = (f"CLI: {compatibility.get('cli_version', 'Unknown')}\nDaemon: {compatibility.get('app_server_version', 'Unknown')}\n"
-                   f"{compatibility.get('reason', '')}\n\n" + "\n\n".join(warnings + [issue, updates.get("reason", "")]))
+                   f"{compatibility.get('reason', '')}\n\n" + "\n\n".join(explanations))
+        evidence = {"certified": "Verified", "untested": "Untested"}.get(compatibility.get("status"),
+            "Blocked" if compatibility and not compatibility.get("dispatch_allowed") else "Not Checked")
         return {"label": state_label("failed" if state_problem else self.state, snapshot), "threads": threads,
                 "clients": ", ".join({"vscode": "VS Code", "cli": "CLI", "desktop": "Desktop"}[c] for c in self.cfg.clients) or "None",
-                "scan": when, "compatibility": {"certified": "Verified", "untested": "Untested", "blocked": "Blocked"}.get(
-                    compatibility.get("status"), "Not Checked") + f" ({self.cfg.compatibility_policy.title()})",
+                "scan": when, "compatibility": evidence + f" ({self.cfg.compatibility_policy.title()})",
                 "updates": updates.get("status", "Not Checked").replace("_", " ").title(), "issue": issue,
                 "details": details, "usage": self.usage()}
 

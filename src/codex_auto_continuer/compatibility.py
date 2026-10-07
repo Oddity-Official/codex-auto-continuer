@@ -21,6 +21,7 @@ _CONSTRAINTS = {"type", "enum", "const", "minimum", "maximum", "exclusiveMinimum
                 "dependencies", "not", "if", "then", "else", "contains", "patternProperties"}
 THREAD = {key: None for key in ("id", "updatedAt", "status", "source", "originator", "archived")}
 TURN = {key: None for key in ("id", "status", "completedAt", "error")}
+TURN["error"] = {"codexErrorInfo": {"$literal": "usageLimitExceeded"}}
 TURN["items"] = {"$type": "userMessage", "type": None, "clientId": None}
 QUEUE = {"id": None, "clientUserMessageId": None, "input": None}
 WINDOWS = {key: {"usedPercent": None, "resetsAt": None} for key in ("primary", "secondary")}
@@ -52,6 +53,19 @@ def _project(node: dict, document: dict, fields=None, *, request=False, depth=0)
         if not ref.startswith("#/definitions/"):
             raise ProtocolError("Codex schema uses an unsupported external reference.")
         node = document["definitions"][ref.removeprefix("#/definitions/")]
+    if fields and "$literal" in fields:
+        literal = fields["$literal"]
+        if literal in node.get("enum", []):
+            return _project(node | {"enum": [literal]}, document, depth=depth+1)
+        # Only the exact quota branch is actionable. Other error variants are
+        # ignored at runtime; an unconstrained string is not a named contract.
+        for union in ("anyOf", "oneOf"):
+            for choice in node.get(union, []):
+                try:
+                    return _project(choice, document, fields, depth=depth+1)
+                except ProtocolError:
+                    continue
+        raise ProtocolError("Codex schema omitted CAC's explicit usage-limit discriminator.")
     result = {key: node[key] for key in sorted(_CONSTRAINTS & node.keys())}
     if "properties" in node:
         properties = node["properties"]

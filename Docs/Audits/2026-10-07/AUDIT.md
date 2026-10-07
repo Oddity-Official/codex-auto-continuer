@@ -108,3 +108,15 @@ The first opening snapshot showed native fade transparency; a settled snapshot w
 | Documentation and retention | 128 local Markdown links, zero failures; managed cleanup found zero deletion targets |
 
 Publication, downloaded-artifact verification and deployment results follow separately. The exact hosted package may differ from the local build because hosted Python/dependency versions and checkout line endings differ; its own signed checksum is authoritative.
+
+## Independently updated daemon
+
+The final installed-status read reported CLI 0.160.0 / daemon 0.161.0, blocked `thread/turns/list` and `thread/queue/list`, and no supervisor owner. Local sanitized failure frames show a later daemon-start timeout at 17:23:38 UTC, not a queued-message failure. The daemon is now reachable. The initial private release job [37674083303](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37674083303) was cancelled before publication. The separate current/mixed [compatibility matrix](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37674083568) failed while documentation and Windows packaging passed.
+
+[The schema comparator](compare_contracts.py) identified only `CodexErrorInfo`: closed `oneOf` became open `anyOf` with an additional generic string/object branch. The named string `usageLimitExceeded` remained unchanged. The runtime already rejects every other error; the whole-error projection overreached CAC's actual consumer contract.
+
+The projector now requires the explicit quota enum branch and its constraints. It ignores unrelated errors, not arbitrary request/response union changes. Negative regressions reject missing named discriminators and changed type constraints; existing recovery tests reject unknown and object-shaped quota errors. The baseline was deliberately regenerated with the existing helper; [the baseline report](baseline-schema.json) records that change. [The current report](current-schema.json) has no consumed changes and the same new hash. Reports contain only versions, binary/schema checksums and method names.
+
+The downloaded official 0.161.0 package checksum is `f3093b2483f857ae9085e87e1cc0d22488f65d2374889e4466c23a4f3d374c2d`; its executable matches the locally updated daemon SHA-256 `a0f89acca07a511734cac7fddee26b2106fab68918717bc90df16104a0760a30`. Neither package was installed into the user's Codex home or downgraded.
+
+Native current/current: 18 passed in 113.35 seconds. Native old/current: 18 passed in 109.19 seconds. Both commands used all three integration modules, absolute explicit CLI/daemon paths, 240-second process-tree bounds and isolated loopback fixtures. Exact new/current and mixed certificates were added only after these passes. Status maps schema mismatch, unsupported and unverified contracts to Blocked, prioritizes the specific repair reason, and keeps generic monitor errors in Details.

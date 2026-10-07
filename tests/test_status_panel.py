@@ -63,8 +63,21 @@ def test_corrupt_recovery_state_remains_an_actionable_error(tmp_path, monkeypatc
     assert controller.state == "failed" and "state.json" in controller.problem
 
 
+@pytest.mark.parametrize("status", ["schema_mismatch", "unsupported", "unverified"])
+def test_compatibility_blocks_explain_the_cause_instead_of_not_checked(tmp_path, status):
+    controller = TrayController(tmp_path / "settings.toml")
+    controller.problem = "Monitoring stopped. Inspect telemetry."
+    controller.snapshot = {"compatibility": {"status": status, "dispatch_allowed": False,
+        "reason": "Consumed Codex contract changed. Update CAC; pending work is preserved."}}
+    model = controller.status_model()
+    assert model["compatibility"] == "Blocked (Balanced)"
+    assert model["issue"] == controller.snapshot["compatibility"]["reason"]
+    assert controller.problem in model["details"]
+
+
 def test_status_uses_durable_pending_not_observations_and_survives_corrupt_state(tmp_path):
     controller = TrayController(tmp_path / "settings.toml")
+    controller.snapshot = {"reason": None}
     obligation = Obligation.create("private-thread", "failed", 1, None)
     observed = Obligation.create("observed", "old", 1, None)
     observed.phase, observed.queued_submission_id = "submitted", "q"

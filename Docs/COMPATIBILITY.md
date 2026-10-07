@@ -4,7 +4,7 @@ CAC defaults to Balanced mode: unknown stable Codex builds may continue after id
 
 ## What is certified
 
-The packaged `src/codex_auto_continuer/compatibility.json` records the CAC version, Windows architecture, full CLI/daemon versions, both executable SHA-256 hashes, consumer-contract hash, suite identity and dated evidence. CAC 0.7.0 certifies the official Windows x86_64 Codex 0.160.0 executable as both CLI and managed daemon. [Current verification](VALIDATION.md) owns test results.
+The packaged `src/codex_auto_continuer/compatibility.json` records the CAC version, Windows architecture, full CLI/daemon versions, both executable SHA-256 hashes, consumer-contract hash, suite identity and dated evidence. CAC 0.7.0 certifies official Windows x86_64 Codex 0.160.0/0.160.0, 0.161.0/0.161.0 and mixed 0.160.0/0.161.0 CLI/daemon tuples. [Current verification](VALIDATION.md) owns test results.
 
 This is compatibility evidence, not a security attestation. CAC's own EXEs are unsigned. A user who modifies installed code or its certificate file can modify the application.
 
@@ -17,6 +17,8 @@ The supported managed package contains the full `bin/codex.exe`. The separate `c
 The generated contract covers initialization, thread list/read/turns, account permission/windows, resume and queue add/list/delete. Holding also depends on full-history client identity, canonical UserInput variants and queue-change/turn-completion notification shapes. It compares consumed fields, types, variants, constraints and required request fields. Documentation changes, unrelated methods and unconsumed object fields are excluded. A new required request field still blocks compatibility. Existing runtime guards remain authoritative for actual responses, exact ownership, quota permission and ambiguous sends.
 
 Schemas and binary hashes cache in memory only. Cache keys include full version and binary file identity/hash. Generated schema files are removed after inspection. CAC does not contact a certification service, download Codex or change updater settings.
+
+Recovery classifies only the explicit string `usageLimitExceeded`. Its schema projection requires that named variant and its constraints, not every unrelated error variant or diagnostic message. Unknown errors never trigger continuation. This permits forward-compatible error enums without treating a generic string as proof of the quota contract. Other consumed unions and required request fields retain their normal drift checks.
 
 | Evidence | Balanced (default) | Strict |
 | --- | --- | --- |
@@ -46,7 +48,7 @@ GitHub Windows runners are elevated, while Codex correctly rejects elevated daem
 
 `scripts/download-probe-codex.py` fetches complete official GitHub release packages into ignored test staging. It requires GitHub's asset SHA-256 and exact size before extraction/execution. Paths, links, duplicates and extracted-size limits are validated. It never installs into a developer's Codex home. Downloads have 180-second deadlines; the outer runner bounds download/extraction at 240 seconds.
 
-The probe resolves exact stable versions and runs each distinct CLI/daemon tuple once, with schema comparison and 17 native scenarios. These use synthetic authentication and loopback model/account services, not an OpenAI login or real allowance. Managed lifecycle tests disable Codex updater/remote control in their disposable home, exercise production discovery/reconnect, deliberately remove certification, prove Strict pending-state preservation and Balanced recovery, then verify one continuation and no duplicates. Owner holding verifies ordered release, quota recovery, encrypted restart, lost replay acknowledgement, coverage and original-client approval routing. Candidate builds receive test-only access inside isolated behavioral fixtures; CI never changes production certificates automatically.
+The probe resolves exact stable versions and runs each distinct CLI/daemon tuple once, with schema comparison and 18 native scenarios. These use synthetic authentication and loopback model/account services, not an OpenAI login or real allowance. Managed lifecycle tests disable Codex updater/remote control in their disposable home, exercise production discovery/reconnect, deliberately remove certification, prove Strict pending-state preservation and Balanced recovery, then verify one continuation and no duplicates. Owner holding verifies ordered release, quota recovery, encrypted restart, lost replay acknowledgement, coverage and original-client approval routing. Candidate builds receive test-only access inside isolated behavioral fixtures; CI never changes production certificates automatically.
 
 Reports contain versions, checksums, schema differences and synthetic-test results. Jobs fail if either schema or behavior fails. Artifacts expire after 14 days. Compatibility jobs never edit certificates or publish releases; the separate signed release workflow owns publication.
 
