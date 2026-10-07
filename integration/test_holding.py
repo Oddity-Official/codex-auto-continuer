@@ -75,7 +75,7 @@ def test_native_holder_restart_continue_then_ordered_inputs(codex_binary, monkey
             input = [{"type": "text", "text": f"PRIVATE_SYNTHETIC_FOLLOW_UP_{index}", "text_elements": []}]
             if index == 1:
                 image = native.home / "synthetic-image.png"
-                shutil.copyfile(native_support.Path(__file__).resolve().parents[1] / "src/codex_auto_continuer/assets/monitoring.png", image)
+                shutil.copyfile(native_support.Path(__file__).resolve().parents[1] / "src/codex_auto_continuer/assets/monitoring-0.png", image)
                 input.append({"type": "localImage", "path": str(image)})
             native.owner.queue_add_input(identity, input, f"holding-fixture-{index}")
         wait_for(lambda: len((supervisor.holding.journal.read() or {}).get("records", [])) == 2

@@ -178,11 +178,12 @@ def test_icon_assets_match_svg_master_and_preserve_state_colors():
     from codex_auto_continuer.icon import tray_image
     assets = Path(config.__file__).parent / "assets"
     digest = hashlib.sha256((assets / "cac.svg").read_bytes()).hexdigest()
-    for state in ("monitoring", "stopped", "failed"):
-        with Image.open(assets / f"{state}.png") as image:
-            assert image.info["svg_sha256"] == digest
-            assert image.getpixel((0, 0))[3] == 0
-    assert tray_image("monitoring").tobytes() == tray_image("waiting").tobytes()
+    for state in ("monitoring", "waiting", "stopped", "failed"):
+        for count in range(5):
+            with Image.open(assets / f"{state}-{count}.png") as image:
+                assert image.info["svg_sha256"] == digest
+                assert image.getpixel((0, 0))[3] == 0
+    assert tray_image("monitoring").tobytes() != tray_image("waiting").tobytes()
     assert tray_image("monitoring").tobytes() != tray_image("stopped").tobytes()
     assert tray_image("failed").tobytes() != tray_image("stopped").tobytes()
 

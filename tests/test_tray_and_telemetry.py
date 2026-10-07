@@ -99,18 +99,10 @@ def test_tray_menu_actions_match_cli_controls(tmp_path, monkeypatch):
         items[label](None)
         assert opened[-1] == command
     assert not {"Scan now", "Run one cycle", "Initialize missing files", "Restart monitoring"} & set(items)
-    controller._held_records = ({"id": "q1", "threadId": "t1", "phase": "held"},
-                                {"id": "q2", "threadId": "t2", "phase": "uncertain"})
-    reviewed = []
-    monkeypatch.setattr(controller, "manage_held", lambda *args: reviewed.append(args))
-    held_items = list(items["Queue Holding"].submenu.items)
-    first = {item.text: item for item in held_items[2].submenu.items}
-    second = {item.text: item for item in held_items[3].submenu.items}
-    first["Resume After Review"](None)
-    first["Discard Unsent Input"](None)
-    second["Confirm Not Consumed"](None)
-    second["Confirm Consumed"](None)
-    assert reviewed == [("resume", "t1"), ("discard", "q1"), ("confirm-unsent", "q2"), ("confirm-consumed", "q2")]
+    assert "Queue Holding" not in items
+    assert "Read Full Status" in items
+    labels = list(items)
+    assert labels.index("Check For Updates") + 1 == next(index for index, label in enumerate(labels) if label.startswith("About CAC"))
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows tray launch")

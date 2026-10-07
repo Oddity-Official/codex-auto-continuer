@@ -26,7 +26,7 @@ Continue existing local interactive Codex tasks after account usage recovers, wi
 - block diagnostically on unsupported identity, protocol drift or unreadable prompts; isolate ambiguous sends without retries while other safe chats continue
 - default to Balanced compatibility for schema-verified stable Codex builds; offer Strict exact-build certification and deduplicated warnings
 - update portable CAC from signed stable GitHub releases at cycle boundaries, preserving runtime data and a recoverable code backup
-- offer off-by-default owner-supported holding: encrypted queued inputs, explicit coverage warnings, unchanged Continue, individual release after successful completion and fresh usage permission, and review controls for uncertainty or manual progress
+- keep experimental owner-supported holding off by default and outside the tray; preserve its encrypted data and CLI review controls
 
 ## Non-goals
 
@@ -44,7 +44,7 @@ Version 0.6.1 targets Windows 11 x86_64. Balanced mode permits unknown stable bu
 
 ## Approved tray and status refinement
 
-This is the consolidated implementation brief, approved on 4 October 2026. It includes the user's later decisions. It is not implemented in release 0.5.2. Queue-holding research is separate: this presentation work must not change recovery decisions or the saved continuation prompt.
+This is the consolidated interface contract, approved on 4 October 2026 with later user decisions. The source implementation uses native owner drawing. Current acceptance checks and delivery limits belong to [verification](VALIDATION.md). Presentation must not change recovery decisions or the saved continuation prompt.
 
 ### Rendering approach
 
@@ -168,3 +168,9 @@ Preserve exact-thread targeting, quota-only recovery, crash reconciliation, mult
 Meaningful checks must cover singular/plural counts; 0/1/2/3/4/more pending icons; all arrow states and precedence; stopped-with-pending; selected versus hover versus disabled rows; no checkmark gutter; usage semantics, partial unknowns and stale readings; long/absent/unavailable titles; dynamic version; dark layout and accessibility names/states. Existing continuation/recovery regressions must remain green.
 
 Run the native Windows gate and inspect actual popup, submenus, icons and status window under light/dark Windows themes and representative DPI settings. Check keyboard-only navigation, Enter/Escape, submenu traversal, outside-click dismissal, repeated opening and state changes while a menu is open. A unit-test-only pass is insufficient. Application-rendered images do not prove mouse/keyboard behavior. If native computer-control tools remain unavailable, record that limit and obtain the user's hands-on inspection rather than claiming it occurred.
+
+## Deferred client queue integration
+
+Queue holding remains experimental and is not exposed in the tray. Preserve the engine, encrypted journal, CLI review controls and native probe evidence. Do not add transport adapters, patch Codex or promise normal composer coverage as part of the interface work.
+
+Revisit only with an explicit user request. Acceptance requires pre-consumption capture through each actual Desktop, VS Code and CLI composer, unchanged Continue, ordered exactly-once follow-up handling and restart/uncertainty checks. Server-RPC fixtures and connection proofs alone do not meet this requirement. CLI's client-local queue needs its own integration boundary. See the [installed-client investigation](Audits/History/2026-10-05/AUDIT.md).

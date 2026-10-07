@@ -14,6 +14,7 @@ from .compatibility import Compatibility, CompatibilityGate, CompatibilityBlocke
 from .config import Config, read_prompt
 from .errors import ConfigurationError, ProtocolError, TransportError
 from .state import Obligation, State, load_state, save_state
+from .presentation import usage_snapshot, pending_threads
 from .telemetry import emit, failure, changed, begin_cycle, thread_summary, turn_summary
 
 LOG = logging.getLogger(__name__)
@@ -43,6 +44,8 @@ class CycleResult:
     compatibility: dict | None = None
     warnings: list[dict] = field(default_factory=list)
     holding: dict | None = None
+    usage: dict | None = None
+    waitingThreads: tuple[dict, ...] = ()
 
 
 class Supervisor:
@@ -200,7 +203,8 @@ class Supervisor:
                 wait(delay)
             except CompatibilityBlocked:
                 if self.on_cycle:
-                    self.on_cycle(CycleResult(pending=len(self.state.obligations), compatibility=self.compatibility.report()))
+                    self.on_cycle(CycleResult(pending=len(self.state.obligations), compatibility=self.compatibility.report(),
+                                              waitingThreads=pending_threads(self.state.obligations)))
                 self.close()
                 wait(max(1.0, self.config.poll_seconds))
             except RpcError as exc:
@@ -237,15 +241,18 @@ class Supervisor:
         begin_cycle()
         client = self._require_client()
         if not self.compatibility.read_allowed:
-            result = CycleResult(pending=len(self.state.obligations), compatibility=self.compatibility.report())
+            result = CycleResult(pending=len(self.state.obligations), compatibility=self.compatibility.report(),
+                                 waitingThreads=pending_threads(self.state.obligations))
             emit("cycle.completed", **result.__dict__, observations=len(self.state.observations))
             return result
         now = self.clock()
-        limits = _parse_rate_limits(client.rate_limits())
+        raw_limits = client.rate_limits()
+        limits = _parse_rate_limits(raw_limits)
         result = CycleResult(
             ordinary_usage_allowed=limits.ordinary_usage_allowed,
             next_reset_at=limits.next_reset_at,
             compatibility=self.compatibility.report(),
+            usage=usage_snapshot(raw_limits, now),
         )
         self._observe_deliveries()
 
@@ -332,7 +339,9 @@ class Supervisor:
                     if self.config.dispatch_spacing_seconds > 0:
                         self.sleep(self.config.dispatch_spacing_seconds)
                 # Re-check account permission between multiple threads so one reset does not fan out blindly.
-                limits = _parse_rate_limits(client.rate_limits())
+                raw_limits = client.rate_limits()
+                limits = _parse_rate_limits(raw_limits)
+                result.usage = usage_snapshot(raw_limits, self.clock())
                 result.ordinary_usage_allowed = limits.ordinary_usage_allowed
                 result.next_reset_at = limits.next_reset_at
                 if limits.ordinary_usage_allowed is not True:
@@ -341,6 +350,7 @@ class Supervisor:
             LOG.warning("Codex did not verify ordinary usage availability; pending obligations will not dispatch.")
 
         result.pending = len(self.state.obligations)
+        result.waitingThreads = pending_threads(self.state.obligations)
         if self.holding is not None:
             result.holding = self.holding.report()
             result.warnings.extend(result.holding["warnings"])

@@ -19,6 +19,7 @@ from .icon import tray_image
 from .instance_lock import SingleInstanceLock
 from .startup import launch_command, startup_path
 from .status import read_runtime, owns_monitor, phase
+from .presentation import state_label, icon_state, usage_windows
 from .updates import update_status, write_json
 
 PRIVACY_TEXT = {
@@ -51,6 +52,9 @@ class TrayController:
         self.snapshot: dict = {}
         self.running = False
         self.icon = None
+        self.status_window = None
+        self._status_unavailable_since = None
+        self._icon_state = None
         self.dialogs = Dialogs(on_error=self.dialog_failed)
         self._last_phase = None
         self._log_settings = self.log_settings(self.cfg)
@@ -58,8 +62,6 @@ class TrayController:
         self._update_busy = False
         self._installing = False
         self._notices = set()
-        self._held_records = ()
-        self._held_stamp = None
         notice_file = config_file.parent / "notifications.json"
         if notice_file.exists():
             try:
@@ -117,38 +119,20 @@ class TrayController:
                     self.command("stop")
                     self.done.set()
                     self.dialogs.close()
+                    if self.status_window:
+                        self.status_window.close()
                     self.icon.stop()
                     return
                 telemetry.emit("tray.action", action=label)
                 if label == "update":
                     self._installing = True
                 output = self.command(*arguments)
-                if label == "held-manage":
-                    identity = {"threadId" if arguments[1] == "resume" else "queuedSubmissionId": arguments[2]}
-                    telemetry.emit("holding.reviewed", operation=arguments[1], **identity)
-                if label == "held-input":
-                    record = json.loads(output)[0]
-                    parts = [p.get("text", "")[:8000] if p.get("type") == "text" else
-                             f"[{p.get('type', 'Unknown')} attachment/input retained]" for p in record["input"]]
-                    preview = "\n\n".join(parts)
-                    suffix = "\n\nPreview truncated. Use held list INPUT-ID --show-input in the CLI for full text." if len(preview) > 4000 else ""
-                    self.dialogs.show("held-input", preview[:4000] + suffix, title="CAC private held input")
-                if label == "held-view":
-                    records = json.loads(output)
-                    body = "No requests are held." if not records else "\n\n".join(
-                        f"Input: {r['id']}\nThread: {r['threadId']}\nPhase: {r['phase']}" for r in records[:20])
-                    if len(records) > 20:
-                        body += f"\n\nShowing 20 of {len(records)} requests. CLI held list shows all."
-                    body += ("\n\nHeld bodies are encrypted for this Windows account. CLI: held list --show-input. "
-                             "Use held resume THREAD after reviewing newer progress; held discard INPUT discards confirmed unsent requests. "
-                             "For unconfirmed requests, inspect Codex history and queue before explicit held confirm-unsent/confirm-consumed INPUT --confirm.")
-                    self.dialogs.show("held", body, title="CAC held requests")
                 if label in {"update", "auto-update"}:
                     result = json.loads(output)
                     if result.get("status") == "staged":
                         self.icon.notify("A signed CAC update is staged. It will restart CAC after the current monitoring cycle; your data stays in place.", "CAC")
                     elif label == "update":
-                        self.icon.notify(f"Updates: {result.get('status', 'unknown')}. Select Status for details.", "CAC")
+                        self.icon.notify(f"Updates: {result.get('status', 'unknown')}. Select Read Full Status for details.", "CAC")
                 if label == "reset":
                     self.icon.notify("Default settings restored. Your prompt, pending work, logs and login shortcut were preserved.", "CAC")
             except Exception as exc:
@@ -191,8 +175,8 @@ class TrayController:
         threading.Thread(target=launch, name="CAC-editor", daemon=True).start()
 
     def refresh(self) -> None:
-        previous_state = self.state
         self.problem = ""
+        reading_status = False
         try:
             self.running = owns_monitor(self.config_file)
             self.cfg = load_config(self.config_file)
@@ -200,30 +184,48 @@ class TrayController:
             if log_settings != self._log_settings:
                 telemetry.setup(self.config_file.parent / "tray.jsonl", self.cfg)
                 self._log_settings = log_settings
+            reading_status = True
             self.snapshot = read_runtime(self.config_file)
+            reading_status = False
+            from .presentation import pending_threads
+            from .state import load_state
+            self.snapshot = self.snapshot | {"waitingThreads": pending_threads(load_state(self.config_file.parent / "state.json").obligations)}
+            if self._status_unavailable_since is not None:
+                telemetry.emit("tray.status_recovered", durationMs=round((time.monotonic() - self._status_unavailable_since) * 1000))
+            self._status_unavailable_since = None
             self.state = phase(self.config_file, self.snapshot, running=self.running)
             if self.state == "failed":
                 self.problem = self.snapshot.get("reason", "Monitoring stopped with an error. Open the data folder for telemetry, then start monitoring after repair.")
         except Exception as exc:
-            self.state = "failed"
+            from .errors import ConfigurationError
+            self.state = "reconnecting" if self.running and reading_status and not isinstance(exc, ConfigurationError) else "failed"
             self.problem = str(exc)
-            if self._last_phase != "failed":
+            if self._status_unavailable_since is None:
+                self._status_unavailable_since = time.monotonic()
                 try:
-                    telemetry.failure("tray.status_failed", exc)
+                    cause = exc.__cause__
+                    telemetry.failure("tray.status_failed", exc, causeType=type(cause).__name__ if cause else None,
+                                      errorCode=getattr(cause, "winerror", None), errno=getattr(cause, "errno", None))
                 except OSError:
                     pass
         if self.icon:
             self.icon.title = f"CAC {__version__}: {self.status_label()}"
-            if self.state != previous_state:
-                self.icon.icon = tray_image(self.state)
+            visual = icon_state(self.state, self.snapshot)
+            if visual != self._icon_state:
+                self.icon.icon = tray_image(visual[0], pending=visual[1])
+                self._icon_state = visual
             if self.state == "failed" and self._last_phase != "failed":
-                self.icon.notify("Continuation is blocked. Select Status for the issue, or Modify Settings to repair it.", "CAC")
+                self.icon.notify(self.problem + " Select Read Full Status for details.", "CAC")
+            if self.state == "reconnecting" and self._status_unavailable_since is not None and time.monotonic() - self._status_unavailable_since >= 5:
+                self.notify_once("status-unavailable:" + str(self.snapshot.get("updatedAt")),
+                    "CAC cannot read local status. The monitor is still running, but its progress is unavailable. "
+                    "Select Read Full Status for repair details.")
             compatibility = self.snapshot.get("compatibility") or {}
             if compatibility.get("status") == "untested":
                 key = "compatibility:" + ":".join(str(compatibility.get(field)) for field in ("cli_sha256", "server_sha256"))
                 self.notify_once(key, "This Codex build passes schema checks but has no exact recovery certificate. "
                     + ("Balanced mode continues with runtime checks." if compatibility.get("dispatch_allowed") else "Strict mode blocks writes.")
-                    + " Select Status for details.")
+                    + " Select Read Full Status for details.")
             for warning in self.snapshot.get("warnings", []):
                 self.notify_once(warning["key"], warning["message"])
             try:
@@ -232,19 +234,8 @@ class TrayController:
                 updates = {"status": "failed", "reason": "Update status is unreadable. Inspect update-status.json; monitoring continues."}
             if updates.get("status") in {"failed", "rolled_back"}:
                 self._installing = False
-                self.notify_once("update:" + str(updates.get("job")), updates.get("reason", "CAC update was rolled back. Select Status and inspect the recovery journal; runtime data was preserved."))
+                self.notify_once("update:" + str(updates.get("job")), updates.get("reason", "CAC update was rolled back. Select Read Full Status and inspect the recovery journal; runtime data was preserved."))
         self._last_phase = self.state
-
-    def refresh_held(self):
-        from .holding_journal import Journal
-        journal = Journal(self.config_file.parent / "held-inputs.dpapi")
-        stamp = journal.path.stat().st_mtime_ns if journal.path.exists() else None
-        if stamp == self._held_stamp:
-            return
-        raw = journal.read()
-        self._held_records = tuple({key: r[key] for key in ("id", "threadId", "phase")}
-                                  for r in (raw or {}).get("records", []))
-        self._held_stamp = stamp
 
     def notify_once(self, key, body):
         fingerprint = hashlib.sha256(key.encode()).hexdigest()
@@ -270,7 +261,7 @@ class TrayController:
                 if result["status"] == "staged" and not self.done.is_set() and (not automatic or self.cfg.auto_update):
                     self.enqueue("update", "update", "install", result["job"])
                 elif not automatic and not self.done.is_set():
-                    self.icon.notify(f"Updates: {result['status']}. Select Status for details.", "CAC")
+                    self.icon.notify(f"Updates: {result['status']}. Select Read Full Status for details.", "CAC")
             except Exception as exc:
                 telemetry.failure("update.check_failed", exc)
                 if not self.done.is_set():
@@ -281,46 +272,71 @@ class TrayController:
         threading.Thread(target=check, name="CAC-updates", daemon=True).start()
 
     def status_label(self):
-        names = {"monitoring": "Monitoring", "waiting": "Waiting for usage", "paused": "No clients selected",
-                 "stopped": "Stopped", "starting": "Starting", "scanning": "Scanning",
-                 "reconnecting": "Reconnecting", "failed": "Needs attention"}
-        label = names[self.state]
-        waiting = self.snapshot.get("pending", 0)
-        return f"{label} · {waiting} waiting" if self.state in {"monitoring", "waiting"} else label
+        return state_label(self.state, self.snapshot)
+
+    def usage(self):
+        return usage_windows(self.snapshot, self.state, poll_seconds=self.cfg.poll_seconds)
 
     def show_status(self):
-        self.refresh()
-        scan = self.snapshot.get("lastScan", {})
-        scanned_at = self.snapshot.get("lastScanAt")
-        when = datetime.fromtimestamp(scanned_at).astimezone().strftime("%H:%M:%S %Z") if scanned_at else "Not scanned yet"
-        body = (f"Status: {self.status_label()}\nClients: {', '.join(self.cfg.clients) or 'None'}\n"
-                f"Last scan: {when}\n"
-                f"Chats checked: {scan.get('scanned_threads', 0)}\nNew quota failures: {scan.get('detected', 0)}\n"
-                f"Continuations sent: {scan.get('dispatched', 0)}\nPending: {self.snapshot.get('pending', 'Unknown')}\n"
-                f"Telemetry: {'Detailed' if self.cfg.detailed_telemetry else 'Private'}, local only")
+        from .status_window import StatusWindow
+        if self.status_window is None:
+            self.status_window = StatusWindow(self.status_model, self.lookup_titles, self.dialog_failed)
+        self.status_window.show()
+
+    def status_model(self):
+        from .state import load_state
         compatibility = self.snapshot.get("compatibility") or {}
-        body += (f"\n\nCompatibility: {compatibility.get('status', 'Not checked')} ({self.cfg.compatibility_policy})"
-                 f"\nCLI: {compatibility.get('cli_version', 'Unknown')}; daemon: {compatibility.get('app_server_version', 'Unknown')}"
-                 f"\nQueue writes: {'Allowed' if compatibility.get('dispatch_allowed') else 'Blocked/not checked'}"
-                 f"\n{compatibility.get('reason', '')}")
-        holding = self.snapshot.get("holding") or {}
-        body += (f"\n\nQueue holding: {'On' if self.cfg.queue_holding else 'Off'}"
-                 f"\nHeld requests: {holding.get('held', 'Unknown')}"
-                 f"\nObserved active owner chats: {holding.get('observedActive', 0)}")
-        for warning in self.snapshot.get("warnings", []):
-            body += "\n\n" + warning["message"]
         try:
             updates = update_status(self.config_file)
-            body += f"\n\nUpdates: {updates.get('status', 'Not checked')} ({'automatic' if self.cfg.auto_update else 'manual'})"
-            if updates.get("reason"):
-                body += "\n" + updates["reason"]
         except AutoContinuerError as exc:
-            body += "\n\nUpdates: " + str(exc)
-        if self.problem:
-            body += f"\n\nIssue: {self.problem}"
-        elif self.snapshot.get("reason"):
-            body += f"\n\nIssue: {self.snapshot['reason']}"
-        self.dialogs.show("status", body, title=f"CAC {__version__} status")
+            updates = {"status": "unavailable", "reason": str(exc)}
+        # Durable obligations are the authority, including while the monitor is stopped.
+        from .presentation import pending_threads
+        state_problem = ""
+        try:
+            threads = pending_threads(load_state(self.config_file.parent / "state.json").obligations)
+        except AutoContinuerError as exc:
+            threads = self.snapshot.get("waitingThreads", ())
+            state_problem = str(exc) + " Preserve state.json; repair its readability before restarting."
+        snapshot = self.snapshot | {"waitingThreads": threads}
+        stamp = snapshot.get("lastScanAt")
+        when = datetime.fromtimestamp(stamp).astimezone().strftime("%I:%M:%S %p").lstrip("0") if stamp else "Not Scanned Yet"
+        warnings = [warning["message"] for warning in snapshot.get("warnings", [])]
+        update_issue = updates.get("reason", "") if updates.get("status") in {"failed", "rolled_back", "unavailable"} else ""
+        issue = state_problem or self.problem or snapshot.get("reason") or (warnings[0] if warnings else "") or update_issue
+        details = (f"CLI: {compatibility.get('cli_version', 'Unknown')}\nDaemon: {compatibility.get('app_server_version', 'Unknown')}\n"
+                   f"{compatibility.get('reason', '')}\n\n" + "\n\n".join(warnings + [issue, updates.get("reason", "")]))
+        return {"label": state_label("failed" if state_problem else self.state, snapshot), "threads": threads,
+                "clients": ", ".join({"vscode": "VS Code", "cli": "CLI", "desktop": "Desktop"}[c] for c in self.cfg.clients) or "None",
+                "scan": when, "compatibility": {"certified": "Verified", "untested": "Untested", "blocked": "Blocked"}.get(
+                    compatibility.get("status"), "Not Checked") + f" ({self.cfg.compatibility_policy.title()})",
+                "updates": updates.get("status", "Not Checked").replace("_", " ").title(), "issue": issue,
+                "details": details, "usage": self.usage()}
+
+    def lookup_titles(self, identities):
+        from .appserver import AppServerClient
+        from .codex import find_codex, daemon_version
+        if not (self.snapshot.get("compatibility") or {}).get("read_allowed"):
+            return {}
+        names = {}
+        client = None
+        try:
+            daemon = daemon_version(find_codex(self.cfg.codex_executable), min(5, self.cfg.codex_command_timeout_seconds))
+            client = AppServerClient.connect(daemon.socket_path, min(2, self.cfg.rpc_timeout_seconds))
+            deadline = time.monotonic() + 5
+            for identity in identities:
+                if time.monotonic() >= deadline:
+                    break
+                thread = client.thread_read(identity)
+                if thread and thread.get("id") == identity and "name" in thread and (
+                        thread["name"] is None or isinstance(thread["name"], str)):
+                    names[identity] = thread["name"]
+        except Exception as exc:
+            telemetry.failure("tray.title_lookup_failed", exc)
+        finally:
+            if client:
+                client.close()
+        return names
 
     def select_clients(self, name: str):
         selected = set(self.cfg.clients)
@@ -341,28 +357,6 @@ class TrayController:
         self.dialogs.show("reset", "Restore default settings?\n\nThe selected prompt, pending continuations, logs and Windows login shortcut stay unchanged. Future logging returns to Private mode.",
                           confirm=True, then=lambda: self.enqueue("reset", "restore-defaults", "--prompt-file", self.cfg.prompt_file))
 
-    def toggle_holding(self):
-        value = "off" if self.cfg.queue_holding else "on"
-        self.dialogs.show("holding-consent", "Optional owner-supported queue holding\n\n"
-            "Captures queued requests only while CAC is already observing an active chat on its connected owner. "
-            "Other owners (including stdin/stdout), idle input and unobserved boundaries are not covered. Standard quota recovery is unchanged.\n\n"
-            "Full held input, including attachments, is stored locally encrypted for your Windows account. "
-            "No bodies enter telemetry or uploads. Keep this data until delivered or explicitly discarded. "
-            "Disabling/stopping preserves held requests rather than blindly replaying them.\n\n"
-            f"Turn queue holding {value}?", confirm=True,
-            then=lambda: self.enqueue("holding", "holding", value))
-
-    def manage_held(self, action, identity):
-        descriptions = {
-            "resume": "Resume this thread's held requests after reviewing its latest progress? CAC still waits for a completed turn, current usage permission and an empty native queue.",
-            "discard": "Permanently discard this confirmed, unsent held request? This does not remove anything from Codex history.",
-            "confirm-unsent": "Have you verified that this input is absent from BOTH Codex history and its native queue? An incorrect answer can duplicate your request. Mark it unsent, then separately approve resuming the thread?",
-            "confirm-consumed": "Have you verified that Codex already consumed this exact input? Remove the private recovery copy? Remaining requests still require review.",
-        }
-        arguments = ("held", action, identity) + (("--confirm",) if action.startswith("confirm-") else ())
-        self.dialogs.show("held-manage", descriptions[action] + "\n\nExact identity: " + identity,
-            title="CAC held request review", confirm=True, then=lambda: self.enqueue("held-manage", *arguments))
-
     def about(self):
         self.dialogs.show("about", f"Codex Auto Continuer {__version__}\n\nContinues exact local Codex chats after usage recovers.\nLocal diagnostics; no analytics uploads or credential logging.\n\nIndependent tool, not an OpenAI product. MIT license.",
                           title=f"About CAC {__version__}")
@@ -370,11 +364,6 @@ class TrayController:
     def watch(self):
         while not self.done.wait(1):
             self.refresh()
-            try:
-                self.refresh_held()
-            except Exception as exc:
-                telemetry.failure("tray.held_read_failed", exc)
-                self._held_records = ()
             if self.cfg.auto_update and not self.busy and (not self._last_update_check or time.monotonic() - self._last_update_check > self.cfg.update_check_hours * 3600):
                 self._last_update_check = time.monotonic()
                 self.check_updates(automatic=True)
@@ -389,25 +378,11 @@ class TrayController:
         client_items = [Item(label, client_action(value),
                              checked=lambda item, value=value: value in self.cfg.clients, enabled=available)
                         for value, label in (("vscode", "VS Code"), ("cli", "CLI"), ("desktop", "Desktop"))]
-        def held_items():
-            def manage_action(verb, identity):
-                return lambda icon, item: self.manage_held(verb, identity)
-            result = [Item("Enable Owner-Supported Holding", lambda icon, item: self.toggle_holding(),
-                           checked=lambda item: self.cfg.queue_holding, enabled=available),
-                      Item("Read Held Requests", action("held-view", "held", "list"), enabled=available)]
-            for index, record in enumerate(self._held_records[:20], 1):
-                identity, thread_id, state = record["id"], record["threadId"], record["phase"]
-                controls = [Item("View Private Input", action("held-input", "held", "list", identity, "--show-input"), enabled=available),
-                    Item("Resume After Review", manage_action("resume", thread_id), enabled=available)]
-                if state == "held":
-                    controls.append(Item("Discard Unsent Input", manage_action("discard", identity), enabled=available))
-                elif state in {"saved", "uncertain", "release_requested"}:
-                    for verb, label in (("confirm-unsent", "Confirm Not Consumed"), ("confirm-consumed", "Confirm Consumed")):
-                        controls.append(Item(label, manage_action(verb, identity), enabled=available))
-                result.append(Item(f"Request {index}: {state.replace('_', ' ')}", Menu(*controls)))
-            return iter(result)
         return Menu(
-            Item(lambda item: f"Status: {self.status_label()}", lambda icon, item: self.show_status(), default=True),
+            Item(lambda item: self.status_label(), lambda icon, item: self.show_status(), default=True),
+            *(Item(lambda item, index=index: f"{self.usage()[index].label}: {self.usage()[index].percentage()} • {self.usage()[index].reset()}",
+                   lambda: None, enabled=False) for index in range(2)),
+            Item("Read Full Status", lambda icon, item: self.show_status()),
             Menu.SEPARATOR,
             Item("Start Monitoring", action("start", "start"), enabled=lambda item: available(item) and bool(self.cfg.clients) and not self.running),
             Item("Stop Monitoring", action("stop", "stop"), enabled=lambda item: available(item) and self.running),
@@ -423,7 +398,6 @@ class TrayController:
                 Item("Detailed", lambda icon, item: self.privacy("detailed"), checked=lambda item: self.cfg.detailed_telemetry, radio=True),
                 Item("Private", lambda icon, item: self.privacy("private"), checked=lambda item: not self.cfg.detailed_telemetry, radio=True))),
             Item("Restore Defaults", lambda icon, item: self.restore_defaults()),
-            Item("Queue Holding", Menu(held_items)),
             Menu.SEPARATOR,
             Item("Check For Updates", lambda icon, item: self.check_updates(), enabled=lambda item: not self._update_busy),
             Item(f"About CAC {__version__}", lambda icon, item: self.about()),
@@ -440,7 +414,8 @@ def run_tray(config_file: Path, *, start_monitor=True) -> int:
             controller = TrayController(config_file)
             telemetry.setup(config_file.parent / "tray.jsonl", controller.cfg)
             telemetry.emit("tray.started", configPath=str(config_file))
-            controller.icon = TrayIcon("CodexAutoContinuer", tray_image(controller.state), "CAC", menu=controller.menu())
+            controller.icon = TrayIcon("CodexAutoContinuer", tray_image(controller.state), "CAC", menu=controller.menu(),
+                                       usage_provider=controller.usage)
             def ready(icon):
                 icon.visible = True
                 telemetry.emit("tray.ready", menuItems=[item.text for item in icon.menu.items])
@@ -457,6 +432,8 @@ def run_tray(config_file: Path, *, start_monitor=True) -> int:
             finally:
                 controller.done.set()
                 controller.dialogs.close()
+                if controller.status_window:
+                    controller.status_window.close()
                 telemetry.emit("tray.closed")
             return 0
     except AlreadyRunningError:

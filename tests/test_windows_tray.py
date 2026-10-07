@@ -90,7 +90,7 @@ def test_next_popup_reads_current_labels_checks_and_enabled_state(monkeypatch):
         value.update(text="After", checked=True, enabled=False)
         icon.update_menu()
         icon._on_notify(0, win32.WM_RBUTTONUP)
-        assert snapshots[0] == ("Before", 0)
+        assert snapshots[0] == ("Before", 0x100)  # MFT_OWNERDRAW, no state flags
         assert snapshots[1][0] == "After"
         assert snapshots[1][1] & win32.MFS_CHECKED
         assert snapshots[1][1] & win32.MFS_DISABLED

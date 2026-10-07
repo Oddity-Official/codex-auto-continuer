@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 from .config import lock_path, owner_path
@@ -14,7 +15,15 @@ def read_runtime(settings: Path) -> dict:
     if not path.exists():
         return {}
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        deadline = time.monotonic() + 0.25
+        while True:
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+                break
+            except PermissionError:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.02)
         if not isinstance(value, dict) or value.get("phase") not in {
             "starting", "scanning", "monitoring", "waiting", "paused", "reconnecting", "failed", "stopped"
         }:

@@ -155,7 +155,7 @@ No probe process remained in the final process inspection. Successful native and
 
 ### Remaining acceptance work
 
-No new all-client queue-holding feature is certified. Desktop/VS Code need a production owner transport with preserved client configuration, security and approvals, followed by the full composer matrix above. CLI additionally needs a supported TUI-local input hook. Peer queue polling cannot substitute for either integration. The current release keeps holding off by default and leaves normal quota recovery independent of it. Current gates, release and installation results belong to [verification](../../VALIDATION.md).
+No new all-client queue-holding feature is certified. Desktop/VS Code need a production owner transport with preserved client configuration, security and approvals, followed by the full composer matrix above. CLI additionally needs a supported TUI-local input hook. Peer queue polling cannot substitute for either integration. The current release keeps holding off by default and leaves normal quota recovery independent of it. Current gates, release and installation results belong to [verification](../../../VALIDATION.md).
 
 ### Native lock race found during release verification
 

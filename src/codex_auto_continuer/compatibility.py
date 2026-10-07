@@ -191,7 +191,7 @@ class CompatibilityGate:
                     all(certificate[field] == values[field] for field in ("cli_version", "app_server_version", "cli_sha256", "server_sha256", "schema_sha256"))):
                     return Compatibility(status="certified", reason="Exact Codex CLI/daemon build passed CAC's native recovery tests.", **values)
             provisional = Compatibility(status="untested", **values)
-            action = ("Balanced mode permits recovery with runtime checks. Select Status for evidence."
+            action = ("Balanced mode permits recovery with runtime checks. Select Read Full Status for evidence."
                       if provisional.dispatch_allowed else "Queue writes are blocked. Use a certified stable build or update CAC.")
             reason = f"Codex CLI {values['cli_version']} / daemon {daemon.app_server_version} passes schema checks but is not behavior-certified for CAC {__version__}. " + action
             return Compatibility(status="untested", reason=reason, **values)

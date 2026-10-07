@@ -1,12 +1,29 @@
 # Verification
 
-CAC 0.6.1, 5 October 2026. Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Imported checkpoint: v001. Prior version results below remain dated artifact evidence, not checks of changed code.
+Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Imported checkpoint: v001. Prior release results below remain dated artifact evidence, not checks of changed code.
+
+## Source UI candidate, 7 October 2026
+
+The dark owner-drawn native menu, status panel, pending-layer icons and transient-status warning repair are implemented in source. Queue holding is absent from the tray; its off-by-default experimental CLI engine and tests remain. The source still reports 0.6.1; this candidate is not a new published release. The installed 0.6.1 app and user data were not replaced.
+
+| Check | Exact scope | Result |
+| --- | --- | --- |
+| Non-interactive Windows suite | `pytest tests scripts/tests -q -k 'not about_dialog_closes'`; includes real hidden menu-owner callbacks, GDI pixels at 96/144/192 DPI, meters, privacy, recovery and workflow tests | 279 passed, 3 visible dialog cases deselected, 38.40 seconds |
+| Native Codex integration | `scripts/verify-continuation.ps1 -CodexPath .data/ci-official-baseline/package/bin/codex.exe`; isolated official 0.160.0, synthetic loopback account/model service | 18 passed, 110.44 seconds; exact recovery certificate verified |
+| Source compilation and documentation | Application, tests, scripts and integration compilation; local Markdown targets | Results recorded in the [current audit](Audits/2026-10-07/AUDIT.md) |
+| Production telemetry review | Recent cycle/recovery/status metadata only, no public chat names, IDs or bodies | One acknowledged Continue followed by a completed turn; brief tray read failures with no corresponding supervisor stop |
+| Actual interactive acceptance | Final popup/submenu appearance, hover, keyboard, Close/Escape, taskbar edges and mixed-monitor DPI | Deferred at the user's request; preliminary status-panel viewing is not final acceptance |
+| Frozen candidate, signing, publication and deployment | New portable binary/release/update checks | Not performed; installed app remains unchanged |
+
+The first manual native invocation passed 14 cases and failed four: a relative executable path failed the absolute managed-binary identity guard, and three fixture cases referenced the obsolete icon filename. The fixture was corrected; the documented wrapper resolves the executable path. The final native result above passed without changing production identity guards.
+
+The full `verify-windows.ps1` gate is not claimed passed for this candidate: its three visible dialog tests and the requested interactive UI acceptance remain outstanding while the user is working. Do not publish or deploy on the basis of offscreen rendering alone.
 
 ## Compatibility certification
 
-The [5 October real-client investigation](Audits/2026-10-05/AUDIT.md) reproduced and repaired loaded quota `systemError` deferral. Actual CLI composer recovery passed with one completed Continue and three duplicate-free scans. The CLI's queued follow-up remains client-local and unprotected. Normal Desktop composer/history tests accepted two follow-ups exactly once; timed polling did not capture pre-consumption queue IDs. Isolated Desktop and current VS Code composer tests reached Windows setup barriers. None of these results certifies all-client queue holding.
+The [5 October real-client investigation](Audits/History/2026-10-05/AUDIT.md) reproduced and repaired loaded quota `systemError` deferral. Actual CLI composer recovery passed with one completed Continue and three duplicate-free scans. The CLI's queued follow-up remains client-local and unprotected. Normal Desktop composer/history tests accepted two follow-ups exactly once; timed polling did not capture pre-consumption queue IDs. Isolated Desktop and current VS Code composer tests reached Windows setup barriers. None of these results certifies all-client queue holding.
 
-| Current source check | Exact scope | Result |
+| Published 0.6.1 source check (5 October) | Exact scope | Result |
 | --- | --- | --- |
 | `scripts/verify-windows.ps1` | Application/workflow regressions, native transport/dialog/menu checks, encryption safety, compileall and version after lock repair | 260 passed in 38.61 seconds; CAC 0.6.1 |
 | Actual CLI composer probe | ConPTY input, quota denial, loaded native owner, production CAC discovery and dispatch | Passed; one completed Continue and three duplicate-free scans; zero held client-local inputs |

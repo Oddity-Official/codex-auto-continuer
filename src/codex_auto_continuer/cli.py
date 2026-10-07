@@ -370,7 +370,11 @@ def main(argv: list[str] | None = None) -> int:
             requested_scan = None
             def on_cycle(result):
                 nonlocal last_result, last_scan_at, completed_scan, requested_scan
-                last_result = result.__dict__
+                from .presentation import pending_threads
+                previous_usage = last_result.get("usage")
+                last_result = result.__dict__ | {"waitingThreads": pending_threads(supervisor.state.obligations)}
+                if last_result.get("usage") is None:
+                    last_result["usage"] = previous_usage
                 last_scan_at = time.time()
                 completed_scan = requested_scan or completed_scan
                 requested_scan = None
@@ -383,7 +387,7 @@ def main(argv: list[str] | None = None) -> int:
                     current_phase = "failed"
                 _snapshot(args.config, phase=current_phase, **last_result, lastScan=dict(last_result),
                           lastScanAt=last_scan_at, scanRequestId=completed_scan,
-                          reason=("Queue holding needs attention. Read Held Requests and Status; inputs are preserved."
+                          reason=("Experimental queue holding needs attention. Run 'cac held list' and read status; inputs are preserved."
                                   if holding_problem else compatibility.get("reason") if current_phase == "failed" else None))
             def settings_stamp():
                 paths = (args.config, prompt_path(cfg, args.config), args.config.parent / "held-inputs.dpapi")
@@ -424,8 +428,10 @@ def main(argv: list[str] | None = None) -> int:
                 _snapshot(args.config, phase="failed", errorType="ConfigurationError", lastScan=last_result,
                           lastScanAt=last_scan_at, reason="Settings or prompt need repair. Modify Settings or Modify Prompt, then save.")
             def on_phase(value):
+                from .presentation import pending_threads
                 fields = dict(last_result)
-                fields.update(pending=len(supervisor.state.obligations), compatibility=supervisor.compatibility.report())
+                fields.update(pending=len(supervisor.state.obligations), waitingThreads=pending_threads(supervisor.state.obligations),
+                              compatibility=supervisor.compatibility.report())
                 if value == "reconnecting":
                     fields["ordinary_usage_allowed"] = None
                     fields.update(supervisor.read_problem or {})

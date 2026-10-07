@@ -1,6 +1,6 @@
 # Codex Auto Continuer
 
-CAC 0.6.0 continues the exact local Codex chat stopped by a usage limit, once Codex confirms ordinary usage is available. It does not click windows, change the clipboard or answer approvals.
+CAC continues the exact local Codex chat stopped by a usage limit, once Codex confirms ordinary usage is available. It does not click windows, change the clipboard or answer approvals.
 
 ## Get started
 
@@ -12,7 +12,7 @@ You need Windows 11 x86_64 and a signed-in native Codex installation. Python is 
 
 ## Tray controls
 
-- `Status` shows the current state, last scan, chats checked, new quota failures, continuations sent and pending work. Double-click also opens it.
+- `Read Full Status` opens a dark panel showing current state, selected clients, last scan, compatibility, updates, usage and waiting threads. Double-click also opens it. `Details` shows full selected thread names and diagnostic explanations. Double-click a waiting row or press Enter on it for the same details.
 - `Start Monitoring` and `Stop Monitoring` control recovery. Stop finishes the current cycle and preserves pending work.
 - `Clients To Monitor` independently selects VS Code, CLI and Desktop. `All` selects all three. No selection pauses client monitoring. Executor and sub-agent jobs are always excluded.
 - `Modify Prompt` opens the saved Markdown prompt in its associated editor. The default is simply `Continue`.
@@ -22,9 +22,11 @@ You need Windows 11 x86_64 and a signed-in native Codex installation. Python is 
 - `Exit CAC` gracefully stops monitoring and closes the tray.
 - `Check For Updates` checks and installs a newer signed stable CAC release. Downloads do not block monitoring controls.
 
-Green means monitoring, including waiting for quota. Yellow means stopped, starting, paused or reconnecting. Red means continuation is blocked by an error. Select `Status` for guidance.
+The arrow is green when monitoring normally with no pending work, yellow while continuations are pending, gray when stopped, paused, starting or reconnecting, and red for an error or unresolved send. One yellow stack layer represents one unique pending thread, up to four layers for four or more. The stack keeps its pending count when monitoring stops.
 
-Status shows compatibility evidence and policy. Unknown stable builds get one non-modal notice; working Balanced mode stays green. Set `compatibility_policy = "strict"` for exact-build-only recovery. A real compatibility block preserves pending work and allows only verified reads. CAC never changes Codex's installation or updater settings. `status --live` includes exact versions and checksums.
+The dark tray menu displays 5-hour and 7-day quota remaining. Fuller meters mean more capacity. Full Status explicitly says Remaining and marks retained readings Last Known. Unavailable readings and unknown resets are not guessed. Resets use your local timezone. Selected options have a muted row tint and a small right-edge rectangle; a brighter tint indicates hover.
+
+Status shows compatibility evidence and policy. Unknown stable builds get one non-modal notice; an untested build is not by itself an error under Balanced mode. Set `compatibility_policy = "strict"` for exact-build-only recovery. A real compatibility block preserves pending work and allows only verified reads. CAC never changes Codex's installation or updater settings. `status --live` includes exact versions and checksums.
 
 File actions do not wait for monitoring controls. If Windows has no file association, CAC opens the file in Notepad; other launch errors are reported, not hidden.
 
@@ -38,31 +40,21 @@ CAC does not upload diagnostics. `telemetry.jsonl`, `tray.jsonl` and `updates.js
 
 Each stream defaults to 8 MiB plus three compressed backups. Advanced `diagnostic_trace` settings add allowlisted per-request summaries, independently of privacy. Changing privacy does not scrub old logs. Files are not encrypted; pending state still contains real chat IDs. Share the clean ZIP, not a used data folder.
 
-## Optional queue holding
+## Experimental queue holding
 
-`Queue Holding > Enable Owner-Supported Holding`, or `holding on` in the CLI, enables this mode after the tray explains its coverage and private storage. The default is off.
+Queue holding is not in the tray. The existing experimental engine and CLI commands remain for development and recovery of previously held data. The default is off. Do not enable it expecting normal Desktop, extension or CLI composer protection.
 
-CAC must already be observing an active chat on its connected native server owner before follow-ups arrive. Only that owner's dispatch lock can protect removal. A separate Desktop/extension/CLI owner, stdin/stdout owner, idle input or boundary before the observer connects is not protected. There are at most 16 simultaneous active subscriptions; Status shows their count and coverage warnings. This is not a universal composer interceptor.
+Ordinary quota recovery does not require holding. Normal client startup does not provide this engine with pre-consumption access to Desktop/extension inputs or the terminal client's private queue. Enabling the setting alone does not protect those composers.
 
-Normal Desktop and extension startup does not connect their owners to this observer. Client adapters are not included in the release. Normal CLI's Tab-queued prompts stay inside the terminal client and cannot be held by this server-queue feature. Enabling the setting alone does not protect those composers. Ordinary quota recovery is separate; a loaded `systemError` quota chat can currently remain pending rather than receive Continue automatically. Inspect the original chat and send Continue manually if this occurs.
-
-Captured requests and embedded attachments are encrypted in `data/held-inputs.dpapi` for the current Windows account and bound to the Codex home/account. Only queued input is stored, not the full conversation. Telemetry contains IDs, phases and decisions, never these bodies. The journal permits at most 1,000 requests and 32 MiB of plaintext; capture stops with a diagnostic before deleting input if it cannot persist safely. Keep this file until requests are delivered or explicitly discarded. Do not send it with diagnostics or a shared release.
-
-During a usage stop, CAC sends the saved `Continue` unchanged. After that turn completes successfully, it releases the next held request, checks usage again and waits for terminal completion before releasing another. Ordinary successful work does not need an extra Continue. A request appearing in history is evidence of consumption, not successful completion. Exact client message IDs establish identity; duplicate text does not.
-
-The submenu refreshes its request controls in the background. `View Private Input` reveals text only in an owned dialog; attachment bodies are retained but not dumped into the dialog. `Resume After Review` approves newer/manual progress, without bypassing quota, scope or completion checks. `Discard Unsent Input` deletes only a confirmed unsent recovery copy. For an unconfirmed removal/send, inspect the original chat **and its native queue** before choosing `Confirm Not Consumed` or `Confirm Consumed`. An incorrect manual resolution can duplicate or discard work. Remaining requests require separate resume approval. The menu shows the first 20 requests; the CLI lists all:
+If you previously captured requests, preserve `data/held-inputs.dpapi` until they are delivered or explicitly discarded. It is encrypted for the original Windows account and bound to the Codex home/account; do not share it. Stopping monitoring or disabling holding preserves it. Review controls remain in the CLI:
 
 ```powershell
 .\CodexAutoContinuer-CLI.exe held list
-.\CodexAutoContinuer-CLI.exe held list --show-input  # Explicit private body access in this terminal.
-.\CodexAutoContinuer-CLI.exe held resume <thread-id>
-.\CodexAutoContinuer-CLI.exe held discard <input-id>
-.\CodexAutoContinuer-CLI.exe held confirm-unsent <input-id> --confirm
-.\CodexAutoContinuer-CLI.exe held confirm-consumed <input-id> --confirm
+.\CodexAutoContinuer-CLI.exe held list --show-input  # Prints private input bodies here.
 .\CodexAutoContinuer-CLI.exe holding off
 ```
 
-Stopping monitoring, disabling holding or restoring settings preserves held requests; it does not blindly put them back in Codex's queue. Turn holding back on to permit release. Unknown acknowledgement outcomes remain preserved without automatic retry. Original-client approval/input requests cause the observer to disconnect without answering; use Codex's original client, then review held requests.
+`held --help` describes resume, discard and explicit uncertainty resolution. Check the original chat and its queue before resolving unconfirmed input: an incorrect manual decision can duplicate or discard work. No automatic blind replay occurs.
 
 ## Terminal and portability
 

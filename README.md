@@ -4,6 +4,8 @@ A portable Windows tray tool that continues the exact Codex chat stopped by a us
 
 This is an independent tool, not an OpenAI product. It uses experimental local Codex interfaces and stops with a diagnostic if their contract changes. See [verified behavior and limits](Docs/VALIDATION.md).
 
+The redesigned tray/status interface is a source candidate awaiting final interactive Windows checks and a new packaged release. The latest stable download is still the previously verified release.
+
 ## Launch and use
 
 1. Extract the [latest stable release](https://github.com/Oddity-Official/codex-auto-continuer/releases/latest) into a writable folder. Keep both EXEs and `_internal` together.
@@ -21,7 +23,9 @@ The EXEs are unsigned. Windows may display a reputation warning. Verify the down
 
 ## Controls and settings
 
-Double-click the icon or select `Status` for local status and last scan counts. Green means monitoring, including waiting for quota. Yellow means stopped, starting, paused or reconnecting. Red means continuation is blocked by an error. `Exit CAC` stops the supervisor before closing the tray.
+Double-click the icon or select `Read Full Status` for a dark status panel with current state, usage and waiting thread names. The compact menu shows 5-hour and 7-day capacity remaining; Full Status labels the percentages explicitly. Missing readings say Unavailable; retained readings are marked Last Known in Full Status.
+
+The arrow is green when monitoring with no pending work, yellow while work is pending, gray when stopped or reconnecting, and red when attention is required. Up to four yellow stack layers show the number of unique pending threads, including while stopped. Selected menu options have a tinted row and a small right-edge marker, separate from hover highlighting. `Exit CAC` stops the supervisor before closing the tray.
 
 Use the tray to select clients, edit the prompt and settings, choose Private or Detailed logging, and toggle login launch. The companion terminal controls the same supervisor and saved settings:
 
@@ -63,9 +67,7 @@ The queue has no verified atomic turn precondition or idempotent-send guarantee.
 
 ## Local telemetry and privacy
 
-Optional `Queue Holding` keeps queued follow-ups out of an already observed active owner's queue, sends the unchanged saved `Continue` after a quota failure, then releases requests individually after completed turns and fresh usage checks. It is off by default. Separate owners, stdin/stdout clients, idle input and unobserved boundaries are not protected. Status reports coverage; the tray offers private input review and explicit recovery controls. See [queue holding](Docs/USER-GUIDE.md#optional-queue-holding).
-
-Enabling it alone does not protect normal Desktop/extension composers; client connection adapters are not shipped. Normal CLI's Tab queue is client-local and invisible to this server-queue holder. The [installed-client investigation](Docs/Audits/2026-10-05/AUDIT.md) records connection proofs and outstanding acceptance checks, including a loaded quota `systemError` recovery deferral.
+Queue holding is experimental, off by default and not exposed in the tray. Its existing engine, encrypted data and [CLI review controls](Docs/USER-GUIDE.md#experimental-queue-holding) remain available. It does not protect normal Desktop, extension or CLI composers. Client integration is [deferred work](Docs/PRODUCT.md#deferred-client-queue-integration); the [installed-client investigation](Docs/Audits/History/2026-10-05/AUDIT.md) records the evidence. Ordinary quota recovery remains independent of holding.
 
 Held input and attachments are an explicit privacy exception: only this opt-in feature stores their canonical payload, encrypted locally for the Windows account and bound to the Codex home/account. No full conversation archive, telemetry bodies or diagnostic uploads are created. A used encrypted journal is not portable to another person's account; share the clean release instead.
 

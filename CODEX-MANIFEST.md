@@ -2,13 +2,22 @@
 
 ChatGPT base checkpoint: v001
 
-Updated: 2026-10-05
+Updated: 2026-10-07
 
 ## Imported base
 
 All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba04` preserves v001 and its original checksum manifest. ChatGPT's manifest is unchanged. The stale imported checksum file is not retained as a current-source checksum; each new transport owns its generated manifest.
 
-## CAC 0.6.1 local work
+## Dark UI source candidate
+
+- Implemented the approved compact dark tray/status interface with native owner-drawn HMENU and a Win32 status panel, live read-only authoritative names, remaining-capacity meters, right-edge selected markers, and twenty SVG-derived arrow/pending-layer icon variants. Names remain memory-only. Native popup border/submenu appearance and final interactive acceptance remain unverified.
+- Removed queue holding from the tray. Preserved the off-by-default experimental CLI engine, encrypted journals and native tests. Deferred actual client queue integration in the product owner document; no new interception capability is claimed.
+- Reviewed recent private telemetry. One acknowledged Continue was followed by completed-turn metadata without duplicate submission. Brief tray runtime-status read failures coincided with an independently running monitor. Repaired warning classification, bounded sharing-error reads, and added cause/code/recovery-duration diagnostics. The old logs cannot establish the underlying filesystem cause.
+- Non-interactive Windows regressions: 279 passed, three visible About cases deselected, 38.40 seconds. Native official Codex gate: 18 passed in 110.44 seconds. Failed preliminary fixture/path checks and final compilation/documentation/privacy results belong to Docs/Audits/2026-10-07/AUDIT.md.
+- The user requested no further Computer Use while working. Isolated previews were stopped. Final popup/submenu, keyboard, window-close and mixed-monitor acceptance plus the full native/frozen release gates are deferred. No new version, package publication, deployment, prompt/config mutation or production monitor restart occurred. The installed 0.6.1 app is untouched; this is a source handoff, not release approval.
+- Archived the previous audit through the managed helper, preserved its observations, and corrected its moved verification link. ChatGPT's manifest remains unchanged.
+
+## CAC 0.6.1 release work
 
 - Repaired loaded quota `systemError` recovery without requiring held input. Exact latest failed-turn identity, completion timestamp, authoritative permission, pre-send revalidation and uncertainty guards remain mandatory. Removed the obsolete holding-only permission method. Meaningful focused regressions and a native loaded-owner case cover the failure.
 - The actual CLI ConPTY probe now verifies production CAC dispatch rather than injecting a policy-bypass diagnostic. One Continue completed after permission returned; three scans sent no duplicate. Its local composer queue still escaped server holding. Shared-owner CLI-only provenance remains an acceptance gap.
