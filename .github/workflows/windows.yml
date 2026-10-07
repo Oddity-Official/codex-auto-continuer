@@ -49,7 +49,7 @@ jobs:
         run: ./scripts/build-portable.ps1
       - name: Build source wheel
         run: |
-          & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m', 'pip', 'wheel', '--timeout', '30', '--no-deps', '--no-build-isolation', '--wheel-dir', 'dist', '.') -TimeoutSeconds 120
+          & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('scripts/build-wheel.py') -TimeoutSeconds 150
       - name: Verify frozen UX and private holding modules
         run: |
           & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('scripts/verify-portable.py') -TimeoutSeconds 180

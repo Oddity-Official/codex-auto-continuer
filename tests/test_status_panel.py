@@ -1,6 +1,45 @@
 from __future__ import annotations
 
 import pytest
+import sys
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Native Windows UTF-16 text")
+def test_title_measurement_includes_emoji_and_the_complete_suffix():
+    import ctypes
+    from codex_auto_continuer.windows_ui import Canvas, user, gdi, R
+    dc = user.GetDC(None)
+    canvas = Canvas(dc)
+    try:
+        text = "\U0001f4bb Profile Settings"
+        actual = canvas.text(text, (0, 0, 800, 40), measure=True)
+        previous = gdi.SelectObject(dc, canvas.fonts[(13, False)])
+        rect = R(0, 0, 800, 40)
+        try:
+            user.DrawTextW(dc, text, -1, ctypes.byref(rect), 0x400 | 0x20 | 0x800)
+        finally:
+            gdi.SelectObject(dc, previous)
+        assert actual == (rect.right - rect.left, rect.bottom - rect.top)
+    finally:
+        canvas.close()
+        user.ReleaseDC(None, dc)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Native Windows minimized state")
+def test_reopening_status_restores_a_minimized_window():
+    from codex_auto_continuer.status_window import StatusWindow
+    from codex_auto_continuer.windows_ui import user, bind, I, H
+    bind(user, "IsIconic", I, H)
+    hwnd = user.CreateWindowExW(0x08000008, "STATIC", "CAC restoration fixture",
+        0xA0CA0000, -10000, -10000, 1, 1, None, None, None, None)
+    assert hwnd
+    try:
+        assert user.IsIconic(hwnd)
+        panel = StatusWindow(lambda: {}, lambda ids: {}, lambda error: None)
+        panel._proc(hwnd, 0x8001, 0, 0)
+        assert not user.IsIconic(hwnd)
+    finally:
+        user.DestroyWindow(hwnd)
 
 
 def test_native_enter_opens_selected_thread_details_without_ending_the_panel():

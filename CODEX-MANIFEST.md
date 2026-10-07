@@ -8,7 +8,15 @@ Updated: 2026-10-07
 
 All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba04` preserves v001 and its original checksum manifest. ChatGPT's manifest is unchanged. The stale imported checksum file is not retained as a current-source checksum; each new transport owns its generated manifest.
 
-## CAC 0.7.0 UI release candidate
+## CAC 0.7.1 final UI verification
+
+- The approved dark native interface is implemented. The installed signed 0.7.0 release is monitoring with certified CLI 0.160.0 / daemon 0.161.0, all clients, Detailed local logging, unchanged Continue prompt and the exact normal login shortcut. Published frozen, signed upgrade and code-only rollback checks passed. Final patch publication and installation are recorded in Docs/VALIDATION.md when verified.
+- Final native regressions reproduced truncated emoji-bearing title measurement and failed restoration of a minimized panel. The renderer uses null-terminated UTF-16 text; the reopen callback restores the window. Full Windows gate: 293 passed in 35.22 seconds, compilation and 0.7.1 identity passed. All 18 native integration cases passed separately for baseline, current/current and mixed tuples before adding exact 0.7.1 certificates.
+- The clean wheel builder stages only current package/build inputs, validates exact package names and bytes, and atomically replaces output. Two actual builds excluded three obsolete icons retained in the checkout's old Setuptools cache. CI and contributor commands use the same builder.
+- Current exports exclude runtime data and configured private markers. Two private historical commits contain former username canaries from an audit helper. Keep the repository private pending explicit review or agreed history cleanup; current-file inspection does not certify sanitized Git history.
+- The current audit preserves failed probes and intermittent hosted cleanup failures. Native menus retain Windows chrome; direct hidden shell-owner interaction, physical mixed-DPI transitions, theme switching and high contrast remain acceptance limits. Experimental queue holding is absent from the menu and does not claim all-client interception.
+
+## CAC 0.7.0 UI source record
 
 - Refined the native panel into a prominent state heading, quiet metadata, two rounded usage cards and a borderless bounded waiting list. Footer actions remain visible on the controlled 200% short work area. Native menu interaction, selected markers, hover and disabled appearance were inspected through the visible-owner production HMENU fixture.
 - Corrected native post-painted submenu arrows without undocumented theme changes. Fixed the live Enter-key failure (`MSG.hWnd`, not `hwnd`) with an actual Windows-structure regression; Details now belongs to the visible status panel. Enter opens/dismisses Details and Close dismisses the panel in Computer Use.

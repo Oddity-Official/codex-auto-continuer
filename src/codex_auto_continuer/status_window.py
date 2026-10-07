@@ -328,7 +328,7 @@ class StatusWindow:
                 user.PostQuitMessage(0)
                 return 0
             if msg == 0x8001:
-                user.ShowWindow(hwnd, 5)
+                user.ShowWindow(hwnd, 9)
                 return 0
             if msg == 0x2E0 and hasattr(self, "scale"):
                 self.dpi = wparam & 0xFFFF

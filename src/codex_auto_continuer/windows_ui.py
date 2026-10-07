@@ -101,7 +101,7 @@ class Canvas:
         if measure:
             flags = 0x400 | 0x20 | 0x800
         try:
-            user.DrawTextW(self.dc, text, len(text), C.byref(rect), flags)
+            user.DrawTextW(self.dc, text, -1, C.byref(rect), flags)
             return rect.right - rect.left, rect.bottom - rect.top
         finally:
             gdi.SelectObject(self.dc, previous)

@@ -48,7 +48,7 @@ jobs:
       - name: Build portable ZIP and wheel
         run: |
           ./scripts/build-portable.ps1
-          & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('-m','pip','wheel','--timeout','30','--no-deps','--no-build-isolation','--wheel-dir','dist','.') -TimeoutSeconds 120
+          & ./scripts/run-project-command.ps1 -FileName "$PWD/.venv/Scripts/python.exe" -Arguments @('scripts/build-wheel.py') -TimeoutSeconds 150
       - name: Verify frozen UX and private holding modules
         # This probe uses only disposable settings/control files and no Codex.
         run: |

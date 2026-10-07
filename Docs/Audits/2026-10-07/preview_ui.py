@@ -45,7 +45,7 @@ def main():
         controller.enqueue = lambda *args: print("Fixture action:", args, flush=True)
         controller.open = lambda *args: print("Fixture file action:", args, flush=True)
         controller.lookup_titles = lambda identities: {identity: (
-            "Story Linter — Performance Pass" if index == 0 else None if index == 1 else
+            "\U0001f4bb Story Linter — Performance Pass" if index == 0 else None if index == 1 else
             "A Very Long Authoritative Thread Title That Must Not Widen The Status Panel " * 3)
             for index, identity in enumerate(identities)}
         errors = []

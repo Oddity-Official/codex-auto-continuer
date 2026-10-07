@@ -7,8 +7,10 @@ import json
 import zipfile
 from pathlib import Path
 
-FORBIDDEN = {"App", ".data", "data", ".venv", "node_modules", ".git", "build", "dist", "__pycache__"}
-TOKENS = (b"-----BEGIN PRIVATE KEY-----", b"-----BEGIN RSA PRIVATE KEY-----", b"-----BEGIN OPENSSH PRIVATE KEY-----")
+FORBIDDEN = {"App", ".data", "data", ".venv", "node_modules", ".git", "build", "dist", "__pycache__",
+    ".cac-updates", "Checkpoints", "Handoffs"}
+TOKENS = tuple(b"-----BEGIN " + kind + b"-----" for kind in
+    (b"PRIVATE KEY", b"RSA PRIVATE KEY", b"OPENSSH PRIVATE KEY"))
 
 
 def main():

@@ -2,18 +2,18 @@
 
 Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Imported checkpoint: v001. Prior release results below remain dated artifact evidence, not checks of changed code.
 
-## CAC 0.7.0 UI verification, 7 October 2026
+## CAC 0.7.1 UI verification, 7 October 2026
 
-CAC 0.7.0 implements the dark native menu, compact status panel, pending-layer icons and transient-status warning repair. Queue holding is absent from the tray; its off-by-default experimental CLI engine and tests remain. Current publication and installation results are recorded below when complete.
+CAC 0.7.1 implements the dark native menu, compact status panel, pending-layer icons and transient-status warning repair. Queue holding is absent from the tray; its off-by-default experimental CLI engine and tests remain. The patch fixes UTF-16 title measurement and restores a minimized status window when reopened. Both native regressions failed before repair.
 
 | Check | Exact scope | Result |
 | --- | --- | --- |
-| Full native Windows gate | `scripts/verify-windows.ps1`; includes visible About close tests, actual hidden menu-owner callbacks, GDI pixels at 96/144/192 DPI, meters, privacy, recovery, encryption, workflow and native cleanup regressions | 290 passed, 47.08 seconds after detached-fixture cleanup repair; compilation and 0.7.0 version passed |
+| Full native Windows gate | `scripts/verify-windows.ps1`; includes visible About close tests, actual hidden menu-owner callbacks, GDI pixels at 96/144/192 DPI, UTF-16 titles, minimized-window restoration, meters, privacy, recovery, encryption, workflow and native cleanup regressions | 293 passed, 35.22 seconds; compilation and 0.7.1 version passed |
 | Native Codex integration | All continuation, compatibility and holding modules; isolated official 0.160.0/0.161.0 and mixed tuple, synthetic loopback account/model service | 18 passed for each tuple; exact results in the certification table |
 | Source compilation and documentation | Application, tests, scripts and integration compilation; local Markdown targets | Results recorded in the [current audit](Audits/2026-10-07/AUDIT.md) |
 | Production telemetry review | Recent cycle/recovery/status metadata only, no public chat names, IDs or bodies | One acknowledged Continue followed by a completed turn; brief tray read failures with no corresponding supervisor stop |
 | Actual interactive source inspection | Computer Use on temporary synthetic CAC data, without Codex connections or real control writes | Dark popup and Clients submenu, native keyboard selection/traversal/dismissal, selected versus hover/disabled appearance, normal/empty/long-list panels, full-title Details, error/unknown quota and controlled 200% short-work-area layout inspected |
-| Final local frozen candidate | `scripts/verify-portable.py`; actual EXEs and isolated control/data paths | All 603 manifest files and UX checks passed; zero Codex connections or user-chat dispatches; ZIP identity in the audit |
+| Published 0.7.0 frozen package | `scripts/verify-portable.py`; downloaded signed EXEs and isolated control/data paths | All 604 manifest files and UX checks passed; zero Codex connections or user-chat dispatches. This precedes the two 0.7.1 presentation fixes |
 
 The first manual native invocation passed 14 cases and failed four: a relative executable path failed the absolute managed-binary identity guard, and three fixture cases referenced the obsolete icon filename. The fixture was corrected; the documented wrapper resolves the executable path. The final native result above passed without changing production identity guards.
 
@@ -29,11 +29,11 @@ Codex changed `CodexErrorInfo` from a closed `oneOf` to an open `anyOf` with unk
 
 | 7 October tuple | Native behavioral gate | Certification |
 | --- | --- | --- |
-| CLI 0.161.0 / daemon 0.161.0 | 18 passed in 113.35 seconds | Reviewed exact tuple; schema and connected-build identity checked |
-| CLI 0.160.0 / daemon 0.161.0 | 18 passed in 109.19 seconds | Reviewed exact mixed tuple; same complete native gate |
-| CLI 0.160.0 / daemon 0.160.0 | 18 passed in 111.33 seconds | Reviewed exact baseline |
+| CLI 0.161.0 / daemon 0.161.0 | 18 passed in 113.76 seconds | Reviewed exact 0.7.1 tuple; schema and connected-build identity checked |
+| CLI 0.160.0 / daemon 0.161.0 | 18 passed in 112.43 seconds | Reviewed exact 0.7.1 mixed tuple; same complete native gate |
+| CLI 0.160.0 / daemon 0.160.0 | 18 passed in 113.74 seconds | Reviewed exact 0.7.1 baseline |
 
-Fixtures use checksum-verified official packages, isolated Codex homes, unchanged production recovery logic and synthetic loopback services. They make no real model/account requests. Separate post-certificate connected-build tests passed for current/current (1.61 seconds) and old/current (2.14 seconds), reporting Certified and permitted Strict dispatch. The final post-projection Windows gate passed 288 tests in 38.83 seconds, compilation and version. Hosted publication and downloaded-package checks are recorded separately.
+Fixtures use checksum-verified official packages, isolated Codex homes, unchanged production recovery logic and synthetic loopback services. They make no real model/account requests. The 0.7.1 certificates were added only after these complete behavioral passes. The earlier 0.7.0 post-certificate connected-build checks passed for current/current and old/current, reporting Certified and permitted Strict dispatch. Hosted publication and downloaded-package checks are recorded separately.
 
 The [5 October real-client investigation](Audits/History/2026-10-05/AUDIT.md) reproduced and repaired loaded quota `systemError` deferral. Actual CLI composer recovery passed with one completed Continue and three duplicate-free scans. The CLI's queued follow-up remains client-local and unprotected. Normal Desktop composer/history tests accepted two follow-ups exactly once; timed polling did not capture pre-consumption queue IDs. Isolated Desktop and current VS Code composer tests reached Windows setup barriers. None of these results certifies all-client queue holding.
 
