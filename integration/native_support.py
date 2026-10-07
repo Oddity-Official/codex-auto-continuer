@@ -9,6 +9,7 @@ import base64
 import gzip
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -281,7 +282,7 @@ class NativeFixture:
         try:
             staging = self.root / ".data"
             staging.mkdir(exist_ok=True)
-            self.home = Path(self.stack.enter_context(tempfile.TemporaryDirectory(prefix="n", dir=staging)))
+            self.home = Path(tempfile.mkdtemp(prefix="n", dir=staging))
             self.service = self.stack.enter_context(Service())
             self.data = self.home / "cac"
             self.data.mkdir()
@@ -340,6 +341,11 @@ class NativeFixture:
                 client.close()
         finally:
             self.stack.close()
+        # A cleanup error must retain its cause, not be replaced by rmtree on a live home.
+        if hasattr(self, "home"):
+            assert self.home.resolve().parent == (self.root / ".data").resolve()
+            assert not self.home.is_symlink() and not self.home.is_junction()
+            shutil.rmtree(self.home)
         if hasattr(self, "service"):
             assert not self.service.errors, f"Unexpected fixture traffic: {self.service.errors}"
 
@@ -403,6 +409,7 @@ class NativeFixture:
                     timeout=10, check=True, creationflags=subprocess.CREATE_NO_WINDOW)
                 pids = json.loads(result.stdout)
             result = _run(self.binary, ["app-server", "daemon", "stop"], 15, env=self.env)
+            print(f"Fixture daemon shutdown: {len(pids)} recorded process(es); return code {result.returncode}")
             if (self.home / "app-server-daemon/app-server.pid").exists():
                 assert result.returncode == 0, "Isolated managed daemon did not stop cleanly: " + result.stderr.replace(str(self.home), "<fixture>")
             if pids:
@@ -413,8 +420,7 @@ class NativeFixture:
                         raise AssertionError("Isolated daemon/children did not exit before fixture cleanup")
                     time.sleep(0.02)
             stopped = stop_private_processes(self.home)
-            if stopped:
-                print(f"Reaped {stopped} detached private-package fixture process(es)")
+            print(f"Reaped {stopped} detached private-package fixture process(es)")
             wait_directory_release(settings.parent / "workdir")
         self.stack.callback(stop)
         if self.daemon_binary != self.binary:

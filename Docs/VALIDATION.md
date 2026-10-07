@@ -8,7 +8,7 @@ CAC 0.7.0 implements the dark native menu, compact status panel, pending-layer i
 
 | Check | Exact scope | Result |
 | --- | --- | --- |
-| Full native Windows gate | `scripts/verify-windows.ps1`; includes visible About close tests, actual hidden menu-owner callbacks, GDI pixels at 96/144/192 DPI, meters, privacy, recovery, encryption, workflow and native cleanup regressions | 289 passed, 47.26 seconds after fixture cleanup repair; compilation and 0.7.0 version passed |
+| Full native Windows gate | `scripts/verify-windows.ps1`; includes visible About close tests, actual hidden menu-owner callbacks, GDI pixels at 96/144/192 DPI, meters, privacy, recovery, encryption, workflow and native cleanup regressions | 290 passed, 47.08 seconds after detached-fixture cleanup repair; compilation and 0.7.0 version passed |
 | Native Codex integration | All continuation, compatibility and holding modules; isolated official 0.160.0/0.161.0 and mixed tuple, synthetic loopback account/model service | 18 passed for each tuple; exact results in the certification table |
 | Source compilation and documentation | Application, tests, scripts and integration compilation; local Markdown targets | Results recorded in the [current audit](Audits/2026-10-07/AUDIT.md) |
 | Production telemetry review | Recent cycle/recovery/status metadata only, no public chat names, IDs or bodies | One acknowledged Continue followed by a completed turn; brief tray read failures with no corresponding supervisor stop |

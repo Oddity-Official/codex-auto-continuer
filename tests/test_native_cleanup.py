@@ -18,6 +18,19 @@ def native_support():
     return module
 
 
+def test_shutdown_failure_keeps_primary_error_and_does_not_remove_live_home(tmp_path):
+    module = native_support()
+    fixture = module.NativeFixture(tmp_path, "unused")
+    fixture.home = tmp_path / ".data/nfixture"
+    fixture.home.mkdir(parents=True)
+    def fail_shutdown():
+        raise TimeoutError("original shutdown failure")
+    fixture.stack.callback(fail_shutdown)
+    with pytest.raises(TimeoutError, match="original shutdown failure"):
+        fixture.__exit__(None, None, None)
+    assert fixture.home.is_dir()
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Native Windows directory sharing")
 def test_daemon_directory_requires_delete_sharing_before_cleanup(tmp_path):
     module = native_support()
