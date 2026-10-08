@@ -12,8 +12,19 @@ Installed 0.7.2 accepted the actual connected daemon but its automatic start com
 | Native locking regressions | Shared probes do not see one another as owners; start waits for a brief probe; empty metadata and real second-process exclusion remain covered; I/O failure is not a running status |
 | Windows gate | 315 passed in 52.66 seconds; compilation and CAC 0.7.3 identity passed |
 | Native Codex mixed tuple | All 19 continuation/compatibility/holding cases passed in 117.52 seconds; recovery and holding scopes report Certified with Strict permission |
+| Hosted Windows | [Windows build](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37733081821) passed on source `ec48d75`, including frozen checks |
+| Hosted compatibility | [Matrix](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37733081806): 19 each, baseline 153.093 seconds, current 151.141 seconds, mixed 136.901 seconds; zero failures/errors/skips |
+| Signed publication | [Release gate](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37733474354) passed; exact downloaded ZIP signature and all 604 frozen code hashes/UX checks passed |
+| Upgrade and rollback | Real signed 0.7.2 to 0.7.3 completed and rolled back in isolation; all four protected files and newer state survived, all 604 original code hashes restored; zero user Codex connections |
+| Real installed upgrade | Completed with restart intent true; monitor restarted automatically, both EXEs/tray report 0.7.3, all 604 code sizes/hashes match, settings/prompt/state bytes unchanged |
+| Live installed state | Monitoring, Certified CLI 0.160.0 / daemon 0.161.0, ordinary permission true, all clients, Detailed local telemetry, fresh scan, zero pending obligations/warnings; holding disabled |
+| Windows login | Owned shortcut has exact GUI/config target and normal `tray` arguments without a no-monitor flag; fresh OS login remains untested |
 
-The first 314-case gate passed in 52.79 seconds before adding the explicit I/O-error regression. Source architecture records the current lock boundary. Package and deployment checks are recorded below after completion; a fresh OS login is not established by shortcut verification.
+The first 314-case gate passed in 52.79 seconds before adding the explicit I/O-error regression. Source architecture records the current lock boundary. This patch changes compatibility and process ownership, not visual design; it does not claim fresh Computer Use acceptance beyond the dated UI evidence below.
+
+Published 0.7.3 ZIP: 20,380,656 bytes, SHA-256 `3c107faab1354f6b2cc054478fab4d3ed3b9b7dfd486fc655b7b93bba361e268`. Wheel: 242,135 bytes, SHA-256 `d3e0bb2e53accb55d32e75892224269a4deb8efdc9ad47489458b2aa565b1af8`; all 53 runtime names/bytes match source and include only 20 current icons. CRC, package boundaries and configured private-marker scans passed. No runtime data is shipped.
+
+Two preliminary upgrade probes expected the old baseline's missing executable to become terminal Failed. The 0.7.2 baseline actually started and retried in Reconnecting, as established by its synthetic telemetry; those probes timed out before upgrade, not because of autostart. A temporary explicit-run setup was removed after identifying the stale phase expectation. The final probe retains tray autostart and accepts either documented unavailable-executable state, then completes upgrade/rollback. This does not alter production recovery or broaden quota classification.
 
 ## CAC 0.7.2 compatibility verification, 7 October 2026
 

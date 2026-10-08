@@ -12,7 +12,8 @@ All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba0
 
 - Installed 0.7.2 removed the real identity block. Its autostart reported success without a remaining monitor; source inspection and a failing regression established that exclusive status probes rewrote owner metadata and could impersonate ownership.
 - Status probes now use shared read-only OS range locks. They coexist, preserve metadata and allow actual starts to wait briefly for probes; real second owners remain rejected, including with empty metadata. Permission/I/O errors remain explicit.
-- Local Windows gate: 315 passed in 52.66 seconds, compilation and 0.7.3 identity passed. Full native mixed tuple: 19 passed in 117.52 seconds, both scopes Certified with Strict permission. Signed delivery evidence is recorded in Docs/VALIDATION.md after verification. No user configuration, Codex installation or ChatGPT manifest change.
+- Local Windows gate: 315 passed in 52.66 seconds, compilation and 0.7.3 identity passed. Full native mixed tuple: 19 passed in 117.52 seconds, both scopes Certified with Strict permission. Hosted Windows, all three 19-case native tuples and signed publication passed. Exact downloaded frozen/privacy checks and real signed 0.7.2 upgrade/code-only rollback passed; protected data and newer state survived. Stale baseline-phase probe expectations were corrected without changing production recovery.
+- Signed 0.7.3 is installed and monitoring restarted automatically. All 604 installed code hashes match the published package; settings, saved Continue and durable-state bytes match before/after. Fresh live scan is Certified with no warnings/pending work. All clients, Detailed local logging, holding disabled and the normal login shortcut are preserved. No Codex installation or ChatGPT manifest change. Artifact identities and acceptance limits are in Docs/VALIDATION.md.
 
 ## CAC 0.7.2 compatibility repair
 

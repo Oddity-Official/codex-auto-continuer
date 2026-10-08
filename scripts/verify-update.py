@@ -92,7 +92,7 @@ def main():
         while time.monotonic() < deadline:
             assert tray.poll() is None
             snapshot = settings.parent / "runtime-status.json"
-            if snapshot.exists() and parse_json(snapshot.read_bytes()).get("phase") == "failed":
+            if snapshot.exists() and parse_json(snapshot.read_bytes()).get("phase") in {"failed", "reconnecting"}:
                 break
             time.sleep(0.2)
         else:
