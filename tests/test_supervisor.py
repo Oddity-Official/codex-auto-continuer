@@ -493,6 +493,29 @@ def test_loop_closes_subscription_before_sleep_and_stops_gracefully(tmp_path):
     assert len(closed) == 1
 
 
+def test_cli_update_outage_reconnects_without_losing_obligation_or_sending(tmp_path):
+    from codex_auto_continuer.errors import CodexCommandError
+    save_state(tmp_path / "state.json", State(obligations=[Obligation.create("t", "turn-1", 900, None)]))
+    before = (tmp_path / "state.json").read_bytes()
+    client = FakeClient([thread()], {"t": failed_turn()}, allowed=False)
+    s = supervisor(tmp_path, client)
+    attempts, delays, cycles = [], [], []
+    def connect():
+        attempts.append(True)
+        if len(attempts) == 1:
+            raise CodexCommandError("Private synthetic installation path")
+        s.client = client
+    def sleep(seconds):
+        assert s.client is None and (tmp_path / "state.json").read_bytes() == before
+        assert not client.added and not client.deleted
+        assert "Private synthetic" not in str(s.read_problem)
+        delays.append(seconds)
+    s.connect, s.sleep, s.on_cycle = connect, sleep, cycles.append
+    s.run_forever(lambda: bool(cycles))
+    assert len(attempts) == 2 and delays and cycles[0].pending == 1
+    assert s.read_problem is None
+
+
 @pytest.mark.parametrize("during_probe", [False, True])
 def test_unavailable_quota_read_preserves_state_reconnects_and_recovers(tmp_path, during_probe):
     ob = Obligation.create("t", "turn-1", 900, None)

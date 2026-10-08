@@ -8,6 +8,14 @@ Updated: 2026-10-07
 
 All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba04` preserves v001 and its original checksum manifest. ChatGPT's manifest is unchanged. The stale imported checksum file is not retained as a current-source checksum; each new transport owns its generated manifest.
 
+## CAC 0.7.2 compatibility repair
+
+- Reproduced the real spaced-product identity failure and an independent additive-enum false block before repair. Product branding no longer participates in version matching. Malformed identities and genuine mismatches remain blocked.
+- Balanced accepts compatible unknown stable versions and same-version rebuilds without new CAC certificates. Contract checks ignore enum order and safe additions, not changed constraints, required inputs or potentially overlapping exclusive unions. Normal recovery selects text-only and metadata-only contracts; enabled or stored holding inputs retain the extended contract. One full baseline supplies both scopes.
+- CLI/daemon command outages retry with pending state preserved. Compatible updates sharing a contract do not repeat tray notices; Strict blocks remain build-specific. Full Status/telemetry retain actual build identities and the checked scope.
+- Final local Windows gate: 311 passed in 34.91 seconds, compilation and 0.7.2 version passed. Local full native tuples each passed 18 cases before the added scope case; final current/current passed all 19 cases in 115.56 seconds. Post-certificate mixed scope checks passed both recovery and holding with Strict dispatch. The live production daemon passed a read-only source check with zero mutations. Publication and installation are recorded in Docs/VALIDATION.md after verification.
+- Updated compatibility, architecture and user docs, removing redundant current CAC version strings from policy prose. Sanitized baseline/current reports are in the existing audit. ChatGPT's manifest is unchanged.
+
 ## CAC 0.7.1 final UI verification
 
 - The approved dark native interface is implemented. Signed CAC 0.7.1 is published privately and installed. Monitoring resumed automatically through the updater, with certified CLI 0.160.0 / daemon 0.161.0, all clients, Detailed local logging, unchanged Continue/settings/state and the exact normal login shortcut. All 604 installed hashes match the published manifest. A fresh scan has no warnings or pending obligations.

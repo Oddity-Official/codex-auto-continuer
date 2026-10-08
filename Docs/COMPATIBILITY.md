@@ -4,19 +4,25 @@ CAC defaults to Balanced mode: unknown stable Codex builds may continue after id
 
 ## What is certified
 
-The packaged `src/codex_auto_continuer/compatibility.json` records the CAC version, Windows architecture, full CLI/daemon versions, both executable SHA-256 hashes, consumer-contract hash, suite identity and dated evidence. CAC 0.7.0 certifies official Windows x86_64 Codex 0.160.0/0.160.0, 0.161.0/0.161.0 and mixed 0.160.0/0.161.0 CLI/daemon tuples. [Current verification](VALIDATION.md) owns test results.
+The packaged `src/codex_auto_continuer/compatibility.json` records the CAC version, Windows architecture, full CLI/daemon versions, both executable SHA-256 hashes, recovery and holding contract hashes, suite identity and dated evidence. Current certificates cover official Windows x86_64 Codex 0.160.0/0.160.0, 0.161.0/0.161.0 and mixed 0.160.0/0.161.0 CLI/daemon tuples. [Current verification](VALIDATION.md) owns test results.
 
 This is compatibility evidence, not a security attestation. CAC's own EXEs are unsigned. A user who modifies installed code or its certificate file can modify the application.
 
 ## Checks and failure behavior
 
-Every connection checks CLI version, daemon lifecycle identity, initialization user-agent version and the managed binary's version/hash. The managed binary generates its experimental schema, rather than assuming the invoking CLI describes the daemon. CAC retains prerelease and build suffixes and rechecks identity before resume and queue mutations.
+Every connection checks CLI version, daemon lifecycle identity, initialization user-agent version and the managed binary's version/hash. The product label may contain spaces or change branding; only its structured version participates in matching. Malformed identities and mismatched versions block recovery. The managed binary generates its experimental schema, rather than assuming the invoking CLI describes the daemon. CAC retains prerelease and build suffixes and rechecks identity before resume and queue mutations.
+
+New stable versions and binary hashes trigger verification, not rejection or a required CAC update. Balanced mode accepts them when the consumed contract remains compatible. They appear as Untested because schema evidence is not an exact behavioral certificate. Strict mode deliberately requires the exact tested tuple. CLI and daemon versions may differ; their reported identities must match their respective executables and the connected server.
 
 The supported managed package contains the full `bin/codex.exe`. The separate `codex-app-server.exe` package has no schema generator and is not a supported managed target in Codex 0.160.0. CAC rejects that identity instead of borrowing a same-version CLI schema. CI probes complete CLI packages in the managed role.
 
-The generated contract covers initialization, thread list/read/turns, account permission/windows, resume and queue add/list/delete. Holding also depends on full-history client identity, canonical UserInput variants and queue-change/turn-completion notification shapes. It compares consumed fields, types, variants, constraints and required request fields. Documentation changes, unrelated methods and unconsumed object fields are excluded. A new required request field still blocks compatibility. Existing runtime guards remain authoritative for actual responses, exact ownership, quota permission and ambiguous sends.
+The recovery contract covers initialization, thread list/read/turns, account permission/windows, resume and queue add/list/delete. It selects the text input CAC sends, including its empty text-element array, rather than unused media variants or element layouts. Documentation changes, unrelated methods and unconsumed object fields are excluded.
 
-Schemas and binary hashes cache in memory only. Cache keys include full version and binary file identity/hash. Generated schema files are removed after inspection. CAC does not contact a certification service, download Codex or change updater settings.
+Enum reordering and additional accepted enum values are compatible, except inside exclusive unions where additions can create overlapping branches. Removed values, changed consumed types/constraints, missing fields, changed union branches and new required request fields still block. Actual response guards remain authoritative: an unknown value never becomes permission or a quota failure merely because the schema accepts it.
+
+Full-history client identity, canonical input and queue/turn notifications belong to the holding scope. That scope is checked only when holding is enabled or a held-input journal exists. Normal recovery does not depend on unused holding capabilities. One packaged full baseline supplies both scopes through the same projection, without a duplicate inventory. Existing held data retains the extended checks and remains preserved on a block.
+
+Schemas and binary hashes cache in memory only. Cache keys include full version, binary file identity/hash and capability scope. Generated schema files are removed after inspection. CAC does not contact a certification service, download Codex or change updater settings. Temporary CLI/daemon command failures retry with pending state preserved; malformed protocol data is not treated as a harmless update.
 
 Recovery classifies only the explicit string `usageLimitExceeded`. Its schema projection requires that named variant and its constraints, not every unrelated error variant or diagnostic message. Unknown errors never trigger continuation. This permits forward-compatible error enums without treating a generic string as proof of the quota contract. Other consumed unions and required request fields retain their normal drift checks.
 
@@ -30,7 +36,7 @@ Recovery classifies only the explicit string `usageLimitExceeded`. Its schema pr
 
 Set `compatibility_policy = "strict"` in settings, or run `compatibility strict`. `compatibility balanced` restores the default. Runtime quota, exact-thread, ownership and queue-response guards apply in both modes. Neither mode blindly retries an uncertain send.
 
-Status shows the policy, evidence level, CLI/daemon versions and reason. An unknown build gets one non-modal notice per binary tuple, persisted across restarts. Working Balanced mode stays green; a real compatibility block is red. `status --live` includes binary and schema hashes. Blocks preserve pending, submitted and uncertain work. The monitor rechecks automatically; repair never requires deleting state. Diagnostic `scan`/`once` return exit code 2 when compatibility blocks recovery.
+Status shows the policy, evidence level, CLI/daemon versions and reason. Balanced-mode notices are deduplicated by verified contract and scope, not every binary update. Strict blocks retain build-specific notices. Deduplication persists across restarts; status and telemetry still identify the current builds. Working Balanced mode stays green; a real compatibility block is red. `status --live` includes binary/schema hashes and contract scope. Blocks preserve pending, submitted and uncertain work. The monitor rechecks automatically; repair never requires deleting state. Diagnostic `scan`/`once` return exit code 2 when compatibility blocks recovery.
 
 ## Daily upstream probe
 

@@ -14,14 +14,16 @@ from native_support import NativeFixture
 from conftest import ROOT
 
 
-def test_native_schema_and_connected_build(codex_binary, native):
+@pytest.mark.parametrize("holding", [False, True])
+def test_native_schema_and_connected_build(codex_binary, native, holding):
     cli_version = codex.codex_version(codex_binary, 10)
     server_version, _kind = codex.binary_version(native.binary, 10)
     info = codex.DaemonInfo("running", native.socket, cli_version, server_version, Path(native.binary), server_version)
     client = native.client()
-    report = CompatibilityGate(native.data).inspect(codex_binary, info, client.user_agent, 20)
+    report = CompatibilityGate(native.data).inspect(codex_binary, info, client.user_agent, 20, holding=holding)
     assert report.status in {"certified", "untested"}, report.reason
     assert report.schema_sha256 is not None and report.schema_source == "managed_binary"
+    assert report.contract_scope == ("holding" if holding else "recovery")
     print(json.dumps(report.report(), sort_keys=True))
 
 

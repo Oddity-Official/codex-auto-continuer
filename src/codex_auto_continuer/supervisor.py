@@ -12,7 +12,7 @@ from .appserver import AppServerClient, RpcError
 from .codex import codex_version, ensure_daemon, find_codex
 from .compatibility import Compatibility, CompatibilityGate, CompatibilityBlocked
 from .config import Config, read_prompt
-from .errors import ConfigurationError, ProtocolError, TransportError
+from .errors import CodexCommandError, ConfigurationError, ProtocolError, TransportError
 from .state import Obligation, State, load_state, save_state
 from .presentation import usage_snapshot, pending_threads
 from .telemetry import emit, failure, changed, begin_cycle, thread_summary, turn_summary
@@ -86,7 +86,8 @@ class Supervisor:
         self.managed_binary = daemon.managed_codex_path
         self._cli_version = cli_version
         self.client = client
-        self.compatibility = self.compatibility_gate.recheck(codex_bin, client.user_agent, self.config.codex_command_timeout_seconds, self.config.compatibility_policy)
+        self.compatibility = self.compatibility_gate.recheck(codex_bin, client.user_agent, self.config.codex_command_timeout_seconds, self.config.compatibility_policy,
+            self.config.queue_holding or (self.state_file.parent / "held-inputs.dpapi").exists())
         changed("compatibility.checked", "compatibility", **self.compatibility.report())
         LOG.info("Connected to Codex %s app-server %s", cli_version, client.user_agent)
         changed("codex.connected", "connection", cliVersion=cli_version, daemonVersion=daemon.app_server_version,
@@ -97,7 +98,8 @@ class Supervisor:
     def _check_dispatch_compatibility(self) -> None:
         if self.codex_bin is not None:
             self.compatibility = self.compatibility_gate.recheck(
-                self.codex_bin, self._require_client().user_agent, self.config.codex_command_timeout_seconds, self.config.compatibility_policy)
+                self.codex_bin, self._require_client().user_agent, self.config.codex_command_timeout_seconds, self.config.compatibility_policy,
+                self.config.queue_holding or (self.state_file.parent / "held-inputs.dpapi").exists())
             changed("compatibility.checked", "compatibility", **self.compatibility.report())
         if not self.compatibility.dispatch_allowed:
             raise CompatibilityBlocked(self.compatibility.reason)
@@ -225,10 +227,10 @@ class Supervisor:
                 changed("quota.unavailable", "quota-read", method=exc.method, errorCode=-32603, retrySeconds=delay)
                 self.close()
                 wait(max(1.0, delay))
-            except TransportError as exc:
+            except (TransportError, CodexCommandError) as exc:
                 self.read_problem = {
-                    "reason": "Codex connection unavailable. CAC is reconnecting automatically; pending work is preserved.",
-                    "errorType": "TransportError", "retrySeconds": self.config.reconnect_backoff_seconds,
+                    "reason": "Codex CLI, daemon or connection unavailable. CAC is retrying automatically; pending work is preserved. Check Codex installation and daemon health if this persists.",
+                    "errorType": type(exc).__name__, "retrySeconds": self.config.reconnect_backoff_seconds,
                 }
                 if on_phase:
                     on_phase("reconnecting")

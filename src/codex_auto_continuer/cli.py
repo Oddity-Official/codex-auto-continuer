@@ -129,7 +129,8 @@ def _status(config_path: Path, live: bool = False) -> int:
         client = AppServerClient.connect(daemon.socket_path, cfg.rpc_timeout_seconds)
         try:
             report = CompatibilityGate(config_path.parent / "compatibility-cache").recheck(
-                codex_bin, client.user_agent, cfg.codex_command_timeout_seconds, cfg.compatibility_policy)
+                codex_bin, client.user_agent, cfg.codex_command_timeout_seconds, cfg.compatibility_policy,
+                cfg.queue_holding or (config_path.parent / "held-inputs.dpapi").exists())
             output["compatibility"] = report.report()
             if report.read_allowed:
                 limits = _parse_rate_limits(client.rate_limits())

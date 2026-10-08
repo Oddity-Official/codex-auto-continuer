@@ -42,11 +42,12 @@ def test_schema_projection_ignores_annotations_and_unconsumed_fields_but_checks_
 
 def test_packaged_certificate_matches_consumer_contract_and_current_application():
     record = json.loads(compatibility.RECORD.read_text(encoding="utf-8"))
-    assert record["format"] == 1 and set(record["contract"]) == set(compatibility.METHODS)
+    assert record["format"] == 2 and set(record["contract"]) == set(compatibility.METHODS)
     assert record["certificates"]
     for certificate in record["certificates"]:
         assert certificate["cac_version"] == __version__
         assert certificate["schema_sha256"] == compatibility.contract_digest(record["contract"])
+        assert certificate["recovery_schema_sha256"] == compatibility.contract_digest(compatibility.recovery_contract(record["contract"]))
 
 
 def test_unknown_error_variants_do_not_block_but_quota_discriminator_drift_does():
@@ -79,11 +80,13 @@ def gate_fixture(tmp_path, monkeypatch):
     monkeypatch.setattr(compatibility, "binary_version", lambda *_: (version, "codex-cli"))
     monkeypatch.setattr(compatibility.platform, "system", lambda: "Windows")
     monkeypatch.setattr(compatibility.platform, "machine", lambda: "AMD64")
-    gate._schemas[(digest, version)] = copy.deepcopy(gate.record["contract"])
+    gate._schemas[(digest, version, False)] = compatibility.recovery_contract(gate.record["contract"])
+    gate._schemas[(digest, version, True)] = copy.deepcopy(gate.record["contract"])
     daemon = codex.DaemonInfo("running", tmp_path / "socket", version, version, binary, version)
     certificate = {field: value for field, value in gate.record["certificates"][0].items()}
     certificate.update(cli_sha256=digest, server_sha256=digest, cac_version=__version__,
-        schema_sha256=compatibility.contract_digest(gate.record["contract"]))
+        schema_sha256=compatibility.contract_digest(gate.record["contract"]),
+        recovery_schema_sha256=compatibility.contract_digest(compatibility.recovery_contract(gate.record["contract"])))
     gate.record["certificates"] = [certificate]
     return gate, binary, daemon
 
@@ -96,6 +99,106 @@ def test_exact_tuple_requires_behavioral_certificate_not_just_matching_schema(tm
     assert result.status == "untested" and result.read_allowed and not result.dispatch_allowed
     balanced = gate.inspect(str(binary), daemon, "cac/0.160.0 (Windows)", 1, "balanced")
     assert balanced.dispatch_allowed and balanced.status == "untested" and balanced.policy == "balanced"
+
+
+@pytest.mark.parametrize("agent", ["Codex Desktop/0.160.0 (Windows)", "Another Product/0.160.0",
+    "codex/0.160.0 (Windows/11)"])
+def test_connected_identity_uses_version_not_product_branding(tmp_path, monkeypatch, agent):
+    gate, binary, daemon = gate_fixture(tmp_path, monkeypatch)
+    assert gate.inspect(str(binary), daemon, agent, 1, "balanced").dispatch_allowed
+
+
+def test_additive_enum_changes_do_not_require_a_new_certificate_or_block_balanced(tmp_path, monkeypatch):
+    gate, binary, daemon = gate_fixture(tmp_path, monkeypatch)
+    contract = next(iter(gate._schemas.values()))
+    contract["thread/list"]["request"]["properties"]["sortKey"]["anyOf"][0]["enum"].append("newSort")
+    result = gate.inspect(str(binary), daemon, "cac/0.160.0 (Windows)", 1, "balanced")
+    assert result.status == "untested" and result.dispatch_allowed and result.read_allowed
+    assert not gate.inspect(str(binary), daemon, "cac/0.160.0 (Windows)", 1, "strict").dispatch_allowed
+
+
+@pytest.mark.parametrize("agent", ["", " /0.160.0", "Codex 0.160.0", "Codex/0.160.0evil", "Codex/0.160.0/0.161.0", "Codex\nDesktop/0.160.0"])
+def test_invalid_connection_identity_cannot_borrow_a_version_from_display_text(tmp_path, monkeypatch, agent):
+    gate, binary, daemon = gate_fixture(tmp_path, monkeypatch)
+    report = gate.inspect(str(binary), daemon, agent, 1, "balanced")
+    assert not report.dispatch_allowed and not report.read_allowed
+
+
+def test_schema_enum_order_is_irrelevant_but_removal_constraints_and_union_changes_block():
+    before = {"method": {"anyOf": [{"type": "string", "enum": ["failed", "completed"]}, {"type": "null"}]}}
+    after = copy.deepcopy(before)
+    after["method"]["anyOf"].reverse()
+    after["method"]["anyOf"][1]["enum"] = ["completed", "failed", "newState"]
+    assert not compatibility.contract_changes(before, after)
+    after["method"]["anyOf"][1]["enum"].remove("failed")
+    assert compatibility.contract_changes(before, after) == ["method"]
+    after = copy.deepcopy(before)
+    after["method"]["anyOf"][0]["maxLength"] = 4
+    assert compatibility.contract_changes(before, after) == ["method"]
+    after = copy.deepcopy(before)
+    after["method"]["anyOf"].append({"type": "object"})
+    assert compatibility.contract_changes(before, after) == ["method"]
+    exclusive = {"method": {"oneOf": [{"enum": ["a"]}, {"enum": ["b"]}]}}
+    overlapping = copy.deepcopy(exclusive)
+    overlapping["method"]["oneOf"][0]["enum"].append("b")
+    assert compatibility.contract_changes(exclusive, overlapping) == ["method"]
+
+
+def test_disabled_holding_contract_drift_does_not_block_normal_recovery(tmp_path, monkeypatch):
+    gate, binary, daemon = gate_fixture(tmp_path, monkeypatch)
+    key = (gate.binary_hash(binary), "0.160.0", True)
+    gate._schemas[key]["thread/queue/add"]["request"]["required"].append("newHoldingField")
+    normal = gate.inspect(str(binary), daemon, "Codex Desktop/0.160.0 (Windows)", 1, "balanced")
+    extended = gate.inspect(str(binary), daemon, "Codex Desktop/0.160.0 (Windows)", 1, "balanced", True)
+    assert normal.dispatch_allowed and normal.contract_scope == "recovery"
+    assert not extended.dispatch_allowed and extended.contract_scope == "holding"
+    assert "holding contract changed" in extended.reason
+
+
+def test_empty_text_elements_ignore_unused_item_layout_not_array_constraints():
+    array = {"type": "array", "items": {"type": "object", "properties": {"unused": {"type": "string"}}}}
+    before = _project(array, {}, {"$empty": True}, request=True)
+    array["items"]["properties"]["newRequired"] = {"type": "integer"}
+    array["items"]["required"] = ["newRequired"]
+    assert _project(array, {}, {"$empty": True}, request=True) == before
+    array["minItems"] = 1
+    assert _project(array, {}, {"$empty": True}, request=True) != before
+
+
+def test_compatible_same_version_rebuild_is_allowed_balanced_not_certified(tmp_path, monkeypatch):
+    gate, binary, daemon = gate_fixture(tmp_path, monkeypatch)
+    binary.write_bytes(b"compatible rebuilt binary")
+    gate._schemas[(gate.binary_hash(binary), "0.160.0", False)] = compatibility.recovery_contract(gate.record["contract"])
+    result = gate.inspect(str(binary), daemon, "Codex Desktop/0.160.0 (Windows)", 1, "balanced")
+    assert result.status == "untested" and result.dispatch_allowed
+    assert not gate.inspect(str(binary), daemon, "Codex Desktop/0.160.0 (Windows)", 1, "strict").dispatch_allowed
+
+
+def test_temporary_cli_unavailability_is_a_rechecked_block_not_an_uncaught_exception(tmp_path, monkeypatch):
+    from codex_auto_continuer.errors import CodexCommandError
+    gate, binary, daemon = gate_fixture(tmp_path, monkeypatch)
+    def unavailable(*_):
+        raise CodexCommandError("Synthetic CLI replacement")
+    monkeypatch.setattr(compatibility, "codex_version", unavailable)
+    result = gate.inspect(str(binary), daemon, "cac/0.160.0 (Windows)", 1, "balanced")
+    assert not result.read_allowed and not result.dispatch_allowed and result.cli_version is None
+
+
+def test_repeated_compatible_updates_and_independent_daemon_updates_need_no_release(tmp_path, monkeypatch):
+    from dataclasses import replace
+    gate, binary, daemon = gate_fixture(tmp_path, monkeypatch)
+    current = [None, None]
+    monkeypatch.setattr(compatibility, "codex_version", lambda *_: current[0])
+    monkeypatch.setattr(compatibility, "binary_version", lambda *_: (current[1], "codex-cli"))
+    for index, pair in enumerate((("0.173.0", "0.174.0"), ("0.175.0", "0.176.0"),
+                                  ("0.177.0", "0.178.0"), ("0.177.0", "0.178.0"))):
+        current[:] = pair
+        binary.write_bytes(f"compatible rebuild {index}".encode())
+        candidate = replace(daemon, cli_version=pair[0], app_server_version=pair[1], managed_codex_version=pair[1])
+        gate._schemas[(gate.binary_hash(binary), pair[1], False)] = compatibility.recovery_contract(gate.record["contract"])
+        report = gate.inspect(str(binary), candidate, f"Codex Desktop/{pair[1]} (Windows)", 1, "balanced")
+        assert report.status == "untested" and report.dispatch_allowed and report.read_allowed
+        assert not gate.inspect(str(binary), candidate, f"Codex Desktop/{pair[1]} (Windows)", 1, "strict").dispatch_allowed
 
 
 def test_balanced_does_not_allow_prereleases_or_invalid_identity():
@@ -128,7 +231,7 @@ def test_mixed_or_missing_identity_blocks_dispatch(tmp_path, monkeypatch, change
 @pytest.mark.parametrize("method,reads", [("thread/queue/add", True), ("thread/list", False)])
 def test_schema_drift_blocks_mutations_and_only_affected_read_contract(tmp_path, monkeypatch, method, reads):
     gate, binary, daemon = gate_fixture(tmp_path, monkeypatch)
-    gate._schemas[(gate.binary_hash(binary), "0.160.0")][method]["request"]["required"].append("newField")
+    gate._schemas[(gate.binary_hash(binary), "0.160.0", False)][method]["request"]["required"].append("newField")
     result = gate.inspect(str(binary), daemon, "cac/0.160.0 (Windows)", 1)
     assert result.status == "schema_mismatch" and result.read_allowed is reads
     assert not result.dispatch_allowed and method in result.reason

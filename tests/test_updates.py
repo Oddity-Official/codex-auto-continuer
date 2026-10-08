@@ -198,6 +198,30 @@ def test_quarantine_and_untested_notices_are_nonmodal_and_deduplicated(tmp_path,
     assert "build:hash" not in (tmp_path / "notifications.json").read_text()
 
 
+def test_compatible_build_updates_do_not_repeat_notice_for_the_same_contract(tmp_path, monkeypatch):
+    from codex_auto_continuer import tray
+    controller = tray.TrayController(tmp_path / "settings.toml")
+    messages = []
+    class Icon:
+        def notify(self, body, title):
+            messages.append(body)
+    controller.icon = Icon()
+    current = {"phase": "monitoring", "compatibility": {"status": "untested", "dispatch_allowed": True,
+        "read_allowed": True, "contract_scope": "recovery", "policy": "balanced", "schema_sha256": "contract-a"}}
+    monkeypatch.setattr(tray, "owns_monitor", lambda *_: True)
+    monkeypatch.setattr(tray, "read_runtime", lambda *_: current)
+    for build in ("first", "second", "third", "fourth"):
+        current["compatibility"].update(cli_sha256=build, server_sha256=build)
+        controller.refresh()
+    assert len(messages) == 1 and "Balanced mode continues" in messages[0]
+    current["compatibility"]["schema_sha256"] = "contract-b"
+    controller.refresh()
+    assert len(messages) == 2
+    current["compatibility"].update(dispatch_allowed=False, policy="strict")
+    controller.refresh()
+    assert len(messages) == 3 and "Strict mode blocks" in messages[-1]
+
+
 def test_release_download_does_not_block_monitor_controls(tmp_path, monkeypatch):
     import threading
     from codex_auto_continuer import tray

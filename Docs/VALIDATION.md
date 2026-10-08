@@ -2,6 +2,22 @@
 
 Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Imported checkpoint: v001. Prior release results below remain dated artifact evidence, not checks of changed code.
 
+## CAC 0.7.2 compatibility verification, 7 October 2026
+
+The real `Codex Desktop/0.161.0` connection exposed a parser that rejected spaces in product names. The patch validates the version independently of branding and narrows schema checks to the active capability scope. Balanced continues on compatible unknown stable builds; Strict retains exact certification. No Codex installation, update policy or conversation was modified.
+
+| Check | Scope and result |
+| --- | --- |
+| Before-fix reproductions | Spaced-product and suffix-free product identities failed; additive enum growth independently produced a false schema mismatch |
+| Windows gate | 311 passed in 34.91 seconds; compilation and CAC 0.7.2 identity passed |
+| Local native tuples | Baseline 18 passed in 117.53 seconds; mixed 18 in 114.01 seconds; current/current final expanded gate 19 in 115.56 seconds |
+| Post-certificate scope checks | Real mixed tuple: recovery and holding both report Certified with Strict read/dispatch permission; 2 passed in 4.21 seconds |
+| Live production identity | Read-only initialization and schema verification accept the actual 0.161.0 daemon; Balanced read/dispatch permission true, zero mutations |
+| Forward-compatibility regressions | Four compatible updates including independent versions and a same-version rebuild; enum addition/order; disabled holding drift; empty text-element layout; malformed/mismatched identity; removed values, constraints, required inputs and overlapping exclusive unions |
+| Availability and notices | CLI outage preserves obligation and reconnects; four same-contract binary updates produce one Balanced notice; changed contract and Strict block remain distinct |
+
+Recovery contract hash: `3e60c81d20a9b640979ba7145bab836198ab2a6cd4a05fc957548ccb82988536`. Full holding hash remains `4f4748360704a777305ba86fbcb0907c8bddab7d5c9063ba032c1899e9f83150`. The [baseline](Audits/2026-10-07/compatibility-072-baseline.json) and [current](Audits/2026-10-07/compatibility-072-current.json) generated reports have no incompatible changes in either scope. Future-version regressions are simulations, not certifications of unreleased Codex versions. Native behavior uses unchanged official binaries and isolated synthetic services; no real model/account requests.
+
 ## CAC 0.7.1 UI verification, 7 October 2026
 
 CAC 0.7.1 implements the dark native menu, compact status panel, pending-layer icons and transient-status warning repair. Queue holding is absent from the tray; its off-by-default experimental CLI engine and tests remain. The patch fixes UTF-16 title measurement and restores a minimized status window when reopened. Both native regressions failed before repair.

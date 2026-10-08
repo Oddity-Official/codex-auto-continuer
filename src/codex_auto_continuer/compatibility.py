@@ -22,8 +22,8 @@ _CONSTRAINTS = {"type", "enum", "const", "minimum", "maximum", "exclusiveMinimum
 THREAD = {key: None for key in ("id", "updatedAt", "status", "source", "originator", "archived")}
 TURN = {key: None for key in ("id", "status", "completedAt", "error")}
 TURN["error"] = {"codexErrorInfo": {"$literal": "usageLimitExceeded"}}
-TURN["items"] = {"$type": "userMessage", "type": None, "clientId": None}
-QUEUE = {"id": None, "clientUserMessageId": None, "input": None}
+HOLDING_TURN = TURN | {"items": {"$type": "userMessage", "type": None, "clientId": None}}
+QUEUE = {"id": None, "clientUserMessageId": None}
 WINDOWS = {key: {"usedPercent": None, "resetsAt": None} for key in ("primary", "secondary")}
 # Only fields read or sent by CAC. New unrelated endpoints/optional fields do not change this contract.
 METHODS = {
@@ -34,9 +34,19 @@ METHODS = {
     "thread/turns/list": ("ThreadTurnsList", dict.fromkeys(("threadId", "cursor", "limit", "sortDirection", "itemsView")), {"data": TURN, "nextCursor": None}),
     "account/rateLimits/read": ("GetAccountRateLimits", {}, {"ordinaryUsageAllowed": None, "rateLimits": WINDOWS, "rateLimitsByLimitId": WINDOWS}),
     "thread/resume": ("ThreadResume", {"threadId": None, "excludeTurns": None}, {"thread": THREAD}),
-    "thread/queue/add": ("ThreadQueueAdd", {"threadId": None, "input": None, "clientUserMessageId": None}, {"queuedSubmission": QUEUE}),
+    "thread/queue/add": ("ThreadQueueAdd", {"threadId": None,
+        "input": {"$type": "text", "type": None, "text": None, "text_elements": {"$empty": True}},
+        "clientUserMessageId": None}, {"queuedSubmission": QUEUE}),
     "thread/queue/list": ("ThreadQueueList", {"threadId": None, "cursor": None, "limit": None}, {"data": QUEUE, "nextCursor": None}),
     "thread/queue/delete": ("ThreadQueueDelete", {"threadId": None, "queuedSubmissionId": None}, {"deleted": None}),
+}
+HOLDING_METHODS = METHODS | {
+    "thread/turns/list": ("ThreadTurnsList", METHODS["thread/turns/list"][1],
+        {"data": HOLDING_TURN, "nextCursor": None}),
+    "thread/queue/add": ("ThreadQueueAdd", {"threadId": None, "input": None, "clientUserMessageId": None},
+        {"queuedSubmission": QUEUE | {"input": None}}),
+    "thread/queue/list": ("ThreadQueueList", METHODS["thread/queue/list"][1],
+        {"data": QUEUE | {"input": None}, "nextCursor": None}),
 }
 READ_METHODS = {"initialize", "thread/list", "thread/read", "thread/turns/list", "account/rateLimits/read"}
 
@@ -67,6 +77,8 @@ def _project(node: dict, document: dict, fields=None, *, request=False, depth=0)
                     continue
         raise ProtocolError("Codex schema omitted CAC's explicit usage-limit discriminator.")
     result = {key: node[key] for key in sorted(_CONSTRAINTS & node.keys())}
+    if fields and "$empty" in fields:
+        return result
     if "properties" in node:
         properties = node["properties"]
         selected = properties if fields is None else fields
@@ -88,14 +100,14 @@ def _project(node: dict, document: dict, fields=None, *, request=False, depth=0)
     return result
 
 
-def schema_contract(directory: Path) -> dict:
+def schema_contract(directory: Path, *, holding=False) -> dict:
     try:
         requests = json.loads((directory / "ClientRequest.json").read_text(encoding="utf-8"))
         variants = {entry["properties"]["method"]["enum"][0]: entry for entry in requests["oneOf"]}
         # Initialize uses v1 definitions in the aggregate schema; v2 responses are standalone.
         aggregate = json.loads((directory / "codex_app_server_protocol.schemas.json").read_text(encoding="utf-8"))
         out = {}
-        for method, (name, sent, received) in METHODS.items():
+        for method, (name, sent, received) in (HOLDING_METHODS if holding else METHODS).items():
             params = variants[method]["properties"]["params"]
             response_path = directory / "v2" / f"{name}Response.json"
             if method == "initialize":
@@ -106,11 +118,12 @@ def schema_contract(directory: Path) -> dict:
                 response = document
             out[method] = {"request": _project(params, requests, sent, request=True),
                            "response": _project(response, document, received)}
-        notifications = json.loads((directory / "ServerNotification.json").read_text(encoding="utf-8"))
-        selected = {entry["properties"]["method"]["enum"][0]: entry for entry in notifications["oneOf"]}
-        for method in ("thread/queue/changed", "turn/completed"):
-            out["thread/queue/list"][method] = _project(selected[method]["properties"]["params"], notifications,
-                {"threadId": None, **({"turn": TURN} if method == "turn/completed" else {})})
+        if holding:
+            notifications = json.loads((directory / "ServerNotification.json").read_text(encoding="utf-8"))
+            selected = {entry["properties"]["method"]["enum"][0]: entry for entry in notifications["oneOf"]}
+            for method in ("thread/queue/changed", "turn/completed"):
+                out["thread/queue/list"][method] = _project(selected[method]["properties"]["params"], notifications,
+                    {"threadId": None, **({"turn": HOLDING_TURN} if method == "turn/completed" else {})})
         return out
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise ProtocolError("Codex experimental schema is missing a required CAC method or field.") from exc
@@ -118,6 +131,60 @@ def schema_contract(directory: Path) -> dict:
 
 def contract_digest(contract: dict) -> str:
     return hashlib.sha256(json.dumps(contract, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def recovery_contract(full: dict) -> dict:
+    return {method: {"request": _project(full[method]["request"], {}, sent, request=True),
+                     "response": _project(full[method]["response"], {}, received)}
+            for method, (_name, sent, received) in METHODS.items()}
+
+
+def _compatible(expected, actual, *, enum_growth=True):
+    if isinstance(expected, dict):
+        if not isinstance(actual, dict) or expected.keys() != actual.keys():
+            return False
+        for key, value in expected.items():
+            if key == "enum":
+                # New accepted values do not invalidate CAC's existing values.
+                accepted = {json.dumps(item, sort_keys=True) for item in actual[key]} if isinstance(actual[key], list) else set()
+                previous = {
+                    json.dumps(item, sort_keys=True) for item in value
+                }
+                if not isinstance(actual[key], list) or not (previous <= accepted if enum_growth else previous == accepted):
+                    return False
+            elif key in {"allOf", "anyOf", "oneOf"}:
+                remaining = list(actual[key]) if isinstance(actual[key], list) else []
+                if len(value) != len(remaining):
+                    return False
+                for branch in value:
+                    # An exclusive union can reject old inputs if enum growth
+                    # makes two branches overlap. Do not assume that is additive.
+                    match = next((i for i, candidate in enumerate(remaining)
+                        if _compatible(branch, candidate, enum_growth=enum_growth and key != "oneOf")), None)
+                    if match is None:
+                        return False
+                    remaining.pop(match)
+            elif not _compatible(value, actual[key], enum_growth=enum_growth):
+                return False
+        return True
+    if isinstance(expected, list):
+        return isinstance(actual, list) and len(expected) == len(actual) and all(
+            _compatible(a, b, enum_growth=enum_growth) for a, b in zip(expected, actual))
+    return type(expected) is type(actual) and expected == actual
+
+
+def contract_changes(expected: dict, actual: dict) -> list[str]:
+    return [name for name in sorted(expected.keys() | actual.keys())
+            if name not in expected or name not in actual or not _compatible(expected[name], actual[name])]
+
+
+def connected_version(user_agent: str) -> str | None:
+    # The product label and platform suffix are presentation, not build identity.
+    if not user_agent or not user_agent.split("/", 1)[0].strip():
+        return None
+    match = re.fullmatch(r"[^/\x00-\x1f\x7f]+/(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)(?:[ \t]+[^\r\n]*)?",
+                         user_agent or "")
+    return match.group(1) if match else None
 
 
 @dataclass(frozen=True)
@@ -132,6 +199,7 @@ class Compatibility:
     schema_source: str | None = None
     read_allowed: bool = True
     policy: str = "strict"
+    contract_scope: str = "recovery"
 
     @property
     def dispatch_allowed(self):
@@ -161,18 +229,20 @@ class CompatibilityGate:
                 del self._hashes[next(iter(self._hashes))]
         return self._hashes[key]
 
-    def inspect(self, cli: str, daemon: DaemonInfo, user_agent: str, timeout: float, policy: str = "strict") -> Compatibility:
+    def inspect(self, cli: str, daemon: DaemonInfo, user_agent: str, timeout: float, policy: str = "strict", holding=False) -> Compatibility:
         if policy not in {"balanced", "strict"}:
             raise ValueError("Invalid compatibility policy.")
-        values = {"cli_version": codex_version(cli, timeout), "app_server_version": daemon.app_server_version, "policy": policy}
+        values = {"cli_version": None, "app_server_version": daemon.app_server_version, "policy": policy,
+                  "contract_scope": "holding" if holding else "recovery"}
         check = "binary identity"
         try:
+            values["cli_version"] = codex_version(cli, timeout)
             values["cli_sha256"] = self.binary_hash(cli)
             server = daemon.managed_codex_path
-            connected = re.fullmatch(r"[^/\s]+/([^\s]+) .*", user_agent or "")
+            connected = connected_version(user_agent)
             if (not connected or not server or not server.is_absolute() or
                 daemon.cli_version != values["cli_version"] or
-                connected.group(1) != daemon.app_server_version or
+                connected != daemon.app_server_version or
                 daemon.managed_codex_version != daemon.app_server_version):
                 return Compatibility(reason="Codex daemon/connection identity is missing or changed. Scanning and queue writes are blocked; check Codex daemon health.", read_allowed=False, **values)
             server_version, server_kind = binary_version(str(server), timeout)
@@ -182,7 +252,7 @@ class CompatibilityGate:
             if server_kind != "codex-cli":
                 return Compatibility(reason="The managed executable is a standalone app-server, not the supported full CLI package. Its own schema cannot be verified. Scanning and queue writes are blocked; inspect Codex daemon health and update CAC.", read_allowed=False, **values)
             values["schema_source"] = "managed_binary"
-            key = (values["server_sha256"], daemon.app_server_version)
+            key = (values["server_sha256"], daemon.app_server_version, holding)
             if key not in self._schemas:
                 check = "experimental schema generation"
                 self.staging.mkdir(parents=True, exist_ok=True)
@@ -191,18 +261,22 @@ class CompatibilityGate:
                     if result.returncode != 0:
                         raise ProtocolError("Codex could not generate its experimental schema.")
                     check = "experimental schema contract"
-                    self._schemas = {key: schema_contract(Path(temporary))}
+                    if len(self._schemas) >= 4:
+                        self._schemas.clear()
+                    self._schemas[key] = schema_contract(Path(temporary), holding=holding)
             contract = self._schemas[key]
             values["schema_sha256"] = contract_digest(contract)
-            different = [name for name in METHODS if contract[name] != self.record["contract"][name]]
+            expected = self.record["contract"] if holding else recovery_contract(self.record["contract"])
+            different = contract_changes(expected, contract)
             if different:
-                return Compatibility(status="schema_mismatch", reason="Codex contract changed: " + ", ".join(different) + ". Update CAC; pending work is preserved.", read_allowed=not bool(READ_METHODS & set(different)), **values)
+                return Compatibility(status="schema_mismatch", reason=f"Codex {values['contract_scope']} contract changed: " + ", ".join(different) + ". Update CAC; pending work is preserved.", read_allowed=not bool(READ_METHODS & set(different)), **values)
             target = "windows-x86_64" if platform.system() == "Windows" and platform.machine().lower() in {"amd64", "x86_64"} else "unsupported"
             if target == "unsupported":
                 return Compatibility(status="unsupported", reason="CAC supports native Windows x86_64 recovery only. Queue writes are blocked on this platform.", **values)
             for certificate in self.record["certificates"]:
                 if (certificate["cac_version"] == __version__ and certificate["platform"] == target and
-                    all(certificate[field] == values[field] for field in ("cli_version", "app_server_version", "cli_sha256", "server_sha256", "schema_sha256"))):
+                    all(certificate[field] == values[field] for field in ("cli_version", "app_server_version", "cli_sha256", "server_sha256")) and
+                    certificate["schema_sha256" if holding else "recovery_schema_sha256"] == values["schema_sha256"]):
                     return Compatibility(status="certified", reason="Exact Codex CLI/daemon build passed CAC's native recovery tests.", **values)
             provisional = Compatibility(status="untested", **values)
             action = ("Balanced mode permits recovery with runtime checks. Select Read Full Status for evidence."
@@ -214,9 +288,9 @@ class CompatibilityGate:
                 daemonVersion=daemon.app_server_version, errorCode=getattr(exc, "errno", None))
             return Compatibility(status="unverified", reason=f"Cannot verify Codex {check}. Scanning and queue writes are blocked. Check daemon health, file permissions and local telemetry; update CAC if the interface changed.", read_allowed=False, **values)
 
-    def recheck(self, cli: str, user_agent: str, timeout: float, policy: str = "strict") -> Compatibility:
+    def recheck(self, cli: str, user_agent: str, timeout: float, policy: str = "strict", holding=False) -> Compatibility:
         try:
-            return self.inspect(cli, daemon_version(cli, timeout), user_agent, timeout, policy)
+            return self.inspect(cli, daemon_version(cli, timeout), user_agent, timeout, policy, holding)
         except (CodexCommandError, ProtocolError) as exc:
             failure("compatibility.identity_unavailable", exc)
             return Compatibility(reason="Codex daemon identity is unavailable or unsupported. Scanning and queue writes are blocked; CAC will recheck. Inspect daemon health and local telemetry.", read_allowed=False, policy=policy)

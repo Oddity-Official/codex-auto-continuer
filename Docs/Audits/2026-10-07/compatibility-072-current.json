@@ -1,0 +1,10 @@
+{
+  "cac_version": "0.7.2",
+  "codex_version": "0.161.0",
+  "binary_sha256": "a0f89acca07a511734cac7fddee26b2106fab68918717bc90df16104a0760a30",
+  "schema_sha256": "3e60c81d20a9b640979ba7145bab836198ab2a6cd4a05fc957548ccb82988536",
+  "changed_methods": [],
+  "holding_changed_methods": [],
+  "holding_schema_sha256": "4f4748360704a777305ba86fbcb0907c8bddab7d5c9063ba032c1899e9f83150",
+  "behavior_certified": false
+}

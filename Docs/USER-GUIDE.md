@@ -8,7 +8,7 @@ CAC continues the exact local Codex chat stopped by a usage limit, once Codex co
 2. Launch `CodexAutoContinuer.exe`. Monitoring starts automatically. Look in Windows' hidden tray icons if needed.
 3. Right-click the icon. `Start With Windows` launches CAC and starts monitoring at login for this Windows account, without administrator rights. A previous session's saved error does not suppress a new start; invalid current settings still require repair.
 
-You need Windows 11 x86_64 and a signed-in native Codex installation. Python is bundled. Codex 0.160.0 is certified. Balanced mode also permits unknown stable builds after identity, schema and runtime checks. Strict mode requires exact certification. These independent EXEs are unsigned, so Windows may show a reputation warning.
+You need Windows 11 x86_64 and a signed-in native Codex installation. Python is bundled. Codex 0.160.0 and 0.161.0 are certified. Balanced mode automatically verifies compatible new stable builds without requiring a CAC update. Untested in status means no exact behavioral certificate, not that monitoring stopped. Strict mode requires exact certification. These independent EXEs are unsigned, so Windows may show a reputation warning.
 
 ## Tray controls
 

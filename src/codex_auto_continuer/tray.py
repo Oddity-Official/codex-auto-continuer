@@ -222,7 +222,8 @@ class TrayController:
                     "Select Read Full Status for repair details.")
             compatibility = self.snapshot.get("compatibility") or {}
             if compatibility.get("status") == "untested":
-                key = "compatibility:" + ":".join(str(compatibility.get(field)) for field in ("cli_sha256", "server_sha256"))
+                fields = ("contract_scope", "policy", "schema_sha256") if compatibility.get("dispatch_allowed") else ("cli_sha256", "server_sha256")
+                key = "compatibility:" + ":".join(str(compatibility.get(field)) for field in fields)
                 self.notify_once(key, "This Codex build passes schema checks but has no exact recovery certificate. "
                     + ("Balanced mode continues with runtime checks." if compatibility.get("dispatch_allowed") else "Strict mode blocks writes.")
                     + " Select Read Full Status for details.")
