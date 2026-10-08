@@ -2,6 +2,19 @@
 
 Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Imported checkpoint: v001. Prior release results below remain dated artifact evidence, not checks of changed code.
 
+## CAC 0.7.3 startup verification, 7 October 2026
+
+Installed 0.7.2 accepted the actual connected daemon but its automatic start command returned success without a remaining supervisor. Inspection established that status probes briefly acquired exclusive ownership and rewrote PID metadata. Shared read-only probes remove that false-running mechanism; real ownership remains exclusive and survives empty metadata. A short exclusive-acquisition grace period covers in-flight probes, while permission/I/O failures remain explicit.
+
+| Check | Scope and result |
+| --- | --- |
+| Before-fix regression | A status-only read changed the lock's owner metadata; reproduced failure |
+| Native locking regressions | Shared probes do not see one another as owners; start waits for a brief probe; empty metadata and real second-process exclusion remain covered; I/O failure is not a running status |
+| Windows gate | 315 passed in 52.66 seconds; compilation and CAC 0.7.3 identity passed |
+| Native Codex mixed tuple | All 19 continuation/compatibility/holding cases passed in 117.52 seconds; recovery and holding scopes report Certified with Strict permission |
+
+The first 314-case gate passed in 52.79 seconds before adding the explicit I/O-error regression. Source architecture records the current lock boundary. Package and deployment checks are recorded below after completion; a fresh OS login is not established by shortcut verification.
+
 ## CAC 0.7.2 compatibility verification, 7 October 2026
 
 The real `Codex Desktop/0.161.0` connection exposed a parser that rejected spaces in product names. The patch validates the version independently of branding and narrows schema checks to the active capability scope. Balanced continues on compatible unknown stable builds; Strict retains exact certification. No Codex installation, update policy or conversation was modified.
@@ -15,8 +28,16 @@ The real `Codex Desktop/0.161.0` connection exposed a parser that rejected space
 | Live production identity | Read-only initialization and schema verification accept the actual 0.161.0 daemon; Balanced read/dispatch permission true, zero mutations |
 | Forward-compatibility regressions | Four compatible updates including independent versions and a same-version rebuild; enum addition/order; disabled holding drift; empty text-element layout; malformed/mismatched identity; removed values, constraints, required inputs and overlapping exclusive unions |
 | Availability and notices | CLI outage preserves obligation and reconnects; four same-contract binary updates produce one Balanced notice; changed contract and Strict block remain distinct |
+| Hosted Windows | [Build and frozen checks](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37730535695) passed on source `fcd040e` |
+| Hosted compatibility | [Matrix](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37730535646): 19 cases each, baseline 141.298 seconds, current 161.891 seconds, mixed 203.247 seconds; zero final failures/errors/skips |
+| Signed publication | [Release gate](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37731604408) passed, including 311 tests in 39.19 seconds; exact downloaded ZIP signature/checksums and frozen checks passed |
+| Upgrade and rollback | Real signed 0.7.1 to 0.7.2, four protected fixture files and newer state preserved, all 604 baseline code hashes restored; zero user Codex connections |
 
 Recovery contract hash: `3e60c81d20a9b640979ba7145bab836198ab2a6cd4a05fc957548ccb82988536`. Full holding hash remains `4f4748360704a777305ba86fbcb0907c8bddab7d5c9063ba032c1899e9f83150`. The [baseline](Audits/2026-10-07/compatibility-072-baseline.json) and [current](Audits/2026-10-07/compatibility-072-current.json) generated reports have no incompatible changes in either scope. Future-version regressions are simulations, not certifications of unreleased Codex versions. Native behavior uses unchanged official binaries and isolated synthetic services; no real model/account requests.
+
+The first hosted mixed job failed during fixture teardown: Windows PowerShell's CIM process enumeration exceeded its ten-second bound. Schema checks passed; the failure was not a recovery assertion. The failed job was rerun on a fresh runner and all 19 cases passed. The original failed attempt remains available in the run history.
+
+Published 0.7.2 ZIP: 20,379,084 bytes, SHA-256 `dbda019dbc18eb4cd229439c59f86ab44f4cd8ce38e2c19e35c2e3ccf00a0fc4`. Wheel: 241,518 bytes, SHA-256 `ffe23778f38fa52a2a39700ddfebfc0a0c455ab1ff3054e6ceff0e579665b4f3`; its 53 runtime files match source and contain only the 20 current icons. Both archives pass CRC, package-boundary and configured private-marker checks. The real installed update completed with restart intent true and compatibility Certified, but monitoring needed a manual start. That observation prompted the separate 0.7.3 ownership repair above rather than a claim of successful automatic monitoring.
 
 ## CAC 0.7.1 UI verification, 7 October 2026
 

@@ -2097,7 +2097,7 @@
   },
   "certificates": [
     {
-      "cac_version": "0.7.2",
+      "cac_version": "0.7.3",
       "platform": "windows-x86_64",
       "cli_version": "0.160.0",
       "app_server_version": "0.160.0",
@@ -2110,7 +2110,7 @@
       "verified_on": "2026-10-07"
     },
     {
-      "cac_version": "0.7.2",
+      "cac_version": "0.7.3",
       "platform": "windows-x86_64",
       "cli_version": "0.161.0",
       "app_server_version": "0.161.0",
@@ -2123,7 +2123,7 @@
       "verified_on": "2026-10-07"
     },
     {
-      "cac_version": "0.7.2",
+      "cac_version": "0.7.3",
       "platform": "windows-x86_64",
       "cli_version": "0.160.0",
       "app_server_version": "0.161.0",

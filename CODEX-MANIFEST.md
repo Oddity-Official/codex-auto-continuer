@@ -8,6 +8,12 @@ Updated: 2026-10-07
 
 All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba04` preserves v001 and its original checksum manifest. ChatGPT's manifest is unchanged. The stale imported checksum file is not retained as a current-source checksum; each new transport owns its generated manifest.
 
+## CAC 0.7.3 ownership repair
+
+- Installed 0.7.2 removed the real identity block. Its autostart reported success without a remaining monitor; source inspection and a failing regression established that exclusive status probes rewrote owner metadata and could impersonate ownership.
+- Status probes now use shared read-only OS range locks. They coexist, preserve metadata and allow actual starts to wait briefly for probes; real second owners remain rejected, including with empty metadata. Permission/I/O errors remain explicit.
+- Local Windows gate: 315 passed in 52.66 seconds, compilation and 0.7.3 identity passed. Full native mixed tuple: 19 passed in 117.52 seconds, both scopes Certified with Strict permission. Signed delivery evidence is recorded in Docs/VALIDATION.md after verification. No user configuration, Codex installation or ChatGPT manifest change.
+
 ## CAC 0.7.2 compatibility repair
 
 - Reproduced the real spaced-product identity failure and an independent additive-enum false block before repair. Product branding no longer participates in version matching. Malformed identities and genuine mismatches remain blocked.
