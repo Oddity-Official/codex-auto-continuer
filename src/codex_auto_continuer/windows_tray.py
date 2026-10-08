@@ -37,6 +37,7 @@ class TrayIcon(Icon):
         self._message_handlers.update({0x2B: self._draw_item, 0x2C: self._measure_item, 0x120: self._menu_char})
         self._menu_rows = {}
         self._subclass = None
+        self._chrome = None
 
     def _attach_renderer(self):
         # pystray deliberately leaves its separate menu owner on DefWindowProc.
@@ -134,13 +135,13 @@ class TrayIcon(Icon):
                     canvas.fill((r.right - canvas.px(14), r.top + canvas.px(7), r.right - canvas.px(10),
                                  r.bottom - canvas.px(7)), ACCENT)
                 if row.submenu:
-                    # Windows paints its native arrow after WM_DRAWITEM. Do not
-                    # add a second glyph; contrast its dark idle arrow explicitly.
-                    if not value.itemState & 1:
-                        canvas.rounded((r.right - canvas.px(17), r.top + canvas.px(7),
-                                        r.right - canvas.px(5), r.bottom - canvas.px(7)), MUTED, 2)
+                    middle = (r.top + r.bottom) // 2
+                    canvas.chevron((r.right - canvas.px(12), middle - canvas.px(4),
+                                    r.right - canvas.px(7), middle + canvas.px(4)), fg)
         finally:
             canvas.close()
+        if self._chrome:
+            self._chrome.repaint()
         return 1
 
     def _menu_char(self, wparam, lparam):
@@ -184,7 +185,9 @@ class TrayIcon(Icon):
                     user.SetWindowPos(self._menu_hwnd, None, point.x, point.y, 0, 0, 0x15)
                 self._dpi = user.GetDpiForWindow(self._menu_hwnd) or 96
             super()._update_menu()
-            return super()._on_notify(wparam, lparam)
+            from .windows_menu import MenuChrome
+            with MenuChrome(self):
+                return super()._on_notify(wparam, lparam)
         finally:
             self._popup_open = False
 

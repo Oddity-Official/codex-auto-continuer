@@ -12,7 +12,7 @@ You need Windows 11 x86_64 and a signed-in native Codex installation. Python is 
 
 ## Tray controls
 
-- `Read Full Status` opens a dark panel showing current state, selected clients, last scan, compatibility, updates, usage and waiting threads. Double-click also opens it. `Details` shows full selected thread names and diagnostic explanations. Double-click a waiting row or press Enter on it for the same details.
+- `Read Full Status` opens a dark panel showing current state, selected clients, last scan, compatibility, updates, usage and waiting threads. Double-click also opens it. Problems and repair guidance appear directly in the panel. Hover over a shortened thread name to read its full title. Close with X or Escape.
 - `Start Monitoring` and `Stop Monitoring` control recovery. Stop finishes the current cycle and preserves pending work.
 - `Clients To Monitor` independently selects VS Code, CLI and Desktop. `All` selects all three. No selection pauses client monitoring. Executor and sub-agent jobs are always excluded.
 - `Modify Prompt` opens the saved Markdown prompt in its associated editor. The default is simply `Continue`.

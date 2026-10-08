@@ -42,7 +42,7 @@ def test_reopening_status_restores_a_minimized_window():
         user.DestroyWindow(hwnd)
 
 
-def test_native_enter_opens_selected_thread_details_without_ending_the_panel():
+def test_enter_on_a_thread_does_not_open_a_debug_dialog_or_end_the_panel():
     import sys
     if sys.platform != "win32":
         pytest.skip("Native Windows message structure")
@@ -50,13 +50,11 @@ def test_native_enter_opens_selected_thread_details_without_ending_the_panel():
     from codex_auto_continuer.status_window import StatusWindow
     panel = StatusWindow(lambda: {}, lambda ids: {}, lambda error: None)
     panel.listbox = 123
-    opened = []
-    panel._details = lambda: opened.append(True)
     msg = wintypes.MSG()
     msg.hWnd, msg.message, msg.wParam = panel.listbox, 0x100, 13
-    assert panel._handle_key(msg) and opened == [True]
+    assert not panel._handle_key(msg)
     msg.hWnd = 456
-    assert not panel._handle_key(msg) and opened == [True]
+    assert not panel._handle_key(msg)
 
 from codex_auto_continuer import config, telemetry
 from codex_auto_continuer.errors import AutoContinuerError
@@ -111,7 +109,9 @@ def test_compatibility_blocks_explain_the_cause_instead_of_not_checked(tmp_path,
     model = controller.status_model()
     assert model["compatibility"] == "Blocked (Balanced)"
     assert model["issue"] == controller.snapshot["compatibility"]["reason"]
-    assert controller.problem in model["details"]
+    assert controller.problem in model["issues"]
+    assert model["issue"] in model["issues"]
+    assert "details" not in model
 
 
 def test_status_uses_durable_pending_not_observations_and_survives_corrupt_state(tmp_path):

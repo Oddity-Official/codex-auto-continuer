@@ -12,35 +12,8 @@ from . import telemetry
 
 def message(text: str, *, title: str = "Codex Auto Continuer", error: bool = False, confirm: bool = False,
             owner: int | None = None) -> bool:
-    api = ctypes.WinDLL("user32", use_last_error=True)
-    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel.GetModuleHandleW.argtypes = [ctypes.c_wchar_p]
-    kernel.GetModuleHandleW.restype = ctypes.c_void_p
-    api.CreateWindowExW.argtypes = [ctypes.c_uint, ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint,
-                                  ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
-                                  ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
-    api.CreateWindowExW.restype = ctypes.c_void_p
-    api.DestroyWindow.argtypes = [ctypes.c_void_p]
-    api.DestroyWindow.restype = ctypes.c_int
-    api.MessageBoxW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint]
-    api.MessageBoxW.restype = ctypes.c_int
-    # A dedicated STATIC owner uses Windows' window procedure, not pystray's
-    # notification dispatcher, and belongs to this dialog's UI thread.
-    created_owner = owner is None
-    if created_owner:
-        owner = api.CreateWindowExW(0, "STATIC", "CAC dialog owner", 0x80000000,
-                                   0, 0, 0, 0, None, None, kernel.GetModuleHandleW(None), None)
-    if not owner:
-        raise ctypes.WinError(ctypes.get_last_error())
-    try:
-        flags = 0x121 if confirm else 0x10 if error else 0x40
-        result = api.MessageBoxW(owner, text, title, flags)
-        if result == 0:
-            raise ctypes.WinError(ctypes.get_last_error())
-        return result == 1 if confirm else True
-    finally:
-        if created_owner:
-            api.DestroyWindow(owner)
+    from .windows_dialog import DarkDialog
+    return DarkDialog(text, title, error, confirm, owner).run()
 
 
 class Dialogs:
@@ -110,8 +83,8 @@ class Dialogs:
         def dismiss_owned(hwnd, unused):
             name = ctypes.create_unicode_buffer(32)
             api.GetClassNameW(hwnd, name, len(name))
-            if name.value == "#32770":
-                api.PostMessageW(hwnd, 0x111, 2, 0)  # IDCANCEL closes only our dialog thread's window.
+            if name.value.startswith("CACDialog"):
+                api.PostMessageW(hwnd, 0x10, 0, 0)  # Close only our dialog thread's window; never approve.
             return 1
 
         deadline = time.monotonic() + 2

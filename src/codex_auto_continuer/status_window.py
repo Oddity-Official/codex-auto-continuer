@@ -8,55 +8,9 @@ import time
 from ctypes import wintypes as W
 
 from . import __version__
-from .dialogs import message
 from .windows_ui import (user, gdi, kernel, bind, Canvas, DrawItem, H, I, U, P, L, S, R,
-                         BACKGROUND, TEXT, MUTED, HOVER, SELECTED, SURFACE, ACCENT, color)
-
-PROC = C.WINFUNCTYPE(L, H, U, P, L)
-
-
-class WindowClass(C.Structure):
-    _fields_ = [("style", U), ("proc", PROC), ("clsExtra", I), ("wndExtra", I), ("instance", H),
-                ("icon", H), ("cursor", H), ("background", H), ("menu", S), ("name", S)]
-
-
-class Paint(C.Structure):
-    _fields_ = [("dc", H), ("erase", I), ("rect", R), ("restore", I), ("incUpdate", I), ("reserved", C.c_byte * 32)]
-
-
-class MonitorInfo(C.Structure):
-    _fields_ = [("size", U), ("monitor", R), ("work", R), ("flags", U)]
-
-
-bind(user, "RegisterClassW", W.ATOM, C.POINTER(WindowClass))
-bind(user, "UnregisterClassW", I, S, H)
-bind(user, "DefWindowProcW", L, H, U, P, L)
-bind(user, "CreateWindowExW", H, U, S, S, U, I, I, I, I, H, H, H, H)
-bind(user, "DestroyWindow", I, H)
-bind(user, "ShowWindow", I, H, I)
-bind(user, "SetWindowPos", I, H, H, I, I, I, I, U)
-bind(user, "SetWindowTextW", I, H, S)
-bind(user, "SendMessageW", L, H, U, P, L)
-bind(user, "PostMessageW", I, H, U, P, L)
-bind(user, "SetTimer", P, H, P, U, H)
-bind(user, "KillTimer", I, H, P)
-bind(user, "GetMessageW", I, C.POINTER(W.MSG), H, U, U)
-bind(user, "TranslateMessage", I, C.POINTER(W.MSG))
-bind(user, "DispatchMessageW", L, C.POINTER(W.MSG))
-bind(user, "IsDialogMessageW", I, H, C.POINTER(W.MSG))
-bind(user, "PostQuitMessage", None, I)
-bind(user, "BeginPaint", H, H, C.POINTER(Paint))
-bind(user, "EndPaint", I, H, C.POINTER(Paint))
-bind(user, "GetClientRect", I, H, C.POINTER(R))
-bind(user, "InvalidateRect", I, H, C.POINTER(R), I)
-bind(user, "GetCursorPos", I, C.POINTER(W.POINT))
-bind(user, "MonitorFromPoint", H, W.POINT, U)
-bind(user, "GetMonitorInfoW", I, H, C.POINTER(MonitorInfo))
-bind(user, "SetThreadDpiAwarenessContext", H, H)
-bind(user, "AdjustWindowRectExForDpi", I, C.POINTER(R), U, I, U, U)
-bind(user, "LoadCursorW", H, H, H)
-bind(user, "WindowFromPoint", H, W.POINT)
-bind(user, "DestroyIcon", I, H)
+                         BACKGROUND, TEXT, MUTED, HOVER, SELECTED, SURFACE, ACCENT, color,
+                         style_window, PROC, WindowClass, Paint, MonitorInfo)
 
 
 class StatusWindow:
@@ -141,20 +95,14 @@ class StatusWindow:
             self.dpi = user.GetDpiForWindow(self.hwnd) or 96
             self.scale = self.dpi / 96
             self.font = gdi.CreateFontW(-self.px(13), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, "Segoe UI")
-            try:
-                dwm = C.WinDLL("dwmapi")
-                bind(dwm, "DwmSetWindowAttribute", I, H, U, H, U)
-                dark = I(1)
-                dwm.DwmSetWindowAttribute(self.hwnd, 20, C.byref(dark), C.sizeof(dark))
-            except OSError:
-                pass  # Client content is always dark, independently of title-bar support.
+            style_window(self.hwnd)
             self.controls = {}
             for key in ("heading", "state", "clients", "scan", "compatibility", "updates", "issue", "usage",
                         "usage5", "usage7", "value5", "value7", "reset5", "reset7", "waiting"):
                 self.controls[key] = self._control("STATIC", "", 0, 0)
             self.listbox = self._control("LISTBOX", "Waiting Threads", 0x50010151, 101)
-            self.details = self._control("BUTTON", "Details", 0x5001000B, 102)
-            self.close_button = self._control("BUTTON", "Close", 0x5001000B, 103)
+            from .windows_tooltip import Tooltip
+            self.tooltip = Tooltip(self.hwnd, self.listbox)
             self.up = self._control("BUTTON", "Previous Threads", 0x5001000B, 104)
             self.down = self._control("BUTTON", "Next Threads", 0x5001000B, 105)
             initial = self.provider()
@@ -177,6 +125,9 @@ class StatusWindow:
             with self.guard:
                 self.stop.set()
                 self.names.clear()
+                if hasattr(self, "tooltip"):
+                    self.tooltip.text = ""
+                    self.tooltip.info.text = ""
                 self.list_rows = ()
                 self.model = {}
                 try:
@@ -206,13 +157,10 @@ class StatusWindow:
         if msg.wParam == 27:
             user.DestroyWindow(self.hwnd)
             return True
-        if msg.wParam == 13 and msg.hWnd == self.listbox:
-            self._details()
-            return True
         return False
 
     def _control(self, kind, label, style, identity):
-        control = user.CreateWindowExW(0, kind, label, style or 0x50000000, 0, 0, 1, 1,
+        control = user.CreateWindowExW(0, kind, label, style or 0x50000080, 0, 0, 1, 1,
             self.hwnd, H(identity), kernel.GetModuleHandleW(None), None)
         user.SendMessageW(control, 0x30, self.font, 0)
         return control
@@ -248,7 +196,8 @@ class StatusWindow:
         self._label("scan", "Last Scan: " + model["scan"])
         self._label("compatibility", "Compatibility: " + model["compatibility"])
         self._label("updates", "Updates: " + model["updates"])
-        self._label("issue", model["issue"], 13)
+        issues = "\n\n".join(model["issues"])
+        self._label("issue", issues, 13)
         self._label("usage", "USAGE" + ("  ·  LAST KNOWN" if any(w.stale for w in model["usage"]) else ""), 11, True)
         self._label("waiting", f"WAITING THREADS  ·  {len(model['threads'])}", 11, True)
         self._place(self.controls["heading"], 24, 20, 464, 18)
@@ -258,8 +207,15 @@ class StatusWindow:
         self._place(self.controls["compatibility"], 24, 121 if self.compact else 139, 250, 20)
         self._place(self.controls["updates"], 282, 121 if self.compact else 139, 206, 20)
         y = 149 if self.compact else 169
-        self._place(self.controls["issue"], 24, y, 464, 38 if self.compact else 56, visible=bool(model["issue"]))
-        y += (48 if self.compact else 68) if model["issue"] else 0
+        dc = user.GetDC(self.hwnd)
+        canvas = Canvas(dc, dpi=self.dpi)
+        try:
+            _, issue_height = canvas.text(issues, (0, 0, self.px(464), 0), wrap=True, measure=True)
+        finally:
+            canvas.close()
+            user.ReleaseDC(self.hwnd, dc)
+        self._place(self.controls["issue"], 24, y, 464, issue_height / self.scale, visible=bool(issues))
+        y += issue_height / self.scale + 14 if issues else 0
         self._place(self.controls["usage"], 24, y, 464, 18)
         y += 27
         self.usage_y = y
@@ -297,9 +253,7 @@ class StatusWindow:
         y += height + (23 if rows else 0)
         self._place(self.up, 132, y, 96, 32, visible=len(rows) > self.page_rows)
         self._place(self.down, 236, y, 96, 32, visible=len(rows) > self.page_rows)
-        self._place(self.details, 24, y, 88, 32)
-        self._place(self.close_button, 400, y, 88, 32)
-        y += 52
+        y += 52 if len(rows) > self.page_rows else 12
         if y != getattr(self, "height", None):
             rect = R(0, 0, self.px(512), self.px(y))
             user.AdjustWindowRectExForDpi(C.byref(rect), 0x80CA0000, False, 0x10000, self.dpi)
@@ -309,14 +263,6 @@ class StatusWindow:
             user.SetWindowPos(self.hwnd, None, x, top, min(width, work.right - work.left), min(height, work.bottom - work.top), 0x14)
             self.height = y
         user.InvalidateRect(self.hwnd, None, True)
-
-    def _details(self):
-        index = user.SendMessageW(self.listbox, 0x188, 0, 0)
-        selected = ""
-        if 0 <= index < len(self.list_rows):
-            identity, title, reason = self.list_rows[index]
-            selected = f"{title}\n{reason}\nThread ID: {identity}\n\n"
-        message(selected + self.model["details"], title="CAC Status Details", owner=self.hwnd)
 
     def _proc(self, hwnd, msg, wparam, lparam):
         try:
@@ -335,7 +281,7 @@ class StatusWindow:
                 self.scale = self.dpi / 96
                 old_font = self.font
                 self.font = gdi.CreateFontW(-self.px(13), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, "Segoe UI")
-                for child in list(self.controls.values()) + [self.listbox, self.details, self.close_button, self.up, self.down]:
+                for child in list(self.controls.values()) + [self.listbox, self.up, self.down]:
                     user.SendMessageW(child, 0x30, self.font, 1)
                 if old_font:
                     gdi.DeleteObject(old_font)
@@ -353,18 +299,24 @@ class StatusWindow:
                 point = W.POINT()
                 user.GetCursorPos(C.byref(point))
                 hover = user.WindowFromPoint(point)
+                title = ""
+                if hover == self.listbox and self.list_rows:
+                    bind(user, "ScreenToClient", I, H, C.POINTER(W.POINT))
+                    local = W.POINT(point.x, point.y)
+                    user.ScreenToClient(self.listbox, C.byref(local))
+                    hit = user.SendMessageW(self.listbox, 0x1A9, 0, (local.y & 0xFFFF) << 16 | local.x & 0xFFFF)
+                    index = hit & 0xFFFF
+                    if not hit >> 16 and index < len(self.list_rows):
+                        title = self.list_rows[index][1]
+                self.tooltip.update(title)
                 if hover != getattr(self, "hover", None):
-                    for child in (self.details, self.close_button, self.up, self.down):
+                    for child in (self.up, self.down):
                         if child in (hover, getattr(self, "hover", None)):
                             user.InvalidateRect(child, None, True)
                     self.hover = hover
                 return 0
             if msg == 0x111:
-                if wparam & 0xFFFF == 103:
-                    user.DestroyWindow(hwnd)
-                elif wparam & 0xFFFF == 102 or (wparam & 0xFFFF == 101 and wparam >> 16 == 2):
-                    self._details()
-                elif wparam & 0xFFFF in (104, 105):
+                if wparam & 0xFFFF in (104, 105):
                     top = user.SendMessageW(self.listbox, 0x18E, 0, 0)
                     direction = -self.page_rows if wparam & 0xFFFF == 104 else self.page_rows
                     user.SendMessageW(self.listbox, 0x197, max(0, min(len(self.list_rows) - self.page_rows, top + direction)), 0)
@@ -387,10 +339,10 @@ class StatusWindow:
                         split = 25 if self.compact else 31
                         canvas.text(title, (r.left + self.px(12), r.top + self.px(3), r.right - self.px(12), r.top + self.px(split)), size=13 if self.compact else 14)
                         canvas.text(reason, (r.left + self.px(12), r.top + self.px(split - 2), r.right - self.px(12), r.bottom - self.px(3)), shade=MUTED, size=11 if self.compact else 12)
-                    elif item.CtlID in (102, 103, 104, 105):
+                    elif item.CtlID in (104, 105):
                         hovered = item.hwndItem == getattr(self, "hover", None)
                         canvas.rounded((r.left, r.top, r.right, r.bottom), HOVER if hovered or item.itemState & 1 else SURFACE, 6)
-                        canvas.text({102: "Details", 103: "Close", 104: "↑ Previous", 105: "Next ↓"}[item.CtlID],
+                        canvas.text({104: "↑ Previous", 105: "Next ↓"}[item.CtlID],
                                     (r.left, r.top, r.right, r.bottom), align="center")
                         if item.itemState & 0x10:
                             canvas.fill((r.left, r.bottom - 2, r.right, r.bottom), MUTED)

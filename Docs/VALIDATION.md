@@ -2,6 +2,25 @@
 
 Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Imported checkpoint: v001. Prior release results below remain dated artifact evidence, not checks of changed code.
 
+## CAC 0.7.4 UI source candidate, 8 October 2026
+
+Rounded native menus and submenus, clean light arrows, shared dark About/confirmation/error dialogs and the simplified status panel are implemented. Actionable reasons appear directly in Full Status; exact build diagnostics remain in CLI status and local logs. The panel has no Details or Close buttons. Native tooltips expose full authoritative titles without persisting them. Selected tints and right-edge markers remain distinct from hover.
+
+| Check | Scope and result |
+| --- | --- |
+| Final native Windows gate | 323 passed in 31.75 seconds; compilation and 0.7.4 identity passed |
+| Real native popup regression | Actual Windows tracking with pystray's hidden menu owner verifies rounded region clipping and final light-arrow pixels without a backing box; callback/hook cleanup passed |
+| GDI checks | Selected, hover and disabled rows, absent checkmark gutter, arrow/background pixels and remaining-capacity meters at 96/144/192 DPI passed |
+| Dialog safety | About OK/X/Escape, confirmation OK/Cancel/X/default Enter/Escape, queue shutdown and recovery from failed window setup passed |
+| Interactive source inspection | Computer Use on synthetic, disposable data inspected normal/empty status, nine waiting threads, inline repair guidance, full-title tooltip, rounded main/Clients menus, selected/hover states, native keyboard submenu navigation and About X dismissal |
+| Final interactive boundary | The user stopped Computer Use with physical Escape during the final 0.7.4 preview selection. No later desktop input was issued. The last border/button-outline adjustments have native rendering/regression evidence, not a completed final interactive sweep |
+| Recovery evidence | Recovery, protocol, state, privacy and startup logic are unchanged. The 7 October 0.7.3 three-tuple, 19-case native results remain unchanged-engine evidence; candidate certificate metadata carries those identities and the original verification date |
+| Publication and installation | No 0.7.4 portable release was built, uploaded or installed. Installed CAC remains 0.7.3; its data and login configuration were not edited |
+
+The first new native popup pixel check caught Windows painting a black arrow after the owner's draw callback. A coalesced popup message now paints the final chevron after that operation. The first dialog regression attempted to read a write-only caption-color DWM attribute; its failed assertion escaped the test callback and the bounded runner stopped the process tree after 90 seconds. The corrected regression catches callback failures, always closes its own window, and checks readable dark/corner attributes. This was a test-harness failure, not an observed product hang. An earlier 322-case gate passed before the explicit setup-failure regression and literal-text fix; the final 323-case gate above covers both.
+
+Before publishing/installing 0.7.4, finish the final interactive sweep and the normal signed-release/frozen-artifact/upgrade checks. Physical mixed-DPI transitions, Windows theme switching and high contrast remain untested; no OS settings were changed. Synthetic previews neither connect to Codex nor change real controls.
+
 ## CAC 0.7.3 startup verification, 7 October 2026
 
 Installed 0.7.2 accepted the actual connected daemon but its automatic start command returned success without a remaining supervisor. Inspection established that status probes briefly acquired exclusive ownership and rewrote PID metadata. Shared read-only probes remove that false-running mechanism; real ownership remains exclusive and survives empty metadata. A short exclusive-acquisition grace period covers in-flight probes, while permission/I/O failures remain explicit.

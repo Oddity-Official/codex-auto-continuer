@@ -52,7 +52,7 @@ Use an owner-drawn Win32 `HMENU`: compact dark rows and custom header rendering 
 
 The current pystray adapter owns the native menu for the whole tracking operation. Preserve that lifetime rule: background updates and callbacks must not replace a menu while Windows is tracking it.
 
-Keep dark-only rows and submenus, no checkmark gutter, tight padding, persistent selected backgrounds, distinct hover styling, meters, custom header layout and readable disabled states. Check borders and submenu arrows too. Do not rely on undocumented theme hacks or silently compromise these requirements.
+Keep dark-only rows and submenus, gently rounded corners, no checkmark gutter, tight padding, persistent selected backgrounds, distinct hover styling, meters, custom header layout and readable disabled states. Use clean light submenu arrows without backing boxes. All CAC windows, including About, confirmations and errors, share the same palette and rounded styling. Do not rely on undocumented theme hacks or silently compromise these requirements.
 
 If a custom popup is necessary, account for keyboard navigation, Enter and Escape, submenu navigation, mouse hover/click, outside-click dismissal, activation/focus, taskbar edges, multiple monitors, DPI, work-area clamping, disabled items and practical accessibility. Styling convenience alone does not justify interaction regressions.
 
@@ -137,7 +137,7 @@ Generate or render variants from the SVG master. Inspect realistic 16px, 20px, 2
 
 Replace the dense native status message box with a compact dark window. Its hierarchy is current state, usage, then waiting threads. Align labels and values and keep information grouped.
 
-Current state includes human-readable status, selected clients and last scan. Retain a compact compatibility summary (`Verified`, `Untested` or `Blocked`, with Balanced/Strict policy) and update state. Expose exact version details and failure explanations through a lightweight details affordance. Blocking issues need a specific reason and useful next action, not only `Needs Attention` or advice to inspect logs.
+Current state includes human-readable status, selected clients and last scan. Retain a compact compatibility summary (`Verified`, `Untested` or `Blocked`, with Balanced/Strict policy) and update state. Put actionable problems directly in this window, with enough space for the reason and useful next action. Do not add Details or Close buttons: the title-bar X closes the window, and Escape also dismisses it. Exact binary versions, hashes and other build diagnostics belong in the CLI and local logs, not the everyday status view.
 
 Do not carry over counters such as chats checked, failures or continuations sent without a clear user need and scope. Do not duplicate telemetry mode here.
 
@@ -157,7 +157,7 @@ Send Unconfirmed - Checking Whether Codex Accepted It
 
 Other useful reasons include `Reconciling`. Explain actionable ambiguity without claiming acceptance or retrying it.
 
-Ellipsize long names within a fixed reasonable width; offer a full-title tooltip or lightweight detail affordance. Hide the entire waiting section when empty and shrink the window. For many threads, scroll only that section instead of growing the window without bound.
+Ellipsize long names within a fixed reasonable width and offer a full-title tooltip. Hide the entire waiting section when empty and shrink the window. For many threads, scroll only that section instead of growing the window without bound; show pagination controls only when needed.
 
 Fetch required names asynchronously and keep them in memory for the status view. Opening status must not block the UI, resume a chat or subscribe to its work. No focus manipulation may be used to perform recovery. Do not persist names solely for UI, particularly in the on-disk Private status snapshot. Preserve existing explicit Detailed telemetry behavior.
 

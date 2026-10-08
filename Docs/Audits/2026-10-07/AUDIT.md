@@ -5,6 +5,16 @@ Started at: 2026-10-07T11:35:31.757824+00:00
 
 ## Scope and boundary
 
+### 8 October UI follow-up
+
+The reported square menus, arrow backing boxes, unstyled About window and unnecessary Details/Close status controls are addressed in source 0.7.4. Current behavior is specified in the existing product and architecture owners. This follow-up implements reported UI findings; it does not start a new audit or rewrite earlier evidence below.
+
+Computer Use inspected disposable production-renderer fixtures: rounded main/Clients menus, persistent selected rows versus hover, native C/Right/Left navigation, About X dismissal, nine waiting rows with inline repair guidance, and the full-title tooltip. No Codex connection or real control write was involved. The user stopped Computer Use with physical Escape during the final preview selection. No further desktop input followed; installed 0.7.3 remains unchanged. The final border/button-outline refinements have native tests but not a completed final interactive sweep.
+
+The actual hidden-owner popup regression checks a rounded native window region and final arrow/background pixels under Windows tracking. It initially reproduced a black post-painted native arrow despite correct owner drawing; a coalesced popup message fixes the final paint order. Dialog regressions cover safe confirmation dismissal, About OK/X/Escape, asynchronous shutdown and setup-failure recovery. Final native Windows gate: 323 passed in 31.75 seconds, compilation and 0.7.4 version passed. An initial faulty DWM getter assertion hung its test callback until the 90-second process-tree bound; callback failures now force test-window cleanup and only readable DWM attributes are queried. No production failure was hidden or retried away.
+
+No new portable release, GitHub publication or installed update has been performed for this candidate. The prior 0.7.3 three-tuple integration results are dated unchanged-engine evidence, not new 0.7.4 artifact validation. Complete final interactive and signed/frozen/upgrade gates before release. Current verification is in `Docs/VALIDATION.md`.
+
 Implement the approved tray/status presentation, remove experimental queue holding from everyday controls, and inspect recent production recovery/notification metadata. The source baseline was commit `8f4fcfa`; the installed release is CAC 0.6.1. Windows 11 x86_64, PowerShell 7, CPython 3.13.7 and the project virtual environment were used.
 
 The user requested no further Computer Use while working. Isolated preview processes were stopped. No production monitor, installed binary, prompt, settings, startup shortcut or client profile was changed. No new release was built, uploaded or deployed. Source version remains 0.6.1 pending final interactive acceptance and versioned release checks.

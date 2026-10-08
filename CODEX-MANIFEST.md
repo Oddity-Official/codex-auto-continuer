@@ -2,11 +2,18 @@
 
 ChatGPT base checkpoint: v001
 
-Updated: 2026-10-07
+Updated: 2026-10-08
 
 ## Imported base
 
 All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba04` preserves v001 and its original checksum manifest. ChatGPT's manifest is unchanged. The stale imported checksum file is not retained as a current-source checksum; each new transport owns its generated manifest.
+
+## CAC 0.7.4 UI source candidate
+
+- Implemented gently rounded owner-drawn native menus/submenus, dark central borders and clean post-painted submenu chevrons. Native tracking, menu snapshot lifetime, keyboard navigation, accessibility states and selected/hover/disabled semantics remain intact. A real hidden-owner popup regression caught the final native arrow overwrite before the coalesced repaint repair.
+- Full Status directly presents actionable problems with measured wrapping; Details/Close controls and diagnostic build text were removed. Long authoritative titles have dark native tooltips; names remain transient. Only overflowing waiting lists show pagination controls. About, confirmation and error dialogs share dark palette, rounded chrome and accessible native controls; Cancel is the safe initial confirmation choice. Failed setup cannot poison subsequent dialog message loops.
+- Final Windows gate: 323 passed in 31.75 seconds, compilation and source 0.7.4 identity passed. Actual Computer Use inspected source menus, selected/hover states, native submenu keys, normal/empty/long-list/error panels, full-title tooltip and About X dismissal. The user stopped Computer Use with physical Escape during the final preview selection; no further desktop input followed. Docs/VALIDATION.md distinguishes inspected source from final native pixel checks and remaining release acceptance.
+- Recovery and privacy logic are unchanged; 0.7.3 native integration evidence and exact tuple identities are carried with their original date. No 0.7.4 portable publication or installation occurred. Installed CAC remains 0.7.3; user data, prompt, login settings and Codex clients were not changed. ChatGPT's manifest is unchanged. Source handoff is refreshed separately from release binaries.
 
 ## CAC 0.7.3 ownership repair
 

@@ -230,7 +230,7 @@ def test_about_dialog_closes_and_does_not_hold_tray_popup_tracking(monkeypatch, 
             def inspect_our_dialog(hwnd, unused):
                 name = ctypes.create_unicode_buffer(32)
                 api.GetClassNameW(hwnd, name, len(name))
-                if name.value == "#32770":
+                if name.value.startswith("CACDialog"):
                     found.append(hwnd)
                 return 1
             while not found and time.monotonic() < deadline:
@@ -243,8 +243,7 @@ def test_about_dialog_closes_and_does_not_hold_tray_popup_tracking(monkeypatch, 
             hwnd = found[0]
             while not (api.GetDlgItem(hwnd, 1) or api.GetDlgItem(hwnd, 2)) and time.monotonic() < deadline:
                 time.sleep(0.01)
-            # Windows may give a single OK button IDCANCEL so Escape also works.
-            button = api.GetDlgItem(hwnd, 1) or api.GetDlgItem(hwnd, 2)
+            button = api.GetDlgItem(hwnd, 1)
             assert button, "About did not initialize its OK button"
             text = ctypes.create_unicode_buffer(32)
             api.GetWindowTextW(button, text, len(text))

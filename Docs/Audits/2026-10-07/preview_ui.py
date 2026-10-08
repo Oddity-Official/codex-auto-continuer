@@ -25,9 +25,17 @@ def main():
     for flag in ("many", "empty", "menu", "unknown", "error"):
         parser.add_argument("--" + flag, action="store_true")
     parser.add_argument("--dpi", type=int, choices=(96, 144, 192))
+    parser.add_argument("--dialog", choices=("about", "confirm", "error"))
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="cac-ui-") as directory:
         controller = TrayController(Path(directory) / "settings.toml")
+        if args.dialog:
+            from codex_auto_continuer.dialogs import message
+            from codex_auto_continuer import __version__
+            accepted = message(f"Codex Auto Continuer {__version__}\n\nContinues exact local Codex chats after usage recovers.\nLocal diagnostics; no analytics uploads or credential logging.\n\nIndependent tool, not an OpenAI product. MIT license.",
+                title="CAC Preview " + args.dialog.title(), confirm=args.dialog == "confirm", error=args.dialog == "error")
+            print("Fixture dialog accepted:", accepted, flush=True)
+            return
         count = 9 if args.many else 0 if args.empty else 3
         obligations = [Obligation.create(f"fixture-{index}", f"failed-{index}", time.time(), None) for index in range(count)]
         save_state(controller.config_file.parent / "state.json", State(obligations=obligations))
@@ -41,7 +49,7 @@ def main():
             controller.snapshot["usage"] = usage_snapshot({}, time.time())
         if args.error:
             controller.state = "failed"
-            controller.problem = "Synthetic compatibility block. Read Details for the exact build; pending work is preserved."
+            controller.problem = "Synthetic compatibility block. Update CAC, then start monitoring again. Pending work is preserved."
         controller.enqueue = lambda *args: print("Fixture action:", args, flush=True)
         controller.open = lambda *args: print("Fixture file action:", args, flush=True)
         controller.lookup_titles = lambda identities: {identity: (
@@ -53,11 +61,10 @@ def main():
             errors.append(exc)
             print("UI ERROR:", repr(exc), flush=True)
         class PreviewPanel(StatusWindow):
-            def _details(self):
-                print("Fixture details opened", flush=True)
-                return super()._details()
-
             def _proc(self, hwnd, message, wparam, lparam):
+                if args.menu and message == 0x205:
+                    preview_menu()
+                    return 0
                 if message in (0x10, 0x111):
                     print("Fixture window action:", hex(message), wparam, flush=True)
                 return super()._proc(hwnd, message, wparam, lparam)
@@ -88,7 +95,6 @@ def main():
                     if icon._subclass:
                         api.RemoveWindowSubclass(panel.hwnd, ctypes.cast(icon._subclass, H), 1)
                     icon._hwnd, icon._menu_hwnd, icon._subclass = original
-            panel._details = preview_menu
         def ready(unused):
             icon.visible = True
             panel.show()
