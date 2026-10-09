@@ -8,7 +8,7 @@ CAC continues the exact local Codex chat stopped by a usage limit, once Codex co
 2. Launch `CodexAutoContinuer.exe`. Monitoring starts automatically. Look in Windows' hidden tray icons if needed.
 3. Right-click the icon. `Start With Windows` launches CAC and starts monitoring at login for this Windows account, without administrator rights. A previous session's saved error does not suppress a new start; invalid current settings still require repair.
 
-Codex must be installed, but an interactive CLI terminal does not need to be open. CAC locates the executable and starts Codex's shared background service when needed (`auto_start_daemon = true`). A missing **GitHub CLI (gh)** warning concerns private CAC updates, not Codex monitoring; see [Updates](UPDATES.md).
+Codex must be installed, but an interactive CLI terminal does not need to be open. CAC locates the executable and starts Codex's shared background service when needed (`auto_start_daemon = true`). A missing GitHub CLI (`gh`) warning concerns private CAC updates, not Codex monitoring; see [Updates](https://github.com/Oddity-Official/codex-auto-continuer/blob/master/Docs/UPDATES.md).
 
 You need Windows 11 x86_64 and a signed-in native Codex installation. Python is bundled. Codex 0.160.0 and 0.161.0 are certified. Balanced mode automatically verifies compatible new stable builds without requiring a CAC update. Untested in status means no exact behavioral certificate, not that monitoring stopped. Strict mode requires exact certification. These independent EXEs are unsigned, so Windows may show a reputation warning.
 
@@ -60,7 +60,7 @@ If you previously captured requests, preserve `data/held-inputs.dpapi` until the
 
 ## Terminal and portability
 
-Portable CAC checks GitHub releases every 6 hours by default. `auto_update = false` makes updates manual. Installation waits for the current cycle, preserves data, backs up code and restarts at the same path. Failure restores code, never old continuation state. `update-status.json` names the recovery job; an interrupted installation can be recovered from its staged CLI with `update recover <absolute-job.json-path>`.
+Portable CAC checks GitHub releases every 6 hours by default; failed automatic checks retry after 15 minutes without stopping monitoring. `auto_update = false` makes updates manual. Installation waits for the current cycle, preserves data, backs up code and restarts at the same path. Failure restores code, never old continuation state. `update-status.json` names the recovery job; an interrupted installation can be recovered from its staged CLI with `update recover <absolute-job.json-path>`.
 
 The publisher repository is private during testing. `update_use_github_cli_auth = true` uses an existing `gh auth login` for private releases. The token stays in memory, goes only to GitHub's API and is never bundled or logged. Public releases need no login. GitHub receives ordinary release requests and CAC's version, not chat data. Source and pip installations use their package manager instead.
 
