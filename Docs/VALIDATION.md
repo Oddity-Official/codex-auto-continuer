@@ -2,6 +2,12 @@
 
 Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Imported checkpoint: v001. Prior release results below remain dated artifact evidence, not checks of changed code.
 
+## CAC 0.7.5 status reopening, 8 October 2026
+
+The native close/reopen regression first reproduced a clipped 261-pixel client height against a required 333 pixels. Resetting the cached layout height when creating each new HWND restores full sizing and work-area positioning. All twelve focused status tests passed after repair, including three openings through the same tray controller. The complete Windows gate passed 331 tests in 48.64 seconds, compilation and 0.7.5 identity included.
+
+Computer Use inspected the empty status fixture before and after X dismissal and reopening through the same controller. The new native window retained the correct lower-right work-area position and full 514-by-365 visible frame; both usage meters and reset labels were visible. This is native source-renderer evidence, not a physical mixed-DPI transition or installed binary check. Release and installation acceptance are pending. The existing recovery-engine certificates retain their original verification date because this repair changes only status-window lifetime.
+
 ## CAC 0.7.4 release verification, 8 October 2026
 
 Rounded native menus and submenus, clean light arrows, shared dark About/confirmation/error dialogs and the simplified status panel are implemented. Actionable reasons appear directly in Full Status; exact build diagnostics remain in CLI status and local logs. The panel has no Details or Close buttons. Native tooltips expose full authoritative titles without persisting them. Selected tints and right-edge markers remain distinct from hover.

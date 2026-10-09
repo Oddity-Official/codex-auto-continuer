@@ -42,6 +42,54 @@ def test_reopening_status_restores_a_minimized_window():
         user.DestroyWindow(hwnd)
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Native Windows status-window lifecycle")
+def test_closed_status_reopens_with_full_layout_and_work_area_position(tmp_path, monkeypatch):
+    import ctypes
+    import threading
+    from ctypes import wintypes
+    from codex_auto_continuer.status_window import StatusWindow, MonitorInfo
+    from codex_auto_continuer.windows_ui import user, bind, I, H, R
+    bind(user, "GetWindowRect", I, H, ctypes.POINTER(R))
+    # Exercise real layout without displaying windows or depending on mouse movement.
+    monkeypatch.setattr(user, "ShowWindow", lambda *args: 0)
+    def cursor(point):
+        ctypes.cast(point, ctypes.POINTER(wintypes.POINT)).contents.x = 0
+        ctypes.cast(point, ctypes.POINTER(wintypes.POINT)).contents.y = 0
+        return 1
+    monkeypatch.setattr(user, "GetCursorPos", cursor)
+    laid_out = threading.Event()
+    errors = []
+    class Panel(StatusWindow):
+        def _apply(self, *args, **kwargs):
+            super()._apply(*args, **kwargs)
+            laid_out.set()
+    controller = TrayController(tmp_path / "settings.toml")
+    panel = Panel(controller.status_model, lambda ids: {}, errors.append)
+    controller.status_window = panel
+    bounds = []
+    for opening in range(3):
+        laid_out.clear()
+        controller.show_status()
+        try:
+            assert laid_out.wait(5), f"Status layout did not complete: {errors!r}"
+            rect, client = R(), R()
+            assert user.GetWindowRect(panel.hwnd, ctypes.byref(rect))
+            assert user.GetClientRect(panel.hwnd, ctypes.byref(client))
+            monitor = MonitorInfo(ctypes.sizeof(MonitorInfo))
+            assert user.GetMonitorInfoW(user.MonitorFromPoint(wintypes.POINT(0, 0), 2), ctypes.byref(monitor))
+            work = monitor.work
+            assert client.bottom >= panel.px(panel.height), f"Opening {opening + 1} clipped the layout"
+            assert work.left <= rect.left < rect.right <= work.right
+            assert work.top <= rect.top < rect.bottom <= work.bottom
+            bounds.append((rect.left, rect.top, rect.right, rect.bottom))
+        finally:
+            panel.close()
+            panel.thread.join(5)
+        assert not panel.thread.is_alive()
+    assert not errors
+    assert bounds[0] == bounds[1] == bounds[2]
+
+
 def test_enter_on_a_thread_does_not_open_a_debug_dialog_or_end_the_panel():
     import sys
     if sys.platform != "win32":

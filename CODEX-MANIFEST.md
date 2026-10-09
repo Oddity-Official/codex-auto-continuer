@@ -8,6 +8,11 @@ Updated: 2026-10-08
 
 All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba04` preserves v001 and its original checksum manifest. ChatGPT's manifest is unchanged. The stale imported checksum file is not retained as a current-source checksum; each new transport owns its generated manifest.
 
+## CAC 0.7.5 status reopening
+
+- Reproduced the reported top-left, bottom-clipped Full Status window through the same controller's close/reopen lifecycle. A retained layout-height cache skipped sizing the new native HWND. Window creation now resets that cache; the native regression checks three openings, content height and work-area placement without displaying windows or connecting to Codex.
+- Focused status tests: twelve passed; full native Windows gate: 331 passed in 48.64 seconds, compilation and 0.7.5 identity included. Computer Use verified the same panel's X dismissal and recreated HWND, full 514-by-365 frame, lower-right work-area placement and visible meters/reset labels. The disposable preview supports this lifecycle and stops after the second dismissal. Signed release and installation are pending. No recovery policy, privacy model, saved prompt or user data has changed. Existing engine certification dates are preserved; ChatGPT's manifest is unchanged.
+
 ## CAC 0.7.4 release and startup updater
 
 - Implemented gently rounded owner-drawn native menus/submenus, dark central borders and clean post-painted submenu chevrons. Native tracking, menu snapshot lifetime, keyboard navigation, accessibility states and selected/hover/disabled semantics remain intact. A real hidden-owner popup regression caught the final native arrow overwrite before the coalesced repaint repair.

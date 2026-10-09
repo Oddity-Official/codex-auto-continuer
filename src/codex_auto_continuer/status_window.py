@@ -73,6 +73,8 @@ class StatusWindow:
     def _run(self):
         if self.stop.is_set():
             return
+        # Layout dimensions belong to the native window, not this reusable panel.
+        self.height = None
         old_dpi = user.SetThreadDpiAwarenessContext(H(-4))
         self.brush = gdi.CreateSolidBrush(color(BACKGROUND))
         self.surface_brush = gdi.CreateSolidBrush(color(SURFACE))

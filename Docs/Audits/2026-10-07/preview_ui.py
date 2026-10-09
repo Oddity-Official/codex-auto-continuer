@@ -22,7 +22,7 @@ from codex_auto_continuer.windows_ui import user
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for flag in ("many", "empty", "menu", "unknown", "error"):
+    for flag in ("many", "empty", "menu", "unknown", "error", "reopen"):
         parser.add_argument("--" + flag, action="store_true")
     parser.add_argument("--dpi", type=int, choices=(96, 144, 192))
     parser.add_argument("--dialog", choices=("about", "confirm", "error"))
@@ -95,10 +95,22 @@ def main():
                     if icon._subclass:
                         api.RemoveWindowSubclass(panel.hwnd, ctypes.cast(icon._subclass, H), 1)
                     icon._hwnd, icon._menu_hwnd, icon._subclass = original
+        finished = threading.Event()
+        def reopen():
+            panel.thread.join(300)
+            if not finished.is_set() and not panel.thread.is_alive():
+                print("Fixture reopening the same status panel", flush=True)
+                controller.show_status()
+                panel.thread.join(300)
+                if not panel.thread.is_alive():
+                    stop()
         def ready(unused):
             icon.visible = True
             panel.show()
+            if args.reopen:
+                threading.Thread(target=reopen, daemon=True).start()
         def stop():
+            finished.set()
             panel.close()
             icon.stop()
         timer = threading.Timer(300, stop)
@@ -106,6 +118,7 @@ def main():
         try:
             icon.run(setup=ready)
         finally:
+            finished.set()
             timer.cancel()
             panel.close()
         if errors:

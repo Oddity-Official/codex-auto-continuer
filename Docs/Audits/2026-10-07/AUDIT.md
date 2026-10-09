@@ -5,6 +5,12 @@ Started at: 2026-10-07T11:35:31.757824+00:00
 
 ## Scope and boundary
 
+### 8 October status reopening follow-up
+
+Closing Full Status destroys its native window but retains the tray controller's panel object. The old layout-height cache survived that destruction. Reopening with the same content therefore skipped sizing and positioning, leaving the new window at its initial top-left location with a clipped 261-pixel client area instead of the required 333 pixels. A native regression reproduced the failure through `TrayController.show_status()` before repair.
+
+Each new window now resets that window-scoped cache. The regression opens, closes and reopens the same panel three times, checks full content height and monitor work-area containment, and never displays a window or contacts Codex. The disposable preview's `--reopen` option reopens that same panel after X/Escape, for interactive lifecycle inspection. Fresh-object preview evidence alone did not cover this defect. Final verification and release acceptance belong to `Docs/VALIDATION.md`; recovery, prompt, privacy and compatibility policy are unchanged.
+
 ### 8 October UI follow-up
 
 The reported square menus, arrow backing boxes, unstyled About window and unnecessary Details/Close status controls are addressed in source 0.7.4. Current behavior is specified in the existing product and architecture owners. This follow-up implements reported UI findings; it does not start a new audit or rewrite earlier evidence below.
