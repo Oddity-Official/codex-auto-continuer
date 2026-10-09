@@ -8,7 +8,7 @@ Rounded native menus and submenus, clean light arrows, shared dark About/confirm
 
 | Check | Scope and result |
 | --- | --- |
-| Final native Windows gate | 330 passed in 38.24 seconds; compilation and 0.7.4 identity passed, including updater retry/scheduling and native list-wheel regressions |
+| Final native Windows gate | 330 passed in 40.60 seconds; compilation and 0.7.4 identity passed, including updater retry/scheduling, native list-wheel and direct fixture cleanup regressions |
 | Real native popup regression | Actual Windows tracking with pystray's hidden menu owner verifies rounded region clipping and final light-arrow pixels without a backing box; callback/hook cleanup passed |
 | GDI checks | Selected, hover and disabled rows, absent checkmark gutter, arrow/background pixels and remaining-capacity meters at 96/144/192 DPI passed |
 | Dialog safety | About OK/X/Escape, confirmation OK/Cancel/X/default Enter/Escape, queue shutdown and recovery from failed window setup passed |
@@ -27,6 +27,12 @@ Before publishing/installing 0.7.4, finish the normal signed-release/frozen-arti
 The reported update dialog matches the installed Equalizer APO Update Checker: its executable contains the exact title, error text and checkbox wording. No Equalizer APO setting was changed. CAC's separate recorded failure was a five-second GitHub CLI authentication timeout, not a missing Codex executable. Earlier authentication succeeded and a fresh bounded credential read completed in 0.068 seconds; the cause of the temporary delay is not established. Tokens were captured only in memory and never printed.
 
 The source updater retries a timed-out credential read once for ten seconds, distinguishes launch failures from timeouts, and schedules failed automatic checks after fifteen minutes rather than six hours. Focused updater tests passed: 36 cases in 5.42 seconds. Fresh installed 0.7.3 runtime metadata remained Monitoring with CLI 0.160.0 and daemon 0.162.0, Balanced schema-verified dispatch permission, zero pending obligations and zero warnings. This is live compatibility evidence, not exact 0.162.0 behavioral certification or a fresh OS-login test.
+
+### Native test cleanup
+
+Hosted run `37880303865` passed schemas for all tuples and all 19 baseline/mixed cases, but current/current had one teardown failure after successful recovery assertions: PowerShell/CIM process enumeration exceeded ten seconds. The failed result was investigated, not retried away. The fixture now uses development-only `psutil` enumeration and process identities, while retaining same-handle executable verification for termination, actual exit waits and directory-release checks. It does not add `psutil` to CAC's runtime. The real private-versus-external executable cleanup regression rejects shell enumeration and passed with the other cleanup tests in 0.57 seconds.
+
+Local official 0.162.0/0.162.0 then passed all 19 continuation/compatibility/holding cases in 111.63 seconds, including both managed-daemon policies and teardown. Both contract hashes remain unchanged from 0.160.0. These isolated probes use synthetic loopback account/model services and zero user Codex connections; they are behavioral evidence, not an exact-build certificate granted to the user's daemon. The final native gate above covers the cleanup dependency and regression changes too; the preceding 330-case gate took 38.24 seconds before this harness change.
 
 ## CAC 0.7.3 startup verification, 7 October 2026
 

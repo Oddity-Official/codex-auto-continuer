@@ -52,7 +52,7 @@ def test_daemon_directory_requires_delete_sharing_before_cleanup(tmp_path):
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Native Windows process identity")
-def test_detached_cleanup_stops_only_executables_inside_private_home(tmp_path):
+def test_detached_cleanup_stops_only_executables_inside_private_home(tmp_path, monkeypatch):
     module = native_support()
     original = Path(os.environ["SystemRoot"]) / "System32/cmd.exe"
     owned = tmp_path / "cmd.exe"
@@ -62,6 +62,7 @@ def test_detached_cleanup_stops_only_executables_inside_private_home(tmp_path):
         creationflags=subprocess.CREATE_NO_WINDOW) for binary in (owned, original)]
     try:
         assert all(process.poll() is None for process in processes)
+        monkeypatch.setattr(module.subprocess, "run", lambda *_args, **_options: pytest.fail("Cleanup must not launch PowerShell/CIM"))
         assert module.stop_private_processes(tmp_path) == 1
         assert processes[0].wait(timeout=5) == 0
         assert processes[1].poll() is None, "An external executable must not be stopped"

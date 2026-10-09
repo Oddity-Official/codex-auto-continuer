@@ -32,6 +32,8 @@ pwsh -NoProfile -File scripts/verify-continuation.ps1
 
 This separate gate requires native Codex, but no real login or allowance. It tests recovery, exact targeting, saved prompts, telemetry, multi-chat permission checks and ambiguous sends. [Native continuation tests](Docs/CONTINUATION-TESTS.md) explains isolation, deadlines and what is real versus simulated.
 
+The development-only `psutil` dependency inventories fixture processes directly, avoiding PowerShell/CIM startup during teardown. Cleanup still verifies executable identity on the same Windows handle used to terminate private-package processes. `psutil` is not an application dependency or part of the portable runtime.
+
 An opt-in [VS Code extension gate](Docs/CONTINUATION-TESTS.md#installed-vs-code-extension) uses your installed editor and extension in a disposable profile. It is separate from regular CI and the native recovery gate. [Compatibility](Docs/COMPATIBILITY.md) explains daily baseline, stable and mixed-daemon probes, and reviewed certificates.
 
 ## Run from source

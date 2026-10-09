@@ -25,6 +25,8 @@ The unrelated illegal-value dialog is identified by all three exact screenshot s
 
 Fresh installed 0.7.3 metadata showed Monitoring with CLI 0.160.0 / daemon 0.162.0, Balanced schema-verified read/dispatch permission, zero pending obligations and zero warnings. This does not certify all 0.162.0 behavior or a fresh OS login. No Equalizer APO, Codex installation or conversation was modified. Signed publication, frozen validation and deployment results are recorded separately in the verification owner when completed.
 
+The first hosted 0.7.4 candidate (`e43bc9d`) passed Windows build/frozen checks and baseline/mixed native cases. The current/current 0.162.0 job failed only in teardown after its strict-policy recovery assertions, on a ten-second PowerShell/CIM inventory timeout. Development-only psutil now replaces both shell inventories, retaining live process identity, same-handle private executable verification, actual exit waits and directory sharing checks. The existing real cleanup boundary regression now forbids subprocess enumeration; all three cleanup cases passed in 0.57 seconds. The unchanged official 0.162.0 package then passed all 19 native cases locally in 111.63 seconds. Final Windows gate after this repair: 330 passed in 40.60 seconds. No application compatibility guard was relaxed and no failed recovery result was discarded.
+
 ### Original implementation scope
 
 Implement the approved tray/status presentation, remove experimental queue holding from everyday controls, and inspect recent production recovery/notification metadata. The source baseline was commit `8f4fcfa`; the installed release is CAC 0.6.1. Windows 11 x86_64, PowerShell 7, CPython 3.13.7 and the project virtual environment were used.

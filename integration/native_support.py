@@ -66,14 +66,11 @@ def stop_private_processes(home: Path):
         return 0
     import ctypes
     from ctypes import wintypes
+    import psutil
     home = home.resolve()
-    script = ("$root = $env:CAC_FIXTURE_PROCESS_ROOT.TrimEnd('\\') + '\\'; "
-        "$owned = @(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and "
-        "$_.ExecutablePath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) } | "
-        "Select-Object -ExpandProperty ProcessId); ConvertTo-Json -InputObject $owned -Compress")
-    result = subprocess.run(["powershell", "-NoProfile", "-Command", script], capture_output=True,
-        timeout=10, check=True, creationflags=subprocess.CREATE_NO_WINDOW,
-        env=os.environ | {"CAC_FIXTURE_PROCESS_ROOT": str(home)})
+    psutil.process_iter.cache_clear()
+    owned = [process.pid for process in psutil.process_iter(["pid", "exe"])
+        if process.info["exe"] and Path(process.info["exe"]).resolve().is_relative_to(home)]
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
     kernel.OpenProcess.restype = wintypes.HANDLE
@@ -83,7 +80,7 @@ def stop_private_processes(home: Path):
     kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
     kernel.CloseHandle.argtypes = [wintypes.HANDLE]
     stopped = 0
-    for pid in json.loads(result.stdout):
+    for pid in owned:
         handle = kernel.OpenProcess(0x1000 | 0x100000 | 1, False, pid)
         if not handle:
             if ctypes.get_last_error() == 87:
@@ -395,27 +392,25 @@ class NativeFixture:
         settings.write_text(json.dumps({"remoteControlEnabled": False, "shutdownGraceSeconds": 0,
             "updater": {"autoUpdateEnabled": False, "updateIntervalMinutes": 120}}), encoding="utf-8")
         def stop():
+            import psutil
             marker = settings.parent / "daemon.pid"
-            pids = []
+            processes = []
             if marker.exists():
                 pid = json.loads(marker.read_text(encoding="utf-8"))["pid"]
                 assert type(pid) is int and pid > 0
-                # The lifecycle response can precede child exit and directory release.
-                script = ("$all = @(Get-CimInstance Win32_Process); $owned = @(" + str(pid) + "); "
-                    "do { $more = @($all | Where-Object { $_.ParentProcessId -in $owned -and $_.ProcessId -notin $owned } | "
-                    "Select-Object -ExpandProperty ProcessId); $owned += $more } while ($more.Count); "
-                    "ConvertTo-Json -InputObject @($owned) -Compress")
-                result = subprocess.run(["powershell", "-NoProfile", "-Command", script], capture_output=True,
-                    timeout=10, check=True, creationflags=subprocess.CREATE_NO_WINDOW)
-                pids = json.loads(result.stdout)
+                # Preserve process identities: a retained/reused PID is not a live fixture.
+                try:
+                    parent = psutil.Process(pid)
+                    processes = [parent, *parent.children(recursive=True)]
+                except psutil.NoSuchProcess:
+                    pass
             result = _run(self.binary, ["app-server", "daemon", "stop"], 15, env=self.env)
-            print(f"Fixture daemon shutdown: {len(pids)} recorded process(es); return code {result.returncode}")
+            print(f"Fixture daemon shutdown: {len(processes)} recorded process(es); return code {result.returncode}")
             if (self.home / "app-server-daemon/app-server.pid").exists():
                 assert result.returncode == 0, "Isolated managed daemon did not stop cleanly: " + result.stderr.replace(str(self.home), "<fixture>")
-            if pids:
-                from codex_auto_continuer.update_install import process_path
+            if processes:
                 deadline = time.monotonic() + 5
-                while any(process_path(pid) is not None for pid in pids):
+                while any(process.is_running() for process in processes):
                     if time.monotonic() >= deadline:
                         raise AssertionError("Isolated daemon/children did not exit before fixture cleanup")
                     time.sleep(0.02)
