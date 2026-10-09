@@ -2,7 +2,7 @@
 
 Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Imported checkpoint: v001. Prior release results below remain dated artifact evidence, not checks of changed code.
 
-## CAC 0.7.4 UI source candidate, 8 October 2026
+## CAC 0.7.4 release verification, 8 October 2026
 
 Rounded native menus and submenus, clean light arrows, shared dark About/confirmation/error dialogs and the simplified status panel are implemented. Actionable reasons appear directly in Full Status; exact build diagnostics remain in CLI status and local logs. The panel has no Details or Close buttons. Native tooltips expose full authoritative titles without persisting them. Selected tints and right-edge markers remain distinct from hover.
 
@@ -15,12 +15,21 @@ Rounded native menus and submenus, clean light arrows, shared dark About/confirm
 | Interactive source inspection | Computer Use on synthetic, disposable data inspected normal/empty status, nine waiting threads, inline repair guidance, full-title tooltip, rounded main/Clients menus, selected/hover states, native keyboard submenu navigation and About X dismissal |
 | Final interactive sweep | Resumed with explicit user authorization: final rounded main/Clients/Telemetry menus, native C/Right/Left navigation, persistent markers versus hover, outside-click dismissal, empty status X, 200% error/unknown-usage layout, bounded waiting-list paging, long-title tooltip, About OK, confirmation default Enter cancellation and error Escape all passed on disposable data |
 | Mouse-wheel repair | Interactive inspection caught a waiting list that paged but ignored the wheel without a native scrollbar. Explicit list-only handling accumulates partial wheel steps and clamps at both ends; the regression and actual post-fix wheel inspection passed |
-| Recovery evidence | Recovery, protocol, state, privacy and startup logic are unchanged. The 7 October 0.7.3 three-tuple, 19-case native results remain unchanged-engine evidence; candidate certificate metadata carries those identities and the original verification date |
-| Publication and installation | No 0.7.4 portable release was built, uploaded or installed. Installed CAC remains 0.7.3; its data and login configuration were not edited |
+| Local native Codex | Official 0.162.0/0.162.0: all 19 continuation/compatibility/holding cases passed in 111.63 seconds; isolated synthetic services, zero user connections |
+| Hosted Windows | [Build and frozen checks](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37881230509) passed on `dc7c849`; the later portable-guide-only commit changes no runtime code |
+| Hosted compatibility | [Final matrix](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37881230443): baseline 0.160/0.160, current 0.162/0.162 and mixed 0.160/0.162 each passed 19; native times 143.232, 142.811 and 128.998 seconds, zero failures/errors/skips |
+| Signed publication | [Release gate](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37881606243) passed on `ea4c798`, including baseline native behavior, clean builds and frozen checks; private v0.7.4 published |
+| Exact downloaded package | Signature, all 607 frozen file hashes, lean package, CRC, configured private markers and frozen UX passed; all 56 wheel runtime files match source, accounting for declared text line endings; development-only psutil is absent from frozen runtime |
+| Upgrade and rollback | Real signed isolated 0.7.3 to 0.7.4 completed and rolled back; four protected files and newer state preserved, all 604 original code hashes restored, zero user Codex connections |
+| Actual installed upgrade | Completed with restart intent true; monitoring restarted automatically. All 607 installed code sizes/hashes match the authenticated release; actual settings/prompt/state bytes are unchanged |
+| Live installed state | Monitoring, CAC/tray 0.7.4, actual CLI 0.160.0 / daemon 0.162.0, Balanced schema-verified read/dispatch permission, ordinary permission true, fresh scan, zero pending/warnings; update state Current |
+| Windows login | Owned shortcut still targets the installed GUI/config and normal tray launch; automatic daemon startup is enabled. No interactive CLI window is required. A fresh OS login remains untested |
 
 The first new native popup pixel check caught Windows painting a black arrow after the owner's draw callback. A coalesced popup message now paints the final chevron after that operation. The first dialog regression attempted to read a write-only caption-color DWM attribute; its failed assertion escaped the test callback and the bounded runner stopped the process tree after 90 seconds. The corrected regression catches callback failures, always closes its own window, and checks readable dark/corner attributes. This was a test-harness failure, not an observed product hang. An earlier 322-case gate passed before the explicit setup-failure regression and literal-text fix; the final 323-case gate above covers both.
 
-Before publishing/installing 0.7.4, finish the normal signed-release/frozen-artifact/upgrade checks. Physical mixed-DPI transitions, Windows theme switching and high contrast remain untested; no OS settings were changed. The 200% preview controls application scaling, not the physical display setting. Synthetic previews neither connect to Codex nor change real controls.
+Physical mixed-DPI transitions, Windows theme switching and high contrast remain untested; no OS settings were changed. The 200% preview controls application scaling, not the physical display setting. Synthetic previews neither connect to Codex nor change real controls. Exact-build certificate metadata retains its original verification date; the new 0.162.0 test evidence does not silently grant Strict certification.
+
+Published 0.7.4 ZIP: 20,399,156 bytes, SHA-256 `e4291fbc37110457bd54beec976d63af83959b591621abf5ace9968c718e24a9`. Wheel: 248,822 bytes, SHA-256 `1d7e436ddbe8fda27dd94b79ccf277cdd8b416473a43ec5370dc6b8f9d947a3a`. The portable README is self-contained and uses a repository URL for update documentation rather than a missing packaged file. No runtime data, developer audits or test dependency is shipped.
 
 ### Startup updater diagnosis
 
