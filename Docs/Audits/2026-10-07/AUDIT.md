@@ -15,6 +15,18 @@ The actual hidden-owner popup regression checks a rounded native window region a
 
 No new portable release, GitHub publication or installed update has been performed for this candidate. The prior 0.7.3 three-tuple integration results are dated unchanged-engine evidence, not new 0.7.4 artifact validation. Complete final interactive and signed/frozen/upgrade gates before release. Current verification is in `Docs/VALIDATION.md`.
 
+### 8 October final acceptance and startup updater follow-up
+
+With renewed explicit authorization, Computer Use completed the final source-renderer sweep. Rounded main/Clients/Telemetry popups, native keyboard traversal, separate selected/hover states, outside-click dismissal, status X, safe confirmation Enter cancellation, About OK and error Escape passed. A controlled 200% application-scale preview verified inline error guidance, unknown usage and bounded waiting-list pagination. The actual normal-scale panel verified untitled fallback, long-title ellipsis and its dark full-title tooltip. No Codex connection, real privacy setting or user control was changed. Existing process-bound preview timers clean up their own fixtures.
+
+The sweep reproduced a wheel-scrolling gap: Previous/Next worked but the scrollbar-free native list ignored wheel input, even with focus. Explicit list-only message handling now accumulates partial steps and clamps movement; a native list regression and actual post-fix wheel input passed. Focused status checks: 11 passed in 3.64 seconds.
+
+The unrelated illegal-value dialog is identified by all three exact screenshot strings in the installed Equalizer APO Update Checker executable and its product metadata. CAC telemetry instead recorded a five-second GitHub CLI credential-read timeout while monitoring continued. No evidence establishes the cold-start delay's cause. A fresh bounded token lookup completed in 0.068 seconds; output was private in-memory capture only. The updater distinguishes missing, launch and login failures, retries only a timed-out credential read once with a ten-second bound, and schedules failed automatic checks after fifteen minutes. Focused updater checks: 36 passed in 5.42 seconds. The final native gate covers all changes: 330 passed in 38.24 seconds, compilation and version 0.7.4 passed. Documentation checks: 138 local file links, zero failures.
+
+Fresh installed 0.7.3 metadata showed Monitoring with CLI 0.160.0 / daemon 0.162.0, Balanced schema-verified read/dispatch permission, zero pending obligations and zero warnings. This does not certify all 0.162.0 behavior or a fresh OS login. No Equalizer APO, Codex installation or conversation was modified. Signed publication, frozen validation and deployment results are recorded separately in the verification owner when completed.
+
+### Original implementation scope
+
 Implement the approved tray/status presentation, remove experimental queue holding from everyday controls, and inspect recent production recovery/notification metadata. The source baseline was commit `8f4fcfa`; the installed release is CAC 0.6.1. Windows 11 x86_64, PowerShell 7, CPython 3.13.7 and the project virtual environment were used.
 
 The user requested no further Computer Use while working. Isolated preview processes were stopped. No production monitor, installed binary, prompt, settings, startup shortcut or client profile was changed. No new release was built, uploaded or deployed. Source version remains 0.6.1 pending final interactive acceptance and versioned release checks.

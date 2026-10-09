@@ -124,15 +124,21 @@ class GitHub:
         if use_cli_auth:
             executable = shutil.which("gh")
             if not executable:
-                raise UpdateError("Private releases need an existing GitHub CLI login. Install gh and run gh auth login, or disable update_use_github_cli_auth.")
-            try:
-                result = subprocess.run([executable, "auth", "token", "--hostname", "github.com"],
-                    capture_output=True, timeout=5, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-            except (OSError, subprocess.TimeoutExpired) as exc:
-                raise UpdateError("The GitHub CLI login could not be read within 5 seconds. Monitoring continues.") from exc
+                raise UpdateError("CAC updates: GitHub CLI (gh) was not found. Private releases need gh auth login. Install gh or disable update_use_github_cli_auth. Codex monitoring continues.")
+            for timeout in (5, 10):
+                try:
+                    result = subprocess.run([executable, "auth", "token", "--hostname", "github.com"],
+                        capture_output=True, timeout=timeout, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                    break
+                except subprocess.TimeoutExpired:
+                    if timeout == 10:
+                        raise UpdateError("CAC updates: GitHub CLI (gh) login timed out after two attempts (15 seconds total). Retry Check For Updates; if it persists, run gh auth status. Codex monitoring continues.") from None
+                    emit("update.auth_retry", timeout_seconds=timeout)
+                except OSError:
+                    raise UpdateError("CAC updates: GitHub CLI (gh) could not be launched. Check its installation, then retry Check For Updates. Codex monitoring continues.") from None
             token = result.stdout.strip()
             if result.returncode or not token or len(token) > 4096 or any(x < 33 or x > 126 for x in token):
-                raise UpdateError("No usable GitHub CLI login for private releases. Run gh auth login; no credentials are stored by CAC.")
+                raise UpdateError("CAC updates: no usable GitHub CLI (gh) login for private releases. Run gh auth login, then retry Check For Updates. Codex monitoring continues; no credentials are stored by CAC.")
             self._token = token.decode("ascii")
 
     def fetch(self, url: str, maximum: int, *, binary=False, target: Path | None = None) -> bytes:

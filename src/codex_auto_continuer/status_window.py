@@ -23,6 +23,7 @@ class StatusWindow:
         self.updates = queue.Queue(maxsize=1)
         self.model = {}
         self.names = {}
+        self._wheel_delta = 0
 
     def show(self):
         with self.guard:
@@ -114,7 +115,7 @@ class StatusWindow:
             threading.Thread(target=self._observe, args=(self.stop,), name="CAC-live-status", daemon=True).start()
             msg = W.MSG()
             while user.GetMessageW(C.byref(msg), None, 0, 0) > 0:
-                if self._handle_key(msg):
+                if self._handle_input(msg):
                     continue
                 if not user.IsDialogMessageW(self.hwnd, C.byref(msg)):
                     user.TranslateMessage(C.byref(msg))
@@ -151,7 +152,22 @@ class StatusWindow:
     def px(self, value):
         return round(value * self.scale)
 
-    def _handle_key(self, msg):
+    def _scroll_threads(self, direction):
+        top = user.SendMessageW(self.listbox, 0x18E, 0, 0)
+        last = max(0, len(self.list_rows) - self.page_rows)
+        user.SendMessageW(self.listbox, 0x197, max(0, min(last, top + direction)), 0)
+
+    def _handle_input(self, msg):
+        if msg.message == 0x20A:  # No native scrollbar: handle wheel input within the list only.
+            point = W.POINT(C.c_short(msg.lParam & 0xFFFF).value, C.c_short(msg.lParam >> 16).value)
+            if user.WindowFromPoint(point) != self.listbox:
+                return False
+            self._wheel_delta += C.c_short(msg.wParam >> 16).value
+            steps = int(self._wheel_delta / 120)
+            self._wheel_delta -= steps * 120
+            if steps:
+                self._scroll_threads(-steps * 3)
+            return True
         if msg.message != 0x100:
             return False
         if msg.wParam == 27:
@@ -317,9 +333,8 @@ class StatusWindow:
                 return 0
             if msg == 0x111:
                 if wparam & 0xFFFF in (104, 105):
-                    top = user.SendMessageW(self.listbox, 0x18E, 0, 0)
                     direction = -self.page_rows if wparam & 0xFFFF == 104 else self.page_rows
-                    user.SendMessageW(self.listbox, 0x197, max(0, min(len(self.list_rows) - self.page_rows, top + direction)), 0)
+                    self._scroll_threads(direction)
                 return 0
             if msg in (0x138, 0x134):  # native labels and list box retain accessibility text
                 key = next((key for key, control in self.controls.items() if control == lparam), "")

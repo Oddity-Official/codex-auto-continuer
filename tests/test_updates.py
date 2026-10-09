@@ -17,6 +17,82 @@ from codex_auto_continuer.config import Config
 from codex_auto_continuer.updates import UpdateError
 
 
+@pytest.mark.parametrize("recover", [True, False])
+def test_github_auth_timeout_has_one_bounded_retry_without_credential_output(monkeypatch, recover):
+    calls, events = [], []
+    monkeypatch.setattr(updates.shutil, "which", lambda _: "gh.exe")
+    monkeypatch.setattr(updates, "emit", lambda name, **fields: events.append((name, fields)))
+    def run(command, **options):
+        calls.append(options)
+        assert command == ["gh.exe", "auth", "token", "--hostname", "github.com"]
+        if recover and len(calls) == 2:
+            return updates.subprocess.CompletedProcess(command, 0, b"fixture-secret\n", b"")
+        raise updates.subprocess.TimeoutExpired(command, options["timeout"], output=b"fixture-secret")
+    monkeypatch.setattr(updates.subprocess, "run", run)
+    if recover:
+        assert updates.GitHub(use_cli_auth=True)._token == "fixture-secret"
+    else:
+        with pytest.raises(UpdateError, match="15 seconds total") as caught:
+            updates.GitHub(use_cli_auth=True)
+        assert caught.value.__suppress_context__ and "fixture-secret" not in str(caught.value)
+    assert [call["timeout"] for call in calls] == [5, 10]
+    assert all(call["capture_output"] for call in calls)
+    assert events == [("update.auth_retry", {"timeout_seconds": 5})]
+
+
+@pytest.mark.parametrize("failure", ["missing", "launch", "login"])
+def test_github_auth_actionable_errors_do_not_retry_or_disclose_credentials(monkeypatch, failure):
+    calls = []
+    monkeypatch.setattr(updates.shutil, "which", lambda _: None if failure == "missing" else "gh.exe")
+    def run(command, **options):
+        calls.append(command)
+        if failure == "launch":
+            raise OSError("fixture-secret")
+        return updates.subprocess.CompletedProcess(command, 1, b"fixture-secret", b"fixture-secret")
+    monkeypatch.setattr(updates.subprocess, "run", run)
+    with pytest.raises(UpdateError) as caught:
+        updates.GitHub(use_cli_auth=True)
+    message = str(caught.value)
+    assert "CAC updates" in message and "GitHub CLI (gh)" in message
+    assert "Codex monitoring continues" in message and "fixture-secret" not in message
+    assert "timed out" not in message and len(calls) == (0 if failure == "missing" else 1)
+
+
+def test_failed_update_retries_earlier_then_restores_normal_schedule(tmp_path, monkeypatch):
+    from codex_auto_continuer import tray
+    controller = tray.TrayController(tmp_path / "settings.toml")
+    now, notices = [100.0], []
+    monkeypatch.setattr(tray.time, "monotonic", lambda: now[0])
+    class InlineThread:
+        def __init__(self, target, **_):
+            self.target = target
+        def start(self):
+            self.target()
+    monkeypatch.setattr(tray.threading, "Thread", InlineThread)
+    monkeypatch.setattr(controller, "notify_once", lambda *values: notices.append(values))
+    def fail(*_):
+        raise UpdateError("CAC updates: transient failure. Codex monitoring continues.")
+    monkeypatch.setattr(controller, "command", fail)
+    controller.check_updates(automatic=True)
+    assert controller._next_update_check == 1000 and not controller._update_busy
+    assert len(notices) == 1 and controller.actions.empty()
+    # The actual watcher must not run early, but must run at the retry deadline.
+    for stamp, expected in ((999, 0), (1000, 1)):
+        now[0] = stamp
+        waits = iter((False, True))
+        monkeypatch.setattr(controller.done, "wait", lambda _: next(waits))
+        monkeypatch.setattr(controller, "refresh", lambda: None)
+        checks = []
+        with monkeypatch.context() as patch:
+            patch.setattr(controller, "check_updates", lambda **options: checks.append(options))
+            controller.watch()
+        assert len(checks) == expected
+    monkeypatch.setattr(controller, "command", lambda *_: json.dumps({"status": "current"}))
+    controller.check_updates(automatic=True)
+    assert controller._next_update_check == 1000 + controller.cfg.update_check_hours * 3600
+    assert not controller._update_busy and controller.actions.empty()
+
+
 def package(tmp_path, extra=None):
     files = {"CodexAutoContinuer.exe": b"new GUI", "CodexAutoContinuer-CLI.exe": b"new CLI",
              "_internal/runtime.dll": b"new runtime", "README.md": b"Guide", "LICENSE": b"MIT"}

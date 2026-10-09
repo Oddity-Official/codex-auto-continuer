@@ -52,9 +52,40 @@ def test_enter_on_a_thread_does_not_open_a_debug_dialog_or_end_the_panel():
     panel.listbox = 123
     msg = wintypes.MSG()
     msg.hWnd, msg.message, msg.wParam = panel.listbox, 0x100, 13
-    assert not panel._handle_key(msg)
+    assert not panel._handle_input(msg)
     msg.hWnd = 456
-    assert not panel._handle_key(msg)
+    assert not panel._handle_input(msg)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Native Windows list scrolling")
+def test_waiting_list_wheel_accumulates_partial_steps_and_clamps_without_scrolling_other_sections(monkeypatch):
+    import ctypes
+    from ctypes import wintypes
+    from codex_auto_continuer.status_window import StatusWindow
+    from codex_auto_continuer.windows_ui import user
+    owner = user.CreateWindowExW(0, "STATIC", "CAC wheel fixture", 0, -10000, -10000, 200, 100, None, None, None, None)
+    listbox = user.CreateWindowExW(0, "LISTBOX", "", 0x50010001, 0, 0, 100, 30, owner, None, None, None)
+    assert owner and listbox
+    try:
+        panel = StatusWindow(lambda: {}, lambda ids: {}, lambda error: None)
+        panel.listbox, panel.page_rows, panel.list_rows = listbox, 2, tuple(range(9))
+        for index in range(9):
+            text = ctypes.create_unicode_buffer(str(index))
+            user.SendMessageW(listbox, 0x180, 0, ctypes.cast(text, ctypes.c_void_p).value)
+        monkeypatch.setattr(user, "WindowFromPoint", lambda point: listbox)
+        message = wintypes.MSG()
+        message.hWnd, message.message = owner, 0x20A
+        def wheel(delta):
+            message.wParam = (delta & 0xFFFF) << 16
+            return panel._handle_input(message)
+        assert wheel(-60) and user.SendMessageW(listbox, 0x18E, 0, 0) == 0
+        assert wheel(-60) and user.SendMessageW(listbox, 0x18E, 0, 0) == 3
+        assert wheel(-1200) and user.SendMessageW(listbox, 0x18E, 0, 0) == 7
+        assert wheel(1200) and user.SendMessageW(listbox, 0x18E, 0, 0) == 0
+        monkeypatch.setattr(user, "WindowFromPoint", lambda point: owner)
+        assert not wheel(-120) and user.SendMessageW(listbox, 0x18E, 0, 0) == 0
+    finally:
+        user.DestroyWindow(owner)
 
 from codex_auto_continuer import config, telemetry
 from codex_auto_continuer.errors import AutoContinuerError

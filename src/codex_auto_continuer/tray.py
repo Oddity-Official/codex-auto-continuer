@@ -58,7 +58,7 @@ class TrayController:
         self.dialogs = Dialogs(on_error=self.dialog_failed)
         self._last_phase = None
         self._log_settings = self.log_settings(self.cfg)
-        self._last_update_check = 0
+        self._next_update_check = 0
         self._update_busy = False
         self._installing = False
         self._notices = set()
@@ -255,7 +255,9 @@ class TrayController:
             if self._update_busy or self.done.is_set():
                 return
             self._update_busy = True
+            self._next_update_check = time.monotonic() + self.cfg.update_check_hours * 3600
         def check():
+            failed = False
             try:
                 result = json.loads(self.command("update", "stage"))
                 telemetry.emit("update.checked", status=result["status"], version=result.get("version"))
@@ -264,11 +266,14 @@ class TrayController:
                 elif not automatic and not self.done.is_set():
                     self.icon.notify(f"Updates: {result['status']}. Select Read Full Status for details.", "CAC")
             except Exception as exc:
+                failed = True
                 telemetry.failure("update.check_failed", exc)
                 if not self.done.is_set():
                     self.notify_once("update:" + str(exc), str(exc))
             finally:
                 with self._guard:
+                    interval = min(900, self.cfg.update_check_hours * 3600) if failed else self.cfg.update_check_hours * 3600
+                    self._next_update_check = time.monotonic() + interval
                     self._update_busy = False
         threading.Thread(target=check, name="CAC-updates", daemon=True).start()
 
@@ -367,8 +372,7 @@ class TrayController:
     def watch(self):
         while not self.done.wait(1):
             self.refresh()
-            if self.cfg.auto_update and not self.busy and (not self._last_update_check or time.monotonic() - self._last_update_check > self.cfg.update_check_hours * 3600):
-                self._last_update_check = time.monotonic()
+            if self.cfg.auto_update and not self.busy and time.monotonic() >= self._next_update_check:
                 self.check_updates(automatic=True)
 
     def menu(self):
