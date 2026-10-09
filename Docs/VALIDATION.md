@@ -6,7 +6,22 @@ Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Imported chec
 
 The native close/reopen regression first reproduced a clipped 261-pixel client height against a required 333 pixels. Resetting the cached layout height when creating each new HWND restores full sizing and work-area positioning. All twelve focused status tests passed after repair, including three openings through the same tray controller. The complete Windows gate passed 331 tests in 48.64 seconds, compilation and 0.7.5 identity included.
 
-Computer Use inspected the empty status fixture before and after X dismissal and reopening through the same controller. The new native window retained the correct lower-right work-area position and full 514-by-365 visible frame; both usage meters and reset labels were visible. This is native source-renderer evidence, not a physical mixed-DPI transition or installed binary check. Release and installation acceptance are pending. The existing recovery-engine certificates retain their original verification date because this repair changes only status-window lifetime.
+Computer Use inspected the empty status fixture before and after X dismissal and reopening through the same controller. The new native window retained the correct lower-right work-area position and full 514-by-365 visible frame; both usage meters and reset labels were visible. A controlled 200% fixture with nine waiting threads also reopened with its complete 1036-by-1026 frame, bounded list and visible paging controls. Both disposable fixtures exited without native UI errors. This is native source-renderer evidence, not a physical mixed-DPI transition or manual interaction with the installed tray. The existing recovery-engine certificates retain their original verification date because this repair changes only status-window lifetime.
+
+| Check | Scope and result |
+| --- | --- |
+| Hosted Windows | [Verification and frozen build](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37885930722) passed on `bf92835`; the initial attempt failed during checkout because the runner could not connect to GitHub, before any source test ran |
+| Hosted native compatibility | [Matrix](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37885930730): baseline 0.160/0.160, current 0.162/0.162 and mixed 0.160/0.162 each passed all 19 cases, zero failures/errors/skips; native times 131.888, 174.040 and 177.008 seconds |
+| Signed release | [Publication gate](https://github.com/Oddity-Official/codex-auto-continuer/actions/runs/37886153846) passed in 4 minutes 51 seconds on `bf92835`, including Windows, native baseline and packaged-app gates; private v0.7.5 published |
+| Exact downloaded package | Signature and all 607 frozen hashes passed; CRC, configured private markers and lean-package boundaries passed. All 56 wheel runtime files match source with declared text line endings; development-only psutil is absent |
+| Frozen UX | Exact downloaded ZIP passed defaults, hot reload, invalid-settings/prompt repair, scan feedback, exclusive one-cycle execution, graceful stop, stale-failure tray startup and encrypted-held review; zero Codex connections or chat dispatches |
+| Real isolated update | Signed 0.7.4 to 0.7.5 upgrade and code-only rollback passed; all four protected files and newer state survived, and all 607 original code hashes restored |
+| Actual installed update | Exact updater job completed with `restart_monitor` true. All 607 installed sizes/hashes match the signed release; actual settings, prompt and recovery-state bytes match both pre-install snapshots, and no held-input file appeared |
+| Live installed state | CAC/tray 0.7.5, monitoring, fresh scan, zero pending, updates Current; CLI 0.160/daemon 0.162 is Untested in Balanced mode with verified read/dispatch contract and ordinary permission true. All clients, Detailed local logging, holding disabled and the owned normal Windows login shortcut remain unchanged |
+
+The first installation-report formatting check used the nonexistent camel-case `restartMonitor` field and failed after its wait had already observed Completed. The exact same job's real `restart_monitor` field and all installed/live checks then passed; no second apply request was sent. Fresh OS login and physical mixed-DPI transitions remain untested.
+
+Portable ZIP: 20,399,161 bytes, SHA-256 `d27b3d261804e523d4f5beee9e7053f0369ac2c028531d64cc18fa3a1c07e055`. Wheel: 248,876 bytes, SHA-256 `7ebe56947556efd4ec75a76dbbbcc42b9f99f0af8e06d5131ab3eb1b01b9fd1a`.
 
 ## CAC 0.7.4 release verification, 8 October 2026
 
