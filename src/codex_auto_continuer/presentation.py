@@ -92,6 +92,8 @@ def state_label(state, snapshot):
         return "Stopped"
     elif state in {"starting", "reconnecting"}:
         return "Starting" if state == "starting" else "Reconnecting"
+    elif count and (snapshot.get("retry") or {}).get("blocked"):
+        label = "Waiting For Usage"
     elif count and (snapshot.get("ordinary_usage_allowed") is True or any(
             row["phase"] != "pending" for row in snapshot.get("waitingThreads", []))):
         label = "Resuming"

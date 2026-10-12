@@ -20,6 +20,8 @@ The loaded-owner regression exercises native `systemError` after a completed quo
 
 Owner-supported holding adds native scenarios for successful completion, quota failure with unchanged Continue, encrypted engine restart, ordered release, lost accepted replay acknowledgement, foreign-owner coverage and real approval routing. Only the original fixture client answers the approval; CAC's observer disconnects without answering. Holding/recovery use production code, unmodified Codex and synthetic local account/model service responses. These scenarios do not certify universal client-composer interception or fresh Windows login. The regular Windows gate separately covers corrupt/account-mismatched journals, failed durable writes, unconfirmed removal, explicit resolution, manual progress, fresh quota denial and singular replay intent.
 
+The rejected-recovery scenario deliberately reports ordinary permission true and 100% consumed while inference returns a quota error. It verifies one acknowledged Continue, durable reset-aware waiting through a restarted engine, no repeated sends, increasing backoff after another rejection, denial at an elapsed deadline, and successful recovery without a percentage buffer. All service responses, accounts, homes and prompts are synthetic; no user Codex connection is made.
+
 The successful chain is:
 
 ```text

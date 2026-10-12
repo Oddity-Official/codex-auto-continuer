@@ -169,6 +169,21 @@ def test_transient_status_read_failure_does_not_claim_monitor_is_blocked(tmp_pat
     assert len(notices) == 1 and controller._status_unavailable_since is None
 
 
+def test_shared_retry_wait_is_explained_without_a_red_error_or_a_quota_reserve(tmp_path):
+    import time
+    from codex_auto_continuer.presentation import icon_state
+    controller = TrayController(tmp_path / "settings.toml")
+    save_state(tmp_path / "state.json", State(obligations=[Obligation.create("t", "failed", 1000, None)]))
+    controller.state, controller.running = "waiting", True
+    controller.snapshot = {"pending": 1, "ordinary_usage_allowed": True,
+        "retry": {"blocked": True, "notBefore": time.time() + 300, "reason": "quota_reset", "backoffStep": 1}}
+    model = controller.status_model()
+    assert model["label"] == "Waiting For Usage • 1 Thread"
+    assert "reported quota reset" in model["issues"][0] and "Next recovery check:" in model["issues"][0]
+    assert "%" not in model["issues"][0]
+    assert icon_state(controller.state, controller.snapshot) == ("waiting", 1)
+
+
 def test_corrupt_recovery_state_remains_an_actionable_error(tmp_path, monkeypatch):
     from codex_auto_continuer import tray
     controller = TrayController(tmp_path / "settings.toml")

@@ -22,7 +22,7 @@ from codex_auto_continuer.windows_ui import user
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for flag in ("many", "empty", "menu", "unknown", "error", "reopen"):
+    for flag in ("many", "empty", "menu", "unknown", "error", "reopen", "retry"):
         parser.add_argument("--" + flag, action="store_true")
     parser.add_argument("--dpi", type=int, choices=(96, 144, 192))
     parser.add_argument("--dialog", choices=("about", "confirm", "error"))
@@ -45,6 +45,10 @@ def main():
             "compatibility": {"status": "untested", "read_allowed": True, "dispatch_allowed": True}}
         controller.running = True
         controller.state = "waiting" if count else "monitoring"
+        if args.retry:
+            controller.snapshot["ordinary_usage_allowed"] = True
+            controller.snapshot["retry"] = {"blocked": True, "notBefore": time.time() + 300,
+                "reason": "backoff", "backoffStep": 1}
         if args.unknown:
             controller.snapshot["usage"] = usage_snapshot({}, time.time())
         if args.error:

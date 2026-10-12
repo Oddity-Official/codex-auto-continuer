@@ -2,11 +2,17 @@
 
 ChatGPT base checkpoint: v001
 
-Updated: 2026-10-08
+Updated: 2026-10-12
 
 ## Imported base
 
 All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba04` preserves v001 and its original checksum manifest. ChatGPT's manifest is unchanged. The stale imported checksum file is not retained as a current-source checksum; each new transport owns its generated manifest.
+
+## CAC 0.7.6 reset-aware retry
+
+- Implemented the approved no-buffer retry policy after telemetry and a disposable reproduction established repeated acknowledged Continue/quota-failure cycles. Durable shared cooldown is independent of failed-turn replacement and restart; reset timing is a veto, never permission. Missing/elapsed reset timing escalates 5/10/20/30-minute delay, and later completion clears the streak. Unknown sends remain isolated without a blind retry.
+- `quota-retry.json` is separate from schema-2 continuation state, uses synced atomic writes and account/home binding, and stores only timing and exact failure identities. Idempotent rejection records precede observation removal; failed writes preserve observations and do not commit an in-memory guard. Full Status explains ordinary waiting without a red error or percentage reserve. Upgrade/rollback checks now protect this file too.
+- Real official baseline: 20 native cases passed in 142.72 seconds. Final Windows gate: 347 passed in 36.10 seconds, compilation and 0.7.6 identity included. The baseline certificate is refreshed; old engine certificates are not silently carried forward. A relative-path native fixture identity failure was corrected by normalizing fixture executable paths, without relaxing production checks. Hosted, release and installation checks are pending. Private telemetry and ChatGPT's manifest are unchanged.
 
 ## CAC 0.7.5 status reopening
 

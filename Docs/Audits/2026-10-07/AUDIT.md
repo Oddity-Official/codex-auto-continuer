@@ -5,6 +5,14 @@ Started at: 2026-10-07T11:35:31.757824+00:00
 
 ## Scope and boundary
 
+### 12 October rejected-recovery follow-up
+
+Read-only telemetry inspection found eight acknowledged continuations followed by quota failures while the five-hour window reported zero remaining and ordinary permission remained true. The ninth send followed a reset and later completed-turn metadata. This is not proof of causal delivery identity; it establishes the unsafe repeated recovery pattern. A disposable fake-client reproduction generated three distinct sends at unchanged zero remaining; denial stopped dispatch. No runtime record, chat title or identifier is exported.
+
+The new guard stores shared reset-aware cooldown separately from continuation state, without a percentage floor. Tests exercise restart, new failed turns, cross-chat waiting, exhausted ordinary-window selection, missing timing, capped escalation, denied permission at an elapsed deadline, low remaining quota, replay idempotency, completion ordering, failed writes and unconfirmed sends. The real native scenario uses contradictory allowed/100%-consumed service metadata and actual quota-rejected inference, then verifies restart/wait/backoff and a successful zero-buffer retry.
+
+The first broad native run passed all 18 recovery/holding cases but failed its two schema identity cases because fixture executable paths remained relative. Normalizing only fixture launch identities repaired the cause; the full 20-case gate then passed in 142.72 seconds. A focused status fixture's ancient epoch mapped before 1970 in the Windows local timezone and failed formatting; using a realistic future deadline repaired that fixture. An invalid test filename selected no tests and was corrected. Final release and installed acceptance belong to Docs/VALIDATION.md; failed preliminary results are not replaced by later success.
+
 ### 8 October status reopening follow-up
 
 Closing Full Status destroys its native window but retains the tray controller's panel object. The old layout-height cache survived that destruction. Reopening with the same content therefore skipped sizing and positioning, leaving the new window at its initial top-left location with a clipped 261-pixel client area instead of the required 333 pixels. A native regression reproduced the failure through `TrayController.show_status()` before repair.

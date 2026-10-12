@@ -268,8 +268,8 @@ def fixture_auth():
 class NativeFixture:
     def __init__(self, root: Path, binary: str, *, managed=False, daemon_binary=None):
         self.root = root
-        self.binary = binary
-        self.daemon_binary = daemon_binary or binary
+        self.binary = str(Path(binary).resolve())
+        self.daemon_binary = str(Path(daemon_binary or binary).resolve())
         self.managed = managed
         self.stack = ExitStack()
         self.clients = []

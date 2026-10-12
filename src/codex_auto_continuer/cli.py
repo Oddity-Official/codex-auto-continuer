@@ -96,6 +96,7 @@ def _status(config_path: Path, live: bool = False) -> int:
         "compatibility": snapshot.get("compatibility"),
         "reason": snapshot.get("reason"),
         "ordinaryUsageAllowed": snapshot.get("ordinary_usage_allowed"),
+        "recoveryRetry": snapshot.get("retry"),
         "nextResetAt": snapshot.get("next_reset_at"),
         "lastScanAt": snapshot.get("lastScanAt"), "lastScan": snapshot.get("lastScan"),
         "pendingObligations": [

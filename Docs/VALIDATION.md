@@ -2,6 +2,12 @@
 
 Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Imported checkpoint: v001. Prior release results below remain dated artifact evidence, not checks of changed code.
 
+## CAC 0.7.6 reset-aware retry, 12 October 2026
+
+Private telemetry established repeated acknowledged recovery attempts followed by quota failures while ordinary permission remained true and the five-hour window reported zero remaining. The implemented guard reserves no percentage: it persists a shared reset-aware deadline and increasing 5/10/20/30-minute backoff, without weakening exact-turn, permission, queue or ambiguity checks. Ordinary continuation state stays at schema 2; the separate guard survives code-only update/rollback. Current source contracts own the behavior; runtime logs and user identifiers are not published.
+
+The new real native contradictory-permission/reset/backoff/restart/zero-buffer scenario passed. Final official Codex 0.160.0/0.160.0: all 20 continuation, compatibility and holding cases passed in 142.72 seconds, with synthetic local accounts/services and zero user connections. Its exact certificate is refreshed for this engine; old certificates are not carried into changed recovery behavior without fresh evidence. Focused retry/status/control checks passed 40 cases. Final Windows gate passed 347 cases in 36.10 seconds, compilation and 0.7.6 identity included. An earlier 347-case gate passed in 49.52 seconds before the concise status-caption refinement. Hosted, signed-release and installed checks are pending.
+
 ## CAC 0.7.5 status reopening, 8 October 2026
 
 The native close/reopen regression first reproduced a clipped 261-pixel client height against a required 333 pixels. Resetting the cached layout height when creating each new HWND restores full sizing and work-area positioning. All twelve focused status tests passed after repair, including three openings through the same tray controller. The complete Windows gate passed 331 tests in 48.64 seconds, compilation and 0.7.5 identity included.

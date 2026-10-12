@@ -313,6 +313,11 @@ class TrayController:
         issue = state_problem or compatibility_issue or self.problem or snapshot.get("reason") or (warnings[0] if warnings else "") or update_issue
         issues = tuple(dict.fromkeys(value for value in [state_problem, compatibility_issue,
             self.problem, snapshot.get("reason"), *warnings, update_issue] if value))
+        retry = snapshot.get("retry") or {}
+        if threads and retry.get("blocked"):
+            until = datetime.fromtimestamp(retry["notBefore"]).astimezone().strftime("%b %d, %I:%M %p").replace(" 0", " ")
+            why = "the reported quota reset" if retry["reason"] == "quota_reset" else "the retry cooldown"
+            issues += (f"Next recovery check: {until}. The last recovery hit a usage limit again; waiting for {why}.",)
         evidence = {"certified": "Verified", "untested": "Untested"}.get(compatibility.get("status"),
             "Blocked" if compatibility and not compatibility.get("dispatch_allowed") else "Not Checked")
         return {"label": state_label("failed" if state_problem else self.state, snapshot), "threads": threads,

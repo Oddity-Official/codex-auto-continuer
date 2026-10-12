@@ -15,6 +15,7 @@ from .config import Config, read_prompt
 from .errors import CodexCommandError, ConfigurationError, ProtocolError, TransportError
 from .state import Obligation, State, load_state, save_state
 from .presentation import usage_snapshot, pending_threads
+from .quota_retry import QuotaRetry
 from .telemetry import emit, failure, changed, begin_cycle, thread_summary, turn_summary
 
 LOG = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ class CycleResult:
     holding: dict | None = None
     usage: dict | None = None
     waitingThreads: tuple[dict, ...] = ()
+    retry: dict | None = None
 
 
 class Supervisor:
@@ -66,6 +68,7 @@ class Supervisor:
         self.prompt_file = prompt_file or state_file.parent / config.prompt_file
         self.on_cycle = on_cycle
         self.state: State = load_state(state_file)
+        self.retry = QuotaRetry(state_file.parent / "quota-retry.json")
         self.client: AppServerClient | None = None
         self.codex_bin: str | None = None
         self.managed_binary: Path | None = None
@@ -250,13 +253,20 @@ class Supervisor:
         now = self.clock()
         raw_limits = client.rate_limits()
         limits = _parse_rate_limits(raw_limits)
+        socket_path = getattr(client, "socket_path", None)
+        if socket_path is not None and socket_path.parent.name == "app-server-control":
+            from .holding_journal import account_binding
+            try:
+                self.retry.bind(account_binding(socket_path.parent.parent))
+            except ConfigurationError:
+                self.retry.bind(None)
         result = CycleResult(
             ordinary_usage_allowed=limits.ordinary_usage_allowed,
             next_reset_at=limits.next_reset_at,
             compatibility=self.compatibility.report(),
             usage=usage_snapshot(raw_limits, now),
         )
-        self._observe_deliveries()
+        self._observe_deliveries(raw_limits)
 
         threads = self._recent_threads(now)
         result.scanned_threads = len(threads)
@@ -346,21 +356,23 @@ class Supervisor:
                 result.usage = usage_snapshot(raw_limits, self.clock())
                 result.ordinary_usage_allowed = limits.ordinary_usage_allowed
                 result.next_reset_at = limits.next_reset_at
-                if limits.ordinary_usage_allowed is not True:
+                if limits.ordinary_usage_allowed is not True or (dispatched and self.retry.state.streak):
                     break
         elif limits.ordinary_usage_allowed is None and self.state.obligations:
             LOG.warning("Codex did not verify ordinary usage availability; pending obligations will not dispatch.")
 
         result.pending = len(self.state.obligations)
         result.waitingThreads = pending_threads(self.state.obligations)
+        result.retry = self.retry.report(self.clock())
         if self.holding is not None:
             result.holding = self.holding.report()
             result.warnings.extend(result.holding["warnings"])
         emit("cycle.completed", **result.__dict__, observations=len(self.state.observations))
         return result
 
-    def _observe_deliveries(self) -> None:
+    def _observe_deliveries(self, limits: dict) -> None:
         client = self._require_client()
+        terminal = []
         for observation in self.state.observations[:]:
             thread = client.thread_read(observation.thread_id)
             if thread is None or thread.get("archived") is True:
@@ -381,8 +393,19 @@ class Supervisor:
                 _required_timestamp(turn, "completedAt", "delivery thread/turns/list")
             if (_thread_status(thread)[0] != "active" and completed_at is not None
                     and turn.get("status") in {"completed", "failed", "interrupted"}):
-                self.state.observations.remove(observation)
-                save_state(self.state_file, self.state)
+                terminal.append((completed_at, observation, turn))
+        # Newer rejections must win over older successful observations in this scan.
+        terminal.sort(key=lambda item: (item[0], _is_usage_limit_failure(item[2])))
+        for completed_at, observation, turn in terminal:
+            if _is_usage_limit_failure(turn):
+                turn_id = _required_string(turn, "id", "quota recovery observation")
+                if self.retry.rejected(observation.thread_id, turn_id, completed_at, limits, self.clock()):
+                    emit("recovery.rejected", threadId=observation.thread_id, failedTurnId=turn["id"],
+                         **self.retry.report(self.clock()))
+            elif turn.get("status") == "completed" and self.retry.succeeded(completed_at):
+                emit("recovery.progress", threadId=observation.thread_id)
+            self.state.observations.remove(observation)
+            save_state(self.state_file, self.state)
 
     def _track_delivery(self, obligation: Obligation) -> None:
         if not any(item.client_user_message_id == obligation.client_user_message_id for item in self.state.observations):
@@ -471,6 +494,10 @@ class Supervisor:
 
     def _dispatch_if_still_valid(self, obligation: Obligation, now: float) -> bool:
         self._check_dispatch_compatibility()
+        if obligation.phase == "pending" and self.retry.blocked(self.clock()):
+            changed("dispatch.cooldown", obligation.thread_id, threadId=obligation.thread_id,
+                    **self.retry.report(self.clock()))
+            return False
         client = self._require_client()
         thread = self._find_thread_by_id(obligation.thread_id)
         if not self._revalidate_obligation(obligation, thread):
@@ -528,6 +555,8 @@ class Supervisor:
             return False
         if _parse_rate_limits(client.rate_limits()).ordinary_usage_allowed is not True:
             emit("dispatch.deferred", threadId=obligation.thread_id, reason="quota_recheck_denied")
+            return False
+        if self.retry.blocked(self.clock()):
             return False
 
         prompt = read_prompt(self.prompt_file)

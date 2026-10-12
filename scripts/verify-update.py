@@ -80,7 +80,10 @@ def main():
             "anchorTurnId": "synthetic-failed-turn", "phase": "held", "releasedQueueId": None,
             "input": [{"type": "text", "text": "PRIVATE_UPDATE_CANARY", "text_elements": []}]}]
         journal.save(raw)
-    protected = {name: (settings.parent / name).read_bytes() for name in ("settings.toml", "continue-prompt.md", "state.json", "held-inputs.dpapi")}
+    from codex_auto_continuer.quota_retry import QuotaRetry
+    retry = QuotaRetry(settings.parent / "quota-retry.json")
+    retry.rejected("synthetic-chat", "synthetic-rejected-turn", time.time() - 1, {}, time.time())
+    protected = {name: (settings.parent / name).read_bytes() for name in ("settings.toml", "continue-prompt.md", "state.json", "held-inputs.dpapi", "quota-retry.json")}
     original_version = command(cli, "--version", env=env).decode().strip()
     original_manifest = parse_json((app / "RELEASE-MANIFEST.json").read_bytes())
     original_local = os.environ.get("LOCALAPPDATA")
@@ -123,6 +126,7 @@ def main():
         assert (settings.parent / "state.json").read_bytes() == newer_state
         assert (settings.parent / "continue-prompt.md").read_bytes() == protected["continue-prompt.md"]
         assert (settings.parent / "held-inputs.dpapi").read_bytes() == protected["held-inputs.dpapi"]
+        assert (settings.parent / "quota-retry.json").read_bytes() == protected["quota-retry.json"]
         for name, entry in original_manifest["files"].items():
             assert hashlib.sha256((app / name).read_bytes()).hexdigest() == entry["sha256"]
         print(json.dumps({"baseline": original_version, "updated": result["version"], "update": "completed", "rollback": "rolled_back",

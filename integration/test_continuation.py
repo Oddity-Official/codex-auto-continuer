@@ -78,6 +78,47 @@ def test_native_queued_quota_failures_and_usage_read_outage_recover(native):
     assert_no_duplicates(native, thread_id, 4)
 
 
+def test_native_rejected_recovery_waits_across_restart_and_retries_without_a_quota_buffer(native):
+    thread_id, failed, supervisor = record_failure(native)
+    native.service.allowed = True  # Deliberately contradict the exhausted percentage and inference rejection.
+    assert supervisor.run_cycle().dispatched == 1
+    rejected = native.wait_turn(thread_id, after=failed["id"])
+    native.assert_quota_failure(rejected)
+    native.service.reset_at = int(time.time()) + 120
+    now = [time.time()]
+    supervisor.clock = lambda: now[0]
+    result = supervisor.run_cycle()
+    assert result.dispatched == 0 and result.pending == 1
+    assert result.retry["reason"] == "quota_reset"
+    assert result.retry["notBefore"] == native.service.reset_at
+    supervisor.close()
+    supervisor = native.supervisor()
+    supervisor.clock = lambda: now[0]
+    for _ in range(3):
+        now[0] += 30
+        assert supervisor.run_cycle().dispatched == 0
+    assert native.service.inference_count == 2
+    now[0] = native.service.reset_at
+    assert supervisor.run_cycle().dispatched == 1
+    rejected_again = native.wait_turn(thread_id, after=rejected["id"])
+    native.assert_quota_failure(rejected_again)
+    native.service.reset_at = int(time.time()) - 60
+    result = supervisor.run_cycle()
+    assert result.dispatched == 0 and result.retry["notBefore"] == now[0] + 600
+    now[0] = result.retry["notBefore"]
+    native.service.allowed = False
+    assert supervisor.run_cycle().dispatched == 0
+    native.service.allowed = True
+    native.service.fail_inference = False
+    # The native fixture still reports 100% consumed: no percentage floor is involved.
+    assert supervisor.run_cycle().dispatched == 1
+    completed = native.wait_turn(thread_id, after=rejected_again["id"])
+    assert completed["status"] == "completed"
+    assert supervisor.run_cycle().pending == 0
+    assert supervisor.retry.state.streak == 0
+    assert_no_duplicates(native, thread_id, 4)
+
+
 def test_native_quota_recovery_exact_chat_and_restart(native):
     # An unrelated successful chat must remain untouched.
     native.service.fail_inference = False

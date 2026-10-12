@@ -10,6 +10,7 @@ Continue existing local interactive Codex tasks after account usage recovers, wi
 - use structured first-party Codex state; no clipboard, keystrokes, screen scraping or UI automation
 - recognize only failed turns with structured `usageLimitExceeded`
 - dispatch only after `ordinaryUsageAllowed == true`, with an immediate exact-thread and quota recheck
+- after an acknowledged recovery is followed by a terminal quota failure, persist a shared reset-aware cooldown across failed-turn replacements and restarts; reserve no quota percentage and never apply blind retry to an ambiguous send
 - cancel stale obligations after manual progress, deleting only our own remaining queue items
 - cover local interactive CLI, VS Code and Desktop by default; exclude executor and sub-agent sessions
 - offer independent CLI, VS Code and Desktop selection using source and originator provenance

@@ -134,6 +134,10 @@ def load_state(path: Path) -> State:
 def save_state(path: Path, state: State) -> None:
     payload = {"version": STATE_VERSION, "obligations": [asdict(item) for item in state.obligations],
                "observations": [asdict(item) for item in state.observations]}
+    save_record(path, payload)
+
+
+def save_record(path: Path, payload: dict) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)

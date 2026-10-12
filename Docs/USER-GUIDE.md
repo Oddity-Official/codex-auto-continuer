@@ -10,9 +10,11 @@ CAC continues the exact local Codex chat stopped by a usage limit, once Codex co
 
 Codex must be installed, but an interactive CLI terminal does not need to be open. CAC locates the executable and starts Codex's shared background service when needed (`auto_start_daemon = true`). A missing GitHub CLI (`gh`) warning concerns private CAC updates, not Codex monitoring; see [Updates](https://github.com/Oddity-Official/codex-auto-continuer/blob/master/Docs/UPDATES.md).
 
-You need Windows 11 x86_64 and a signed-in native Codex installation. Python is bundled. Codex 0.160.0 and 0.161.0 are certified. Balanced mode automatically verifies compatible new stable builds without requiring a CAC update. Untested in status means no exact behavioral certificate, not that monitoring stopped. Strict mode requires exact certification. These independent EXEs are unsigned, so Windows may show a reputation warning.
+You need Windows 11 x86_64 and a signed-in native Codex installation. Python is bundled. Codex 0.160.0 is certified with this release's retry behavior. Balanced mode automatically verifies compatible new stable builds without requiring a CAC update. Untested in status means no exact behavioral certificate, not that monitoring stopped. Strict mode requires exact certification. These independent EXEs are unsigned, so Windows may show a reputation warning.
 
 ## Tray controls
+
+If an automatic Continue is followed by another usage-limit failure, CAC pauses further automatic recovery. It waits for the exhausted quota window's reported reset, or uses increasing 5-, 10-, 20- and 30-minute retry delays when timing is unavailable or recovery keeps failing. The wait survives restarts and applies across monitored chats. Full Status explains the next attempt; monitoring continues, and no percentage of your allowance is reserved. Every retry still needs fresh Codex permission. Manual progress is respected, and unconfirmed sends are never blindly retried.
 
 - `Read Full Status` opens a dark panel showing current state, selected clients, last scan, compatibility, updates, usage and waiting threads. Double-click also opens it. Problems and repair guidance appear directly in the panel. Scroll the waiting list with the mouse wheel or its Previous/Next controls. Hover over a shortened thread name to read its full title. Close with X or Escape.
 - `Start Monitoring` and `Stop Monitoring` control recovery. Stop finishes the current cycle and preserves pending work.
