@@ -10,7 +10,9 @@ CAC updates itself, never Codex. Monitoring controls and editors stay responsive
 
 The trusted repository is `Oddity-Official/codex-auto-continuer`. The bundled `updates.json` pins its Ed25519 public verification key. Each release contains `UPDATE.json`, detached `UPDATE.sig`, the portable ZIP and optionally the source wheel. Cryptography verifies the signature before CAC trusts package identity, version, state schema, size or SHA-256.
 
-The repository is private during testing. Anonymous requests cannot access private releases. For this interim setup, `update_use_github_cli_auth = true` uses an existing `gh auth login`. CAC reads the token into memory with a 5-second deadline; a timeout gets one further attempt bounded to 10 seconds. Missing GitHub CLI, launch failures and unusable logins receive distinct guidance without retries. CAC sends the token only to `api.github.com`, strips authentication on download redirects, and never saves, logs or bundles it. Public releases need no login; leave this option false when sharing the public app.
+Public releases need no GitHub login or GitHub CLI. Leave `update_use_github_cli_auth = false`, its default, for public downloads and updates.
+
+For a private publisher repository, `update_use_github_cli_auth = true` uses an existing `gh auth login`. CAC reads the token into memory with a 5-second deadline; a timeout gets one further attempt bounded to 10 seconds. Missing GitHub CLI, launch failures and unusable logins receive distinct guidance without retries. CAC sends the token only to `api.github.com`, strips authentication on download redirects, and never saves, logs or bundles it.
 
 GitHub sees normal release/download requests, your network address and CAC's version in its user agent. No chat identifiers, names, prompts, state or local diagnostics are uploaded. Update failures do not stop monitoring; Status and a deduplicated non-modal notice explain the issue.
 

@@ -8,6 +8,13 @@ Updated: 2026-10-12
 
 All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba04` preserves v001 and its original checksum manifest. ChatGPT's manifest is unchanged. The stale imported checksum file is not retained as a current-source checksum; each new transport owns its generated manifest.
 
+## Initial public release preparation
+
+- The user authorized public release of the existing repository after documentation and full-history privacy checks, without a VM or another-machine/fresh-login gate. Runtime and signed CAC 0.7.6 assets are unchanged; their existing acceptance remains the release evidence.
+- Corrected the README's stale exact-certificate claim and public/private update guidance. Rotated the prior audit into History and repaired current links. The current publication review is `Docs/Audits/2026-10-12/AUDIT.md`.
+- All 61 reachable commits, all remote release tags and 758 unique blobs were reviewed. The one Gitleaks finding is a literal key-header detection pattern, not a key. No private author email, runtime files, observed private chat identifier or private title was found. A historical Windows profile-name test canary remains after the user's explicit review and acceptance; history is not rewritten. Raw reports/canaries stay local.
+- Public visibility and final anonymous-release/source-transport checks are pending. ChatGPT's manifest and user runtime data are unchanged.
+
 ## CAC 0.7.6 reset-aware retry
 
 - Implemented the approved no-buffer retry policy after telemetry and a disposable reproduction established repeated acknowledged Continue/quota-failure cycles. Durable shared cooldown is independent of failed-turn replacement and restart; reset timing is a veto, never permission. Missing/elapsed reset timing escalates 5/10/20/30-minute delay, and later completion clears the streak. Unknown sends remain isolated without a blind retry.

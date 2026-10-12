@@ -14,7 +14,7 @@
 - [Deferred client queue integration](PRODUCT.md#deferred-client-queue-integration): preserved experimental work and actual-composer acceptance boundary
 - [Architecture](ARCHITECTURE.md): runtime, app-server integration, state machine and safety behavior
 - [Compatibility](COMPATIBILITY.md): Balanced and Strict policies, exact certificates and scheduled upstream checks
-- [Updates](UPDATES.md): signed stable CAC releases, private-repository authentication and code-only rollback
+- [Updates](UPDATES.md): signed public releases, optional private-repository authentication and code-only rollback
 - [Research and provenance](RESEARCH.md): verified facts, inferences and remaining native questions
 - [Native continuation tests](CONTINUATION-TESTS.md): repeatable isolated recovery scenarios without real account usage
 - [Third-party components](THIRD-PARTY.md): bundled dependency notices and replacement/source locations
@@ -25,7 +25,8 @@ These sanitized records are Git-tracked and suitable for public sharing, but exc
 
 - [Workflow](WORKFLOW.md): environment ownership, checkpoint import/export and source transport boundaries
 - [Audits](Audits/README.md): dated audit evidence, rotation and retention
-- [Tray and telemetry investigation](Audits/2026-10-07/AUDIT.md): native UI acceptance, notification evidence and release checks
+- [Publication review](Audits/2026-10-12/AUDIT.md): documentation, full-history privacy review and public release checks
+- [Tray and telemetry investigation](Audits/History/2026-10-07/AUDIT.md): native UI acceptance, notification evidence and release checks
 - [Real client integration investigation](Audits/History/2026-10-05/AUDIT.md): connection proofs, actual CLI recovery repair, Desktop composer evidence and remaining holding limits
 - [ChatGPT manifest](../CHAT-MANIFEST.md) and [Codex manifest](../CODEX-MANIFEST.md): checkpoint ownership and local verification provenance
 
