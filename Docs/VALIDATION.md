@@ -2,6 +2,16 @@
 
 Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Imported checkpoint: v001. Prior release results below remain dated artifact evidence, not checks of changed code.
 
+## Initial public release, 12 October 2026
+
+The existing repository and stable v0.7.6 are public. This is documentation/publication work; runtime and signed binary assets are unchanged from `6690bd8`. The full native, frozen, update/rollback and installed checks below remain the release evidence, not newly repeated tests.
+
+All 61 prepublication commits, remote tags and 758 unique blobs were reviewed. Gitleaks 8.30.1 reported one historical key-header detection string, confirmed not to contain a key. No private author email, runtime/authentication/deployment files, observed private chat identifiers or private titles were found. The user explicitly accepted one historical Windows profile-name test canary remaining public; no history rewrite was performed. [Publication review](Audits/2026-10-12/AUDIT.md) records scope, commands and detector limits.
+
+Anonymous production updater requests, stable-release discovery, Ed25519 metadata validation and actual ZIP/wheel downloads passed without a GitHub login. All 608 frozen hashes match the signed 0.7.6 package and both artifact SHA-256 values below remain unchanged. The isolated check did not stage/install an update or connect to Codex. GitHub secret scanning, push protection and private vulnerability reporting are enabled. Final local Markdown checks passed 139 file links after audit rotation and link repair.
+
+The user waived another machine/VM and fresh-login acceptance for initial publication. The final concise status-caption manual inspection is still incomplete. The unchanged packaged guide retains its private-testing description; current public release notes, README and update documentation explain that public updates need no GitHub login. No binary rebuild was performed for that prose correction.
+
 ## CAC 0.7.6 reset-aware retry, 12 October 2026
 
 Private telemetry established repeated acknowledged recovery attempts followed by quota failures while ordinary permission remained true and the five-hour window reported zero remaining. The implemented guard reserves no percentage: it persists a shared reset-aware deadline and increasing 5/10/20/30-minute backoff, without weakening exact-turn, permission, queue or ambiguity checks. Ordinary continuation state stays at schema 2; the separate guard survives code-only update/rollback. Current source contracts own the behavior; runtime logs and user identifiers are not published.

@@ -8,12 +8,12 @@ Updated: 2026-10-12
 
 All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba04` preserves v001 and its original checksum manifest. ChatGPT's manifest is unchanged. The stale imported checksum file is not retained as a current-source checksum; each new transport owns its generated manifest.
 
-## Initial public release preparation
+## Initial public release
 
 - The user authorized public release of the existing repository after documentation and full-history privacy checks, without a VM or another-machine/fresh-login gate. Runtime and signed CAC 0.7.6 assets are unchanged; their existing acceptance remains the release evidence.
 - Corrected the README's stale exact-certificate claim and public/private update guidance. Rotated the prior audit into History and repaired current links. The current publication review is `Docs/Audits/2026-10-12/AUDIT.md`.
 - All 61 reachable commits, all remote release tags and 758 unique blobs were reviewed. The one Gitleaks finding is a literal key-header detection pattern, not a key. No private author email, runtime files, observed private chat identifier or private title was found. A historical Windows profile-name test canary remains after the user's explicit review and acceptance; history is not rewritten. Raw reports/canaries stay local.
-- Public visibility and final anonymous-release/source-transport checks are pending. ChatGPT's manifest and user runtime data are unchanged.
+- The original repository is public with stable v0.7.6 marked latest. Anonymous production update discovery, signed metadata and ZIP/wheel downloads passed; all 608 frozen hashes match the unchanged release. GitHub secret scanning, push protection and private vulnerability reporting are enabled. Public release notes clarify the optional private-authentication setup described by the unchanged packaged guide. Final local documentation checks passed 139 links. ChatGPT's manifest and user runtime data are unchanged; no runtime gate or binary build was repeated for prose-only work.
 
 ## CAC 0.7.6 reset-aware retry
 
@@ -149,7 +149,7 @@ All 46 imported checksum entries were verified. Standalone Git bootstrap `643ba0
 
 ## Publication work
 
-The user chose one repository for public sharing, then authorized creating and testing it privately under Oddity-Official. Sanitized audits, history and ChatGPT/Codex manifests remain Git-tracked and uploaded; no separate public checkout or history rewrite was performed. App, runtime data, private signing material and recovery folders remain excluded. The repository has not been made public.
+The user chose one repository for public sharing, then authorized creating and testing it privately under Oddity-Official. Sanitized audits, history and ChatGPT/Codex manifests remain Git-tracked and uploaded; no separate public checkout or history rewrite was performed. App, runtime data, private signing material and recovery folders remain excluded.
 
 - Git and source-export exclusions now protect root portable data, root runtime settings/prompt/state/logs, any root log backup count and environment-file variants. Synthetic regression canaries prove the source boundary; custom locations still need explicit exclusions.
 - The Windows gate uses the local venv without a second global install, supports explicit interpreter selection and fails clearly on a wrong Python version.

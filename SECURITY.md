@@ -16,6 +16,6 @@ Logs and state are not encrypted. Private logging is the release default; Detail
 
 ## Report a vulnerability
 
-If the repository's Security tab offers `Report a vulnerability`, use that private channel. Otherwise, open a minimal issue requesting a private contact method before sending sensitive details. Do not put credentials or private conversations in a public issue. Revoke a leaked credential immediately; deleting a post or file is not sufficient.
+Use [private vulnerability reporting](https://github.com/Oddity-Official/codex-auto-continuer/security/advisories/new) for security issues. Do not put credentials or private conversations in a public issue. Revoke a leaked credential immediately; deleting a post or file is not sufficient.
 
 Recovery blocks writes on protocol or identity drift. An unresolved ambiguous send quarantines its chat while other safe chats continue; CAC never blindly retries it. Queue operations have no verified atomic turn precondition or idempotency guarantee. Do not delete pending state to force a retry or disable these checks to bypass an error. [Architecture](Docs/ARCHITECTURE.md) and [verification limits](Docs/VALIDATION.md#environment-and-limits) describe the boundary.

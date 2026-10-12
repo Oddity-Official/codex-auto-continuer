@@ -25,4 +25,12 @@ Raw runtime canaries and local reports remain under ignored `.data`; they are ne
 
 The README now describes the packaged 0.160.0/0.160.0 exact certificate rather than claiming retired certificates for 0.161.0. Public downloads need no GitHub login; optional private-publisher authentication is documented separately. The user guide, update owner and navigation agree. The 7 October audit was rotated into History and active links were repaired; dated historical commands and observations remain unchanged.
 
-Existing 0.7.6 binary assets remain unchanged. Public release notes provide current launch/update guidance without introducing a documentation-only binary release. Anonymous access, visibility and final transport acceptance are pending.
+Existing 0.7.6 binary assets remain unchanged. Public release notes provide current launch/update guidance without introducing a documentation-only binary release. The portable guide inside the unchanged ZIP retains its prepublication description of private testing; its public-update behavior is correct, and current release notes and repository guidance state that no GitHub login is required.
+
+## Publication acceptance
+
+The existing `Oddity-Official/codex-auto-continuer` repository is public, with stable v0.7.6 marked latest. No second repository, history rewrite, binary rebuild or tag replacement occurred. GitHub secret scanning, push protection and private vulnerability reporting are enabled and verified. Issues remain enabled.
+
+Anonymous production updater requests verified repository visibility, latest stable metadata, the Ed25519 signature and actual ZIP download. The check ran with `Config()` defaults, GitHub authentication disabled and isolated local output; a simulated installed version 0.7.5 correctly reported 0.7.6 Available without staging or installation. All 608 frozen hashes passed. ZIP SHA-256 remains `e2be6650cb22b6a969c2073d3e3cf51825fb2a75f22d57f0b96a10c4567a9273`; an anonymous wheel download matched `07206f06973837cd20310a1aeb3a31f271880a2c67f6acfa07c801940d12826a`. No Codex connection or actual user-data mutation occurred.
+
+Local documentation validation passed 138 file links after repairing one relative wheel-builder link exposed by audit rotation, then 139 after linking the enabled private vulnerability-reporting channel. Current runtime and 0.7.6 release assets remain identical to the previously verified candidate. Existing native/UI limits remain explicit; another-machine setup, a fresh OS login and final concise-caption manual inspection were not performed for publication. No VM or computer input was used.
