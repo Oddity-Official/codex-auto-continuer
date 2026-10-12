@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 
 from .errors import ProtocolError
-from .presentation import usage_snapshot
+from .presentation import ordinary_windows, finite
 from .state import save_record
 
 
@@ -84,9 +84,9 @@ class QuotaRetry:
         state.streak = min(4, state.streak + 1)
         state.last_failure_at = max(state.last_failure_at, completed_at)
         delay = min(1800, 300 * 2 ** (state.streak - 1))
-        windows = usage_snapshot(limits, now)["windows"].values()
-        resets = [w["resetsAt"] for w in windows if w["remaining"] == 0
-                  and w["resetsAt"] is not None and w["resetsAt"] > now]
+        windows = ordinary_windows(limits).values()
+        resets = [w["resetsAt"] for w in windows if finite(w.get("usedPercent")) and w["usedPercent"] == 100
+                  and finite(w.get("resetsAt")) and w["resetsAt"] > now]
         reset = max(resets) if resets else None
         deadline = reset if reset is not None and state.streak == 1 else max(reset or 0, now + delay)
         state.not_before = max(state.not_before, deadline)

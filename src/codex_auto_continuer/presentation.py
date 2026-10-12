@@ -38,7 +38,7 @@ def finite(value):
     return type(value) in (int, float) and math.isfinite(value)
 
 
-def usage_snapshot(raw: dict, observed_at: float) -> dict:
+def ordinary_windows(raw: dict) -> dict:
     # The ordinary Codex bucket is explicit; never borrow a model-specific quota.
     buckets = raw.get("rateLimitsByLimitId") or {}
     bucket = buckets.get("codex") if isinstance(buckets, dict) else None
@@ -54,6 +54,13 @@ def usage_snapshot(raw: dict, observed_at: float) -> dict:
         label = {300: "5H", 10080: "7D"}.get(duration) if type(duration) is int else None
         if label is None:
             continue
+        windows[label] = window
+    return windows
+
+
+def usage_snapshot(raw: dict, observed_at: float) -> dict:
+    windows = {}
+    for label, window in ordinary_windows(raw).items():
         used, reset = window.get("usedPercent"), window.get("resetsAt")
         windows[label] = {"remaining": round(100 - used, 1) if finite(used) and 0 <= used <= 100 else None,
                           "resetsAt": reset if finite(reset) else None}

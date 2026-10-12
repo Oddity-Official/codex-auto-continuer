@@ -322,6 +322,9 @@ class Supervisor:
                 if completed < now - self.config.scan_lookback_hours * 3600:
                     continue
                 turn_id = _required_string(turn, "id", "thread/turns/list")
+                if any(item.thread_id == thread_id and item.failed_turn_id != turn_id
+                       for item in self.state.observations):
+                    self._record_rejection(thread_id, turn, raw_limits)
                 obligation = Obligation.create(thread_id, turn_id, now, limits.next_reset_at)
                 self.state.obligations.append(obligation)
                 existing[thread_id] = obligation
@@ -398,14 +401,18 @@ class Supervisor:
         terminal.sort(key=lambda item: (item[0], _is_usage_limit_failure(item[2])))
         for completed_at, observation, turn in terminal:
             if _is_usage_limit_failure(turn):
-                turn_id = _required_string(turn, "id", "quota recovery observation")
-                if self.retry.rejected(observation.thread_id, turn_id, completed_at, limits, self.clock()):
-                    emit("recovery.rejected", threadId=observation.thread_id, failedTurnId=turn["id"],
-                         **self.retry.report(self.clock()))
+                self._record_rejection(observation.thread_id, turn, limits)
             elif turn.get("status") == "completed" and self.retry.succeeded(completed_at):
                 emit("recovery.progress", threadId=observation.thread_id)
             self.state.observations.remove(observation)
             save_state(self.state_file, self.state)
+
+    def _record_rejection(self, thread_id: str, turn: dict, limits: dict) -> None:
+        turn_id = _required_string(turn, "id", "quota recovery observation")
+        completed_at = _required_timestamp(turn, "completedAt", "quota recovery observation")
+        if self.retry.rejected(thread_id, turn_id, completed_at, limits, self.clock()):
+            emit("recovery.rejected", threadId=thread_id, failedTurnId=turn_id,
+                 **self.retry.report(self.clock()))
 
     def _track_delivery(self, obligation: Obligation) -> None:
         if not any(item.client_user_message_id == obligation.client_user_message_id for item in self.state.observations):

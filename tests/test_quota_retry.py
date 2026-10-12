@@ -70,6 +70,25 @@ def test_cooldown_does_not_hide_an_unresolved_send_or_retry_it(tmp_path):
     assert monitor.state.obligations[0].phase == "uncertain"
 
 
+def test_new_rejection_visible_after_observation_still_blocks_discovery_dispatch(tmp_path):
+    client = FakeClient([thread()], {"t": failed_turn()}, allowed=True)
+    monitor = supervisor(tmp_path, client)
+    assert monitor.run_cycle().dispatched == 1
+    client.queue.clear(); client.turns["t"] = failed_turn("new-rejection")
+    read = client.latest_turn
+    calls = []
+    def changing_snapshot(identity):
+        calls.append(identity)
+        if len(calls) == 1:
+            return {"id": "provisional-turn", "status": "interrupted", "completedAt": None}
+        return read(identity)
+    client.latest_turn = changing_snapshot
+    result = monitor.run_cycle()
+    assert result.dispatched == 0 and result.retry["blocked"]
+    assert len(client.added) == 1 and monitor.retry.state.streak == 1
+    assert monitor.run_cycle().dispatched == 0 and monitor.retry.state.streak == 1
+
+
 def test_failure_guard_write_error_keeps_the_observation_and_sends_nothing(tmp_path, monkeypatch):
     client = FakeClient([thread()], {"t": failed_turn()}, allowed=True)
     monitor = supervisor(tmp_path, client)
@@ -110,6 +129,12 @@ def test_only_exhausted_ordinary_windows_affect_the_wait(tmp_path, weekly_used, 
         "windowDurationMins": 300, "resetsAt": 99999}}}
     retry.rejected("chat", "turn", 1000, raw, 1000)
     assert retry.state.not_before == expected
+
+
+def test_display_rounding_cannot_turn_fractional_remaining_quota_into_a_reset_wait(tmp_path):
+    retry = QuotaRetry(tmp_path / "quota-retry.json")
+    retry.rejected("chat", "turn", 1000, limits(used=99.99), 1000)
+    assert retry.state.not_before == 1300 and retry.state.reason == "backoff"
 
 
 def test_weekly_only_and_missing_or_elapsed_reset_use_no_percentage_buffer(tmp_path):
