@@ -4,19 +4,19 @@
 
 The project is self-contained. `AGENTS.md` owns environment-specific instructions; `Docs/README.md` maps product contracts and evidence. `.project-workflow.json` declares the project name, required source anchors, interpreter used by Windows workflow wrappers and additional export exclusions. Helpers use standard-library Python 3.10+, independently of the product language.
 
-`CHAT-MANIFEST.md` belongs to ChatGPT. `CODEX-MANIFEST.md` belongs to the local agent, Codex or Claude. Read both when receiving work; record only your environment's work and checks. `local-bootstrap` means no canonical ChatGPT checkpoint has been imported yet. The first ChatGPT checkpoint replaces that identity; do not invent prior checkpoint history.
+`CHAT-MANIFEST.md` belongs to ChatGPT. `LOCAL-MANIFEST.md` belongs to the local agent, Codex or Claude. Read both when receiving work; record only your environment's work and checks. `local-bootstrap` means no canonical ChatGPT checkpoint has been imported yet. The first ChatGPT checkpoint replaces that identity; do not invent prior checkpoint history.
 
-Codex and Claude are alternatives for the same local role. Both use `CODEX-MANIFEST.md`, `scripts/pack-codex-handoff.ps1` and the existing `-codex-handoff.zip` filename. Preserve earlier local work when switching agents until ChatGPT accounts for it. Do not create separate manifests or checkpoint sequences.
+Codex and Claude are alternatives for the same local role. Both use `LOCAL-MANIFEST.md`, `scripts/pack-local-handoff.ps1` and `<project>-local-handoff.zip`. Preserve earlier local work when switching agents until ChatGPT accounts for it. Do not create separate manifests or checkpoint sequences.
 
 ## Codex or Claude to ChatGPT
 
 Apply the development/delivery tiers below, run audit cleanup, review affected docs, update the local manifest and commit scoped changes when safe. Completed application-code changes require `pwsh -NoProfile -File scripts/verify-windows.ps1`; prose-only changes need relevant documentation checks, not unrelated runtime builds. Every completed delivery still needs the handoff:
 
 ```powershell
-pwsh -NoProfile -File scripts/pack-codex-handoff.ps1
+pwsh -NoProfile -File scripts/pack-local-handoff.ps1
 ```
 
-The packer runs audit retention and replaces one `<project>-codex-handoff.zip` beside `README.md`. It includes source, tests, relevant configuration, docs, helpers and audit evidence/state. `_HANDOFF_MANIFEST.json` records the base checkpoint, Git provenance, exact file set, sizes and SHA-256 hashes. Every entry is verified before replacement. The previous handoff remains available if validation fails.
+The packer runs audit retention and replaces one `<project>-local-handoff.zip` beside `README.md`. It includes source, tests, relevant configuration, docs, helpers and audit evidence/state. `_HANDOFF_MANIFEST.json` records the base checkpoint, Git provenance, exact file set, sizes and SHA-256 hashes. Every entry is verified before replacement. The previous handoff remains available if validation fails.
 
 Give the user the ZIP path. ChatGPT extracts the source into its sandbox, reads both manifests and the current audit, then continues from the supplied evidence. It must account for local work by Codex or Claude before publishing the next canonical checkpoint.
 
@@ -82,7 +82,7 @@ Small local commits do not each require another release build. Push coherent com
 
 At each completed user-requested delivery, reconcile affected owner documents and the environment-owned manifest, run audit cleanup through the existing helper, commit scoped changes when safe, and refresh the stable local handoff ZIP. This also applies to documentation-only deliveries. It does not apply after each intermediate edit or test.
 
-Keep ChatGPT checkpoints and local handoffs distinct. ChatGPT owns its monotonically numbered canonical checkpoints and `CHAT-MANIFEST.md`. Codex or Claude performs local work and updates the same `CODEX-MANIFEST.md`. Preserve earlier local work until ChatGPT accounts for it. Keep existing manifest, script and handoff filenames for compatibility. Never overwrite a checkpoint, invent an imported base, or package secrets, runtime data, dependencies, build output, caches or previous archives.
+Keep ChatGPT checkpoints and local handoffs distinct. ChatGPT owns its monotonically numbered canonical checkpoints and `CHAT-MANIFEST.md`. Codex or Claude performs local work and updates the same `LOCAL-MANIFEST.md`. Preserve earlier local work until ChatGPT accounts for it. Use the local manifest and handoff names consistently, without legacy or agent-specific aliases. Never overwrite a checkpoint, invent an imported base, or package secrets, runtime data, dependencies, build output, caches or previous archives.
 
 Use existing import/export safety helpers. Preserve unrelated changes and runtime data. Inspect Git status after packaging; if retention changed tracked audit data, commit only those managed changes and refresh the archive again. Report a failed transport clearly and retain the preceding verified archive.
 

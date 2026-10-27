@@ -20,9 +20,9 @@ ROOT = Path(__file__).resolve().parent.parent
 CONFIG = ".project-workflow.json"
 LOCK = ".project-workflow.lock"
 LIMIT = 128 * 1024 * 1024
-COMMON = ["AGENTS.md", "README.md", "CHAT-MANIFEST.md", "CODEX-MANIFEST.md", CONFIG,
+COMMON = ["AGENTS.md", "README.md", "CHAT-MANIFEST.md", "LOCAL-MANIFEST.md", CONFIG,
           "Docs/README.md", "Docs/Audits/README.md", "scripts/project-workflow.py", "scripts/manage-audits.py",
-          "scripts/pack-codex-handoff.ps1", "scripts/import-checkpoint.ps1", "scripts/run-project-command.ps1",
+          "scripts/pack-local-handoff.ps1", "scripts/import-checkpoint.ps1", "scripts/run-project-command.ps1",
           "scripts/verify-windows.ps1"]
 CACHE_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache",
               ".ruff_cache", ".mypy_cache", ".idea", ".vs"}
@@ -110,7 +110,7 @@ def excluded(name, config):
         return True
     if len(parts) == 1 and lowered[-1].startswith(("telemetry.jsonl", "tray.jsonl", "updates.jsonl")):
         return True
-    if lowered[-1] == f"{config['name']}-codex-handoff.zip".casefold():
+    if lowered[-1] == f"{config['name']}-local-handoff.zip".casefold():
         return True
     return Path(parts[-1]).suffix.casefold() in SKIP_SUFFIXES
 
@@ -164,9 +164,9 @@ def verify_checkpoint_sequence(root, name, identity):
     number = re.fullmatch(r"v(\d+)(?:[._-].*)?", identity)
     if not number or int(number[1]) < 1:
         raise WorkflowError("Canonical checkpoint IDs must start with a positive v-number, such as v001 or v001-description.")
-    bases = re.findall(r"^ChatGPT base checkpoint:\s*(\S+)", target(root, "CODEX-MANIFEST.md").read_text(encoding="utf-8"), re.MULTILINE)
+    bases = re.findall(r"^ChatGPT base checkpoint:\s*(\S+)", target(root, "LOCAL-MANIFEST.md").read_text(encoding="utf-8"), re.MULTILINE)
     if len(bases) != 1:
-        raise WorkflowError("CODEX-MANIFEST.md must identify exactly one imported ChatGPT base checkpoint.")
+        raise WorkflowError("LOCAL-MANIFEST.md must identify exactly one imported ChatGPT base checkpoint.")
     prior = []
     if bases[0] != "local-bootstrap":
         base = re.fullmatch(r"v(\d+)(?:[._-].*)?", bases[0])
@@ -218,7 +218,7 @@ def build(root, kind="handoff", checkpoint=None):
             raise WorkflowError(f"Checkpoint already exists; identities are never reused: {destination}.")
         verify_checkpoint_sequence(root, config["name"], identity)
     else:
-        destination = target(root, f"{config['name']}-codex-handoff.zip")
+        destination = target(root, f"{config['name']}-local-handoff.zip")
     with workflow_lock(root):
         config = settings(root)
         collect(root, config)  # Fail before retention mutates an incomplete project.
@@ -388,7 +388,7 @@ def import_checkpoint(root, archive_path, preview=False):
                     raise WorkflowError(f"Imported file verification failed: {name}.")
             for name in sorted(removed):
                 target(root, name).unlink()
-            target(root, "CODEX-MANIFEST.md").write_text(
+            target(root, "LOCAL-MANIFEST.md").write_text(
                 f"# Local manifest (Codex or Claude)\n\nChatGPT base checkpoint: {manifest['checkpoint']}\n"
                 f"Updated: {datetime.now(timezone.utc).date()}\n\n## Local work\n\n"
                 "- Imported the canonical checkpoint and verified every source checksum.\n\n"

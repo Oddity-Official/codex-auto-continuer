@@ -40,9 +40,9 @@ def project(tmp_path, monkeypatch):
         else:
             path.write_text("source", encoding="utf-8")
     (root / "scripts/manage-audits.py").write_bytes((SCRIPTS / "manage-audits.py").read_bytes())
-    (root / ".gitignore").write_text(".data/*\n!.data/.gitkeep\nfixture-codex-handoff.zip\nCheckpoints/\n.project-workflow.lock\nDocs/Audits/.maintenance.json\nDocs/Audits/.audit.lock\n__pycache__/\n", encoding="utf-8")
+    (root / ".gitignore").write_text(".data/*\n!.data/.gitkeep\nfixture-local-handoff.zip\nCheckpoints/\n.project-workflow.lock\nDocs/Audits/.maintenance.json\nDocs/Audits/.audit.lock\n__pycache__/\n", encoding="utf-8")
     (root / "CHAT-MANIFEST.md").write_text("Checkpoint: local-bootstrap\n", encoding="utf-8")
-    (root / "CODEX-MANIFEST.md").write_text("ChatGPT base checkpoint: local-bootstrap\n", encoding="utf-8")
+    (root / "LOCAL-MANIFEST.md").write_text("ChatGPT base checkpoint: local-bootstrap\n", encoding="utf-8")
     (root / workflow.CONFIG).write_text(json.dumps({
         "version": 1, "name": "fixture", "required_files": ["src/tool.py"],
         "exclude_directories": [], "exclude_files": [], "windows_python": "3.13",
@@ -135,7 +135,7 @@ def test_checkpoint_preview_and_import_preserve_runtime_and_backup(project, tmp_
     assert (project / "src/tool.py").read_bytes() == b"new source\r\n"
     assert (project / ".data/private.sqlite3").read_bytes() == b"local database and telemetry must stay local"
     assert (project / ".data/.gitkeep").exists()
-    assert "verification is pending" in (project / "CODEX-MANIFEST.md").read_text().lower()
+    assert "verification is pending" in (project / "LOCAL-MANIFEST.md").read_text().lower()
     assert (project / "Docs/Audits/.maintenance.json").is_file()
 
 
@@ -149,7 +149,7 @@ def test_checkpoint_identity_cannot_be_reused(project, tmp_path):
 
 def test_checkpoint_number_cannot_go_backwards_from_imported_base(project):
     (project / "CHAT-MANIFEST.md").write_text("Checkpoint: v001\n")
-    (project / "CODEX-MANIFEST.md").write_text("ChatGPT base checkpoint: v002\n")
+    (project / "LOCAL-MANIFEST.md").write_text("ChatGPT base checkpoint: v002\n")
     with pytest.raises(workflow.WorkflowError, match="greater than"):
         workflow.build(project, "checkpoint", "v001")
     assert not (project / "Checkpoints").exists()
@@ -256,11 +256,11 @@ def test_retention_failure_keeps_previous_handoff(project, blocker):
 
 @pytest.mark.skipif(os.name != "nt", reason="Native PowerShell wrappers")
 def test_native_wrapper_packages_project_with_space_path(project):
-    result = subprocess.run(["pwsh", "-NoProfile", "-File", str(project / "scripts/pack-codex-handoff.ps1")],
+    result = subprocess.run(["pwsh", "-NoProfile", "-File", str(project / "scripts/pack-local-handoff.ps1")],
                             capture_output=True, text=True, encoding="utf-8", timeout=30)
     assert result.returncode == 0, result.stderr
     assert str(project) in result.stdout
-    assert (project / "fixture-codex-handoff.zip").is_file()
+    assert (project / "fixture-local-handoff.zip").is_file()
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Native PowerShell wrappers")
@@ -315,3 +315,30 @@ def test_archive_size_budget_fails_before_extracting(project, tmp_path, monkeypa
     with pytest.raises(workflow.WorkflowError, match="input-size safety limit"):
         workflow.import_checkpoint(project, archive)
     assert (project / "src/tool.py").read_bytes() == b"old source\r\n"
+
+
+def test_handoff_requires_the_local_manifest_without_legacy_fallback(project):
+    (project / "LOCAL-MANIFEST.md").rename(project / "CODEX-MANIFEST.md")
+    with pytest.raises(workflow.WorkflowError, match="LOCAL-MANIFEST.md"):
+        workflow.build(project)
+    assert not (project / "fixture-local-handoff.zip").exists()
+
+
+def test_legacy_checkpoint_is_rejected_before_replacement(project, tmp_path):
+    source = checkpoint(project, tmp_path)
+    with zipfile.ZipFile(source) as archive:
+        payloads = {name: archive.read(name) for name in archive.namelist()}
+    payloads["CODEX-MANIFEST.md"] = payloads.pop("LOCAL-MANIFEST.md")
+    manifest = json.loads(payloads["_CHECKPOINT_MANIFEST.json"])
+    manifest["files"]["CODEX-MANIFEST.md"] = manifest["files"].pop("LOCAL-MANIFEST.md")
+    payloads["_CHECKPOINT_MANIFEST.json"] = json.dumps(manifest).encode()
+    legacy = tmp_path / "legacy-checkpoint.zip"
+    with zipfile.ZipFile(legacy, "w") as archive:
+        for name, data in payloads.items():
+            archive.writestr(name, data)
+    before = (project / "src/tool.py").read_bytes()
+    with pytest.raises(workflow.WorkflowError, match="LOCAL-MANIFEST.md"):
+        workflow.import_checkpoint(project, legacy)
+    assert (project / "src/tool.py").read_bytes() == before
+    assert (project / "LOCAL-MANIFEST.md").is_file()
+    assert not (project / "CODEX-MANIFEST.md").exists()
