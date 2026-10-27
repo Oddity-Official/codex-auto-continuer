@@ -4,11 +4,13 @@
 
 The project is self-contained. `AGENTS.md` owns environment-specific instructions; `Docs/README.md` maps product contracts and evidence. `.project-workflow.json` declares the project name, required source anchors, interpreter used by Windows workflow wrappers and additional export exclusions. Helpers use standard-library Python 3.10+, independently of the product language.
 
-`CHAT-MANIFEST.md` belongs to ChatGPT. `CODEX-MANIFEST.md` belongs to Codex. Read both when receiving work; record only your environment's work and checks. `local-bootstrap` means no canonical ChatGPT checkpoint has been imported yet. The first ChatGPT checkpoint replaces that identity; do not invent prior checkpoint history.
+`CHAT-MANIFEST.md` belongs to ChatGPT. `CODEX-MANIFEST.md` belongs to the local agent, Codex or Claude. Read both when receiving work; record only your environment's work and checks. `local-bootstrap` means no canonical ChatGPT checkpoint has been imported yet. The first ChatGPT checkpoint replaces that identity; do not invent prior checkpoint history.
 
-## Codex to ChatGPT
+Codex and Claude are alternatives for the same local role. Both use `CODEX-MANIFEST.md`, `scripts/pack-codex-handoff.ps1` and the existing `-codex-handoff.zip` filename. Preserve earlier local work when switching agents until ChatGPT accounts for it. Do not create separate manifests or checkpoint sequences.
 
-Apply the development/delivery tiers below, run audit cleanup, review affected docs, update the Codex manifest and commit scoped changes when safe. Completed application-code changes require `pwsh -NoProfile -File scripts/verify-windows.ps1`; prose-only changes need relevant documentation checks, not unrelated runtime builds. Every completed delivery still needs the handoff:
+## Codex or Claude to ChatGPT
+
+Apply the development/delivery tiers below, run audit cleanup, review affected docs, update the local manifest and commit scoped changes when safe. Completed application-code changes require `pwsh -NoProfile -File scripts/verify-windows.ps1`; prose-only changes need relevant documentation checks, not unrelated runtime builds. Every completed delivery still needs the handoff:
 
 ```powershell
 pwsh -NoProfile -File scripts/pack-codex-handoff.ps1
@@ -16,11 +18,11 @@ pwsh -NoProfile -File scripts/pack-codex-handoff.ps1
 
 The packer runs audit retention and replaces one `<project>-codex-handoff.zip` beside `README.md`. It includes source, tests, relevant configuration, docs, helpers and audit evidence/state. `_HANDOFF_MANIFEST.json` records the base checkpoint, Git provenance, exact file set, sizes and SHA-256 hashes. Every entry is verified before replacement. The previous handoff remains available if validation fails.
 
-Give the user the ZIP path. ChatGPT extracts the source into its sandbox, reads both manifests and the current audit, then continues from the supplied evidence. It must account for Codex's work before publishing the next canonical checkpoint.
+Give the user the ZIP path. ChatGPT extracts the source into its sandbox, reads both manifests and the current audit, then continues from the supplied evidence. It must account for local work by Codex or Claude before publishing the next canonical checkpoint.
 
 Inspect project Git status after packaging. If retention pruned tracked audit data after the commit, review and commit those managed changes, then refresh the handoff again. The packer does not stage or commit source automatically.
 
-## ChatGPT to Codex
+## ChatGPT to Codex or Claude
 
 After its checks, ChatGPT updates `CHAT-MANIFEST.md` with a new increasing ID, for example `v001`, then builds:
 
@@ -28,7 +30,7 @@ After its checks, ChatGPT updates `CHAT-MANIFEST.md` with a new increasing ID, f
 python3 scripts/project-workflow.py checkpoint --id v001
 ```
 
-The source-only ZIP is created under `Checkpoints/`, contains `_CHECKPOINT_MANIFEST.json`, and is never overwritten. IDs start with a positive `v` number, optionally followed by a descriptive suffix. The builder rejects numbers no greater than the imported Codex base or existing local checkpoints. Persist the ZIP to the Library or another available durable attachment before the disposable sandbox ends. Codex does not create this canonical sequence.
+The source-only ZIP is created under `Checkpoints/`, contains `_CHECKPOINT_MANIFEST.json`, and is never overwritten. IDs start with a positive `v` number, optionally followed by a descriptive suffix. The builder rejects numbers no greater than the imported local base or existing local checkpoints. Persist the ZIP to the Library or another available durable attachment before the disposable sandbox ends. Neither Codex nor Claude creates this canonical sequence during local work.
 
 On Windows, preview a received checkpoint outside the checkout:
 
@@ -41,7 +43,7 @@ The importer requires a clean project Git subtree, not a clean parent repository
 
 The importer takes a verified backup of replaceable source and audit state outside the checkout. It replaces owned source, removes owned source absent from the checkpoint, and leaves excluded runtime/cache data and unrelated files intact. Audit state is an explicitly owned transport file despite being Git-ignored. Source checksums detect corruption; they do not authenticate an archive from an untrusted sender. Review source before executing imported code.
 
-The importer resets the Codex record to the imported base and marks native verification pending. Run the native gate, reconcile docs, commit only the project changes, then build the stable handoff. Keep the printed recovery backup until verification succeeds. An I/O interruption may leave a partial replacement; the error identifies the backup. Do not repeatedly import over an unexplained partial state.
+The importer resets the local record to the imported base and marks native verification pending. Run the native gate, reconcile docs, commit only the project changes, then build the stable handoff. Keep the printed recovery backup until verification succeeds. An I/O interruption may leave a partial replacement; the error identifies the backup. Do not repeatedly import over an unexplained partial state.
 
 ## Export boundaries
 
@@ -78,9 +80,9 @@ Use observed test durations to identify bottlenecks. Do not remove meaningful re
 
 Small local commits do not each require another release build. Push coherent completion points rather than triggering expensive hosted runs for every bookkeeping edit. Documentation-only pushes should still receive documentation checks, not binary builds or unrelated native compatibility matrices.
 
-At each completed user-requested delivery, reconcile affected owner documents and the environment-owned manifest, run audit cleanup through the existing helper, commit scoped changes when safe, and refresh the stable Codex handoff ZIP. This also applies to documentation-only deliveries. It does not apply after each intermediate edit or test.
+At each completed user-requested delivery, reconcile affected owner documents and the environment-owned manifest, run audit cleanup through the existing helper, commit scoped changes when safe, and refresh the stable local handoff ZIP. This also applies to documentation-only deliveries. It does not apply after each intermediate edit or test.
 
-Keep ChatGPT checkpoints and Codex handoffs distinct. ChatGPT owns its monotonically numbered canonical checkpoints and `CHAT-MANIFEST.md`; Codex owns local work and `CODEX-MANIFEST.md`. Never overwrite a checkpoint, invent an imported base, or package secrets, runtime data, dependencies, build output, caches or previous archives.
+Keep ChatGPT checkpoints and local handoffs distinct. ChatGPT owns its monotonically numbered canonical checkpoints and `CHAT-MANIFEST.md`. Codex or Claude performs local work and updates the same `CODEX-MANIFEST.md`. Preserve earlier local work until ChatGPT accounts for it. Keep existing manifest, script and handoff filenames for compatibility. Never overwrite a checkpoint, invent an imported base, or package secrets, runtime data, dependencies, build output, caches or previous archives.
 
 Use existing import/export safety helpers. Preserve unrelated changes and runtime data. Inspect Git status after packaging; if retention changed tracked audit data, commit only those managed changes and refresh the archive again. Report a failed transport clearly and retain the preceding verified archive.
 

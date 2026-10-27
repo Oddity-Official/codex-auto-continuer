@@ -1,8 +1,8 @@
-# Codex manifest
+# Local manifest (Codex or Claude)
 
 ChatGPT base checkpoint: v001
 
-Updated: 2026-10-12
+Updated: 2026-10-27
 
 ## Imported base
 
@@ -230,3 +230,9 @@ Portable: published `codex-auto-continuer-0.5.2-windows-x86_64.zip`, SHA-256 `cf
 Optional wheel: published `codex_auto_continuer-0.5.2-py3-none-any.whl`, SHA-256 `49e5b0f269e293067b582b16135e043c228a3070b959a49e19ca707717f884bc`.
 
 Stable source transport: `codex-auto-continuer-codex-handoff.zip`. It includes useful public development records and audit state with per-file hashes and Git provenance, excluding runtime data, App, dependencies, build output and secrets. Packaging runs retention and transport validation.
+
+## Local workflow update, 27 October 2026
+
+Codex or Claude now handles the local role. ChatGPT still owns canonical checkpoints. Both local agents share `CODEX-MANIFEST.md` and the existing handoff filenames. Earlier local work and checkpoint identities are preserved. Changes are limited to instructions and transport labels, not application behavior.
+
+All 56 project workflow/retention tests passed. The existing application and live Codex evidence above was not rerun. Shared installer/policy checks passed 7 tests.

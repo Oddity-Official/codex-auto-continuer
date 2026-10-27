@@ -67,6 +67,6 @@ Windows verification runs on pushes and pull requests with read-only permissions
 
 Keep public usage in [README](README.md) and the [portable guide](Docs/USER-GUIDE.md). Product, architecture and current verification each have one owner document. Link rather than copy changing facts. Record historical evidence with dates and checkout-relative references, never personal paths or chat names.
 
-Audits, workflow helpers and ChatGPT/Codex manifests are public Git-tracked development records. They are useful provenance, not something contributors must operate to make an ordinary pull request. The checkpoint/handoff process is documented in [workflow](Docs/WORKFLOW.md); clean binary releases exclude it.
+Audits, workflow helpers and manifests for ChatGPT and the local agent (Codex or Claude) are public Git-tracked development records. They are useful provenance, not something contributors must operate to make an ordinary pull request. The checkpoint/handoff process is documented in [workflow](Docs/WORKFLOW.md); clean binary releases exclude it.
 
 `.gitignore` and transport exclusions are separate safeguards. An ignored file can still be deliberately tracked; Git history can retain removed content. Before pushing, inspect staged files and commit history, and add any custom data locations to both exclusions. Follow [safe reporting](SECURITY.md) when sharing diagnostics.

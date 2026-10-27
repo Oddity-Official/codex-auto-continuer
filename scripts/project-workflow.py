@@ -171,7 +171,7 @@ def verify_checkpoint_sequence(root, name, identity):
     if bases[0] != "local-bootstrap":
         base = re.fullmatch(r"v(\d+)(?:[._-].*)?", bases[0])
         if not base:
-            raise WorkflowError("Cannot verify checkpoint sequence: Codex base must be local-bootstrap or a v-number ID.")
+            raise WorkflowError("Cannot verify checkpoint sequence: local base must be local-bootstrap or a v-number ID.")
         prior.append(int(base[1]))
     directory = target(root, "Checkpoints")
     if directory.exists():
@@ -389,7 +389,7 @@ def import_checkpoint(root, archive_path, preview=False):
             for name in sorted(removed):
                 target(root, name).unlink()
             target(root, "CODEX-MANIFEST.md").write_text(
-                f"# Codex manifest\n\nChatGPT base checkpoint: {manifest['checkpoint']}\n"
+                f"# Local manifest (Codex or Claude)\n\nChatGPT base checkpoint: {manifest['checkpoint']}\n"
                 f"Updated: {datetime.now(timezone.utc).date()}\n\n## Local work\n\n"
                 "- Imported the canonical checkpoint and verified every source checksum.\n\n"
                 "## Verification\n\nNative verification is pending. Run the project gate before committing or handing off.\n",
@@ -406,7 +406,7 @@ def main():
             stream.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("handoff", help="Refresh the stable verified Codex source ZIP.")
+    sub.add_parser("handoff", help="Refresh the stable verified local source ZIP for Codex or Claude.")
     checkpoint = sub.add_parser("checkpoint", help="Create a never-overwritten ChatGPT checkpoint.")
     checkpoint.add_argument("--id", required=True)
     importer = sub.add_parser("import-checkpoint", help="Import into a clean Git project; retain a recovery backup.")

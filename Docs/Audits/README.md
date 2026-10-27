@@ -1,6 +1,6 @@
 # Audit workspace
 
-Keep the current audit report, reproduction scripts, fixtures and measured results together here. Both Codex and ChatGPT use this workflow. Older implementation and investigation ledgers remain in `Docs/History/`.
+Keep the current audit report, reproduction scripts, fixtures and measured results together here. ChatGPT, Codex and Claude use this workflow. Older implementation and investigation ledgers remain in `Docs/History/`.
 
 ## Start an audit
 
@@ -47,7 +47,7 @@ When changing this workflow, run the deletion-safety regression suite with `py -
 
 ## Handoff
 
-On Windows, `scripts/pack-codex-handoff.ps1` runs cleanup before packaging and includes this workspace and its retention state in the project's stable Codex handoff ZIP. It refuses to package if maintenance fails. It does not start or rotate an audit.
+On Windows, `scripts/pack-codex-handoff.ps1` runs cleanup before packaging and includes this workspace and its retention state in the project's stable local handoff ZIP. It refuses to package if maintenance fails. It does not start or rotate an audit.
 
 On ChatGPT, `python3 scripts/project-workflow.py checkpoint --id CHECKPOINT-ID` runs cleanup before creating the versioned project checkpoint. Set `CHAT-MANIFEST.md` to the new ID first. Include `Docs/Audits/`, including `.maintenance.json`, but exclude `.audit.lock`, temporary files, compiler output and caches. The report and evidence travel inside the normal project ZIP; do not create nested audit ZIPs.
 

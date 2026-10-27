@@ -23,16 +23,18 @@
 - Work in the disposable sandbox using the project's declared runtime and dependencies. Do not assume the user's native tools or source-project paths exist.
 - Use fixture configuration for tests when host-specific paths are unavailable. Do not rewrite the user's central configuration to match the sandbox.
 - Linux validation is useful, not proof of Windows compatibility. Do not require WSL or include installed runtimes, wheels/vendor trees, caches or build output in artifacts.
-- Read both manifests and the current audit evidence on receipt of a Codex handoff. Account for local work before creating the next canonical checkpoint.
-- Update `CHAT-MANIFEST.md`, assign a new monotonically increasing checkpoint ID, and run `python3 scripts/project-workflow.py checkpoint --id ID`. Persist the ZIP to the Library or another available durable attachment. Never overwrite or reuse a checkpoint ID. Do not run the Codex handoff packer for normal ChatGPT work.
+- Read both manifests and the current audit evidence on receipt of a local handoff. Account for local work before creating the next canonical checkpoint.
+- Update `CHAT-MANIFEST.md`, assign a new monotonically increasing checkpoint ID, and run `python3 scripts/project-workflow.py checkpoint --id ID`. Persist the ZIP to the Library or another available durable attachment. Never overwrite or reuse a checkpoint ID. Do not run the local handoff packer for normal ChatGPT work.
 
-## Codex environment
+## Codex or Claude environment
+
+Codex and Claude are alternatives for the same local role. Both use `CODEX-MANIFEST.md`, `scripts/pack-codex-handoff.ps1` and the existing `-codex-handoff.zip` filename. Preserve earlier local work when switching agents until ChatGPT accounts for it. Do not create separate manifests or checkpoint sequences.
 
 - Work in native Windows with PowerShell 7 and Python 3.13. Do not use WSL or sandbox-only toolchain bundles.
 - Preview incoming canonical checkpoints with `pwsh -File scripts/import-checkpoint.ps1 -ArchivePath 'absolute-path.zip' -Preview`. Import only after the project subtree is clean and the preview is understood. Unrelated sibling changes need not be cleared.
-- The importer verifies archive paths, role, project anchors and hashes, preserves runtime data and unowned files, and creates a recovery backup outside the checkout. Keep that backup until native verification succeeds. After import, verify before committing; the importer resets the Codex record to the new base with verification marked pending.
+- The importer verifies archive paths, role, project anchors and hashes, preserves runtime data and unowned files, and creates a recovery backup outside the checkout. Keep that backup until native verification succeeds. After import, verify before committing; the importer resets the local record to the new base with verification marked pending.
 - Apply the development/delivery tiers in `Docs/WORKFLOW.md`: focused checks during iteration; native gate and relevant integration checks for completed code changes; documentation checks for prose-only changes. At every completed delivery, including prose-only work, run audit cleanup, reconcile docs, update `CODEX-MANIFEST.md`, commit scoped changes when safe, and refresh `pwsh -File scripts/pack-codex-handoff.ps1`. Inspect status afterward and include managed retention changes if needed. Give the user the stable handoff path. Do not build releases or repeat full gates after each intermediate edit.
-- Do not rewrite `CHAT-MANIFEST.md` for Codex work.
+- Do not rewrite `CHAT-MANIFEST.md` for local work by Codex or Claude.
 
 ## Shared workflow
 
