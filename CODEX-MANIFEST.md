@@ -236,3 +236,5 @@ Stable source transport: `codex-auto-continuer-codex-handoff.zip`. It includes u
 Codex or Claude now handles the local role. ChatGPT still owns canonical checkpoints. Both local agents share `CODEX-MANIFEST.md` and the existing handoff filenames. Earlier local work and checkpoint identities are preserved. Changes are limited to instructions and transport labels, not application behavior.
 
 All 56 project workflow/retention tests passed. The existing application and live Codex evidence above was not rerun. Shared installer/policy checks passed 7 tests.
+
+Normal retention removed 16 expired tracked audit-support files with user approval. Audit reports remain unchanged.
