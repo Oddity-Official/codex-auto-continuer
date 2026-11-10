@@ -10,7 +10,6 @@ on:
       - 'scripts/**/*.ps1'
       - 'integration/**'
       - 'pyproject.toml'
-      - '.project-workflow.json'
       - '.github/workflows/windows.yml'
       - '!src/**/*.md'
       - '!tests/**/*.md'

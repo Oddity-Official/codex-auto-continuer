@@ -140,4 +140,4 @@ Routine RPC requests are suppressed unless `diagnostic_trace` is enabled. Respon
 
 Rotation defaults to 8 MiB and three gzip backups per stream. Compression completes and atomically installs the backup before removing the original. Privacy changes reconfigure each stream on validated reload without restarting the supervisor; old logs remain unchanged. Telemetry I/O failure stops dispatch and reports a blocking local snapshot when writable. Repair dialogs and exit remain usable if their own logging destination fails.
 
-Runtime status records phase, PID, cycle counts, quota permission, update time and error class. It supports the tray without storing conversation bodies. Build and handoff tools exclude runtime files, secrets, caches and the deployed App directory.
+Runtime status records phase, PID, cycle counts, quota permission, update time and error class. It supports the tray without storing conversation bodies. Build tools exclude runtime files, secrets, caches and the deployed App directory.

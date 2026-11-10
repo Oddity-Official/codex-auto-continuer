@@ -10,7 +10,7 @@ Optional queue holding is off by default. It stores canonical held input and emb
 - Inspect a small relevant log excerpt before attaching it. Detailed logs contain real chat names, IDs and filesystem paths. Switching to Private does not rewrite older logs.
 - Private logs use stable keyed identifiers, not guaranteed anonymous data. Durable `state.json` contains real IDs; settings and the Markdown prompt are user-authored. Never attach a whole used data folder or its correlation key.
 - Do not attach Codex authentication files, session files, raw RPC payloads, screenshots of private conversations or your entire deployed app folder.
-- Do not attach `held-inputs.dpapi`, even encrypted. Never force recovery by deleting it. The journal and its plaintext bodies are excluded from clean releases and source handoffs.
+- Do not attach `held-inputs.dpapi`, even encrypted. Never force recovery by deleting it. The journal and its plaintext bodies are excluded from clean releases.
 
 Logs and state are not encrypted. Private logging is the release default; Detailed logging is a deliberate local debugging choice.
 

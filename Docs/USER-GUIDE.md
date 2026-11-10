@@ -70,4 +70,4 @@ Public releases need no GitHub login. Leave `update_use_github_cli_auth = false`
 
 Quit before moving an installed folder. Move its `data` with it, launch from the new location and re-enable `Start With Windows` to update the login shortcut. Small single-instance control files remain under `%LOCALAPPDATA%\CodexAutoContinuer`.
 
-Our code is MIT licensed. `Licenses/` contains dependency notices and pystray's corresponding source. `RELEASE-MANIFEST.json` contains per-file SHA-256 hashes. Developer documentation, tests and audits stay in the source repository and source handoff, not this release.
+Our code is MIT licensed. `Licenses/` contains dependency notices and pystray's corresponding source. `RELEASE-MANIFEST.json` contains per-file SHA-256 hashes. Developer documentation, tests and audits stay in the source repository, not this release.

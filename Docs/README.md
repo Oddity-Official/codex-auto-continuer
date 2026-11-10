@@ -21,14 +21,12 @@
 
 ## Development records
 
-These sanitized records are Git-tracked and suitable for public sharing, but excluded from binary releases. Ordinary use and contributions do not require the checkpoint workflow.
+These sanitized records are Git-tracked and suitable for public sharing, but excluded from binary releases.
 
-- [Workflow](WORKFLOW.md): environment ownership, checkpoint import/export and source transport boundaries
-- [Audits](Audits/README.md): dated audit evidence, rotation and retention
+- [Audits](Audits/README.md): dated audit evidence and rotation
 - [Publication review](Audits/2026-10-12/AUDIT.md): documentation, full-history privacy review and public release checks
 - [Tray and telemetry investigation](Audits/History/2026-10-07/AUDIT.md): native UI acceptance, notification evidence and release checks
 - [Real client integration investigation](Audits/History/2026-10-05/AUDIT.md): connection proofs, actual CLI recovery repair, Desktop composer evidence and remaining holding limits
-- [ChatGPT manifest](../CHAT-MANIFEST.md) and [Local manifest (Codex or Claude)](../LOCAL-MANIFEST.md): checkpoint ownership and local verification provenance
 
 ## Historical records
 

@@ -1,6 +1,6 @@
 # Verification
 
-Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Imported checkpoint: v001. Prior release results below remain dated artifact evidence, not checks of changed code.
+Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Prior release results below remain dated artifact evidence, not checks of changed code.
 
 ## Initial public release, 12 October 2026
 
@@ -297,7 +297,7 @@ An initial race run passed assertions but had a pytest module-instance reporting
 
 ## Development workflow
 
-Documentation-only CI checks local links without installing/building the application. Portable builds and native probes filter their consumed inputs, retaining manual runs, scheduled upstream checks and full release validation. Exact stable versions resolve before the native matrix; equivalent CLI/daemon tuples run once. Shared policy copies and local `AGENTS.md` preserve completed source handoffs, including prose-only work. Focused timings are not a claim that all delivery checks now finish in one second.
+Documentation-only CI checks local links without installing/building the application. Portable builds and native probes filter their consumed inputs, retaining manual runs, scheduled upstream checks and full release validation. Exact stable versions resolve before the native matrix; equivalent CLI/daemon tuples run once. Focused timings are not a claim that all delivery checks now finish in one second.
 
 ## Release and environment limits
 
