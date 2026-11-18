@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,43 @@ from codex_auto_continuer.errors import CodexCommandError, ProtocolError
 
 def cp(code=0, out="", err=""):
     return subprocess.CompletedProcess(["codex"], code, out, err)
+
+
+def test_version_probe_finishes_when_a_helper_inherits_its_output(tmp_path):
+    # A completed probe is not a timeout just because another process kept its handles.
+    release = tmp_path / "release"
+    helper = (
+        "import pathlib, sys, time\n"
+        "end = time.monotonic() + 10\n"
+        "while not pathlib.Path(sys.argv[1]).exists() and time.monotonic() < end: time.sleep(.05)"
+    )
+    probe = ("import subprocess, sys; "
+             "subprocess.Popen([sys.executable, '-c', sys.argv[1], sys.argv[2]], "
+             "stdout=sys.stdout, stderr=sys.stderr); print('codex-cli 0.160.0')")
+    try:
+        result = codex._run(sys._base_executable, ["-c", probe, helper, str(release)], 2)
+        assert result.returncode == 0 and result.stdout.strip() == "codex-cli 0.160.0"
+    finally:
+        release.touch()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows timeout cleanup")
+def test_unresponsive_taskkill_does_not_escape_monitor_reconnect(tmp_path, monkeypatch):
+    import psutil
+    pid_file = tmp_path / "probe.pid"
+    def slow_taskkill(args, **kwargs):
+        assert args[0] == "taskkill"
+        raise subprocess.TimeoutExpired(args, kwargs["timeout"])
+    monkeypatch.setattr(subprocess, "run", slow_taskkill)
+    probe = ("import os, pathlib, sys, time; pathlib.Path(sys.argv[1]).write_text(str(os.getpid())); "
+             "time.sleep(12)")
+    try:
+        with pytest.raises(CodexCommandError, match="exceeded"):
+            codex._run(sys._base_executable, ["-c", probe, str(pid_file)], 1)
+        assert not psutil.pid_exists(int(pid_file.read_text()))
+    finally:
+        if pid_file.exists() and psutil.pid_exists(pid := int(pid_file.read_text())):
+            psutil.Process(pid).kill()
 
 
 def test_version_parse(monkeypatch):

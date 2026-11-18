@@ -2,6 +2,15 @@
 
 Native Windows 11 x86_64, PowerShell 7 and project CPython 3.13.7. Prior release results below remain dated artifact evidence, not checks of changed code.
 
+## CAC 0.7.7 Windows startup recovery
+
+Tested on 18 November 2026. Five recorded monitor exits ended in a second timeout during cleanup of a Codex version check: three while draining output and two while running Windows process cleanup. On the latest unexpected restart, the tray also reported an unreadable previous status snapshot before the new supervisor replaced it. The logs establish these CAC failures, not why Codex itself was slow.
+
+- Both timeout regressions failed on the previous implementation. Native subprocess tests cover a finished command with inherited output handles, a stalled cleanup helper, and a monitor that retries without losing pending work or sending during the outage.
+- `scripts/verify-windows.ps1`: 308 tests passed. `scripts/verify-continuation.ps1`: 20 isolated scenarios passed against the certified Windows Codex 0.160.0 CLI/daemon pair.
+- `scripts/verify-portable.py`: all 607 packaged files passed checksum verification. After abrupt termination of the isolated tray and supervisor, the GUI started a new monitor despite damaged owner and status records. The fixture made no Codex connections and dispatched no user chats.
+- The local portable installation started through its existing Windows Startup shortcut, completed a fresh scan, and dispatched nothing. Settings, saved prompt, continuation state and retry records were unchanged during installation. This exercised the real shortcut, not a fresh Windows sign-in or power cut.
+
 ## Initial public release, 12 October 2026
 
 The existing repository and stable v0.7.6 are public. This is documentation/publication work; runtime and signed binary assets are unchanged from `6690bd8`. The full native, frozen, update/rollback and installed checks below remain the release evidence, not newly repeated tests.

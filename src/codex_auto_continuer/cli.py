@@ -26,7 +26,7 @@ from . import telemetry
 from .actions import open_local
 from .status import read_runtime, owns_monitor, phase
 from .compatibility import CompatibilityGate
-from .atomic import replace_file
+from .atomic import replace_file, write_json
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -158,17 +158,24 @@ def _start(config_file: Path | None) -> int:
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         creationflags=subprocess.CREATE_NO_WINDOW,
     )
-    deadline = time.monotonic() + 10
+    deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         if process.poll() is not None:
             raise AutoContinuerError(f"Background supervisor exited during startup. Read {log_path(config_file)} and run `status`.")
         if is_running(lock_path()):
-            print(f"Background supervisor started (PID {process.pid}). Log: {log_path(config_file)}")
-            return 0
+            # Acquiring the lock alone does not mean this process is ready.
+            # The new owner publishes its identity after replacing stale status.
+            try:
+                owner = json.loads(owner_path().read_bytes())
+            except (FileNotFoundError, PermissionError, ValueError):
+                owner = None
+            if isinstance(owner, dict) and owner.get("pid") == process.pid and owner.get("configPath") == str(config_file):
+                print(f"Background supervisor started (PID {process.pid}). Log: {log_path(config_file)}")
+                return 0
         time.sleep(0.1)
     process.terminate()
     process.wait(timeout=5)
-    raise AutoContinuerError(f"Background supervisor did not acquire its instance lock in 10s. Read {log_path(config_file)}.")
+    raise AutoContinuerError(f"Background supervisor did not confirm startup in 30s. Read {log_path(config_file)}.")
 
 
 def _check_owner(config_file: Path) -> None:
@@ -252,7 +259,7 @@ def main(argv: list[str] | None = None) -> int:
             from .update_install import run_worker
             return run_worker(args.job.resolve(), recover=args.recover)
         if command == "update":
-            from .updates import check_release, launch_update, update_status, write_json, UpdateError
+            from .updates import check_release, launch_update, update_status, UpdateError
             from .config import control_dir
             if args.action == "recover":
                 if args.job is None:
@@ -363,7 +370,8 @@ def main(argv: list[str] | None = None) -> int:
             owns_runtime = True
             stop_path().unlink(missing_ok=True)
             scan_path().unlink(missing_ok=True)
-            owner_path().write_text(json.dumps({"pid": os.getpid(), "configPath": str(args.config)}), encoding="utf-8")
+            _snapshot(args.config, phase="starting")
+            write_json(owner_path(), {"pid": os.getpid(), "configPath": str(args.config)})
             telemetry.setup(log_path(args.config), cfg)
             telemetry.emit("monitor.settings", **asdict(cfg), configPath=str(args.config))
             last_result = {}
@@ -441,7 +449,6 @@ def main(argv: list[str] | None = None) -> int:
                           scanRequestId=completed_scan)
             supervisor = Supervisor(cfg, state_path(args.config), prompt_file=prompt_path(cfg, args.config), on_cycle=on_cycle)
             try:
-                _snapshot(args.config, phase="starting")
                 if command in {"once", "scan"}:
                     supervisor.connect()
                     result = supervisor.run_cycle()

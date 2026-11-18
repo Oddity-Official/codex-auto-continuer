@@ -494,7 +494,8 @@ def test_loop_closes_subscription_before_sleep_and_stops_gracefully(tmp_path):
 
 
 def test_cli_update_outage_reconnects_without_losing_obligation_or_sending(tmp_path):
-    from codex_auto_continuer.errors import CodexCommandError
+    import sys
+    from codex_auto_continuer.codex import _run
     save_state(tmp_path / "state.json", State(obligations=[Obligation.create("t", "turn-1", 900, None)]))
     before = (tmp_path / "state.json").read_bytes()
     client = FakeClient([thread()], {"t": failed_turn()}, allowed=False)
@@ -503,7 +504,7 @@ def test_cli_update_outage_reconnects_without_losing_obligation_or_sending(tmp_p
     def connect():
         attempts.append(True)
         if len(attempts) == 1:
-            raise CodexCommandError("Private synthetic installation path")
+            _run(sys._base_executable, ["-c", "import time; time.sleep(10)", "Private synthetic"], 0.3)
         s.client = client
     def sleep(seconds):
         assert s.client is None and (tmp_path / "state.json").read_bytes() == before

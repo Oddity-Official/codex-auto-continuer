@@ -106,11 +106,13 @@ def test_tray_menu_actions_match_cli_controls(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows tray launch")
-@pytest.mark.parametrize("running,no_monitor,expected", [(False, False, [("start",)]),
-    (True, False, []), (False, True, [])])
-def test_tray_launch_starts_despite_historical_failed_status(tmp_path, monkeypatch, running, no_monitor, expected):
+@pytest.mark.parametrize("historical", [b'{"phase":"failed","reason":"Old failure"}', b'\0' * 20])
+@pytest.mark.parametrize("no_monitor", [False, True])
+def test_tray_does_not_announce_historical_errors_before_start(tmp_path, monkeypatch, historical, no_monitor):
     from codex_auto_continuer import tray, windows_tray
-    actions = []
+    actions, notices = [], []
+    snapshot = tmp_path / "runtime-status.json"
+    snapshot.write_bytes(historical)
 
     class Icon:
         def __init__(self, *args, menu, **kwargs):
@@ -119,19 +121,22 @@ def test_tray_launch_starts_despite_historical_failed_status(tmp_path, monkeypat
         def run(self, setup):
             setup(self)
 
-    def refresh(controller):
-        controller.problem = "Monitoring stopped during the previous login"
-        controller.state = "failed"
-        controller.running = running
+        def notify(self, body, title):
+            notices.append(body)
+
+    def command(controller, *args):
+        actions.append(args)
+        snapshot.write_text('{"phase":"monitoring"}')
 
     monkeypatch.setattr(windows_tray, "TrayIcon", Icon)
     monkeypatch.setattr(tray, "control_dir", lambda: tmp_path / "control")
-    monkeypatch.setattr(tray.TrayController, "refresh", refresh)
-    monkeypatch.setattr(tray.TrayController, "enqueue", lambda self, label, *args: actions.append(args))
+    monkeypatch.setattr(tray, "owns_monitor", lambda path: bool(actions))
+    monkeypatch.setattr(tray.TrayController, "command", command)
     monkeypatch.setattr(tray.TrayController, "worker", lambda self: None)
     monkeypatch.setattr(tray.TrayController, "watch", lambda self: None)
     assert tray.run_tray(tmp_path / "settings.toml", start_monitor=not no_monitor) == 0
-    assert actions == expected
+    assert actions == ([] if no_monitor else [("start",)])
+    assert bool(notices) == no_monitor
 
 
 def test_installed_cli_uses_registered_app_config_and_never_guesses_after_move(tmp_path, monkeypatch):

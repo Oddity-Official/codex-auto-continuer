@@ -432,13 +432,21 @@ def run_tray(config_file: Path, *, start_monitor=True) -> int:
                 icon.visible = True
                 telemetry.emit("tray.ready", menuItems=[item.text for item in icon.menu.items])
                 write_json(config_file.parent / "tray-ready.json", {"version": __version__, "pid": os.getpid(), "config": str(config_file.resolve())})
+                # pystray runs setup off the UI thread. Finish the idempotent
+                # start before polling or showing errors from the previous login.
+                if start_monitor:
+                    try:
+                        telemetry.emit("tray.action", action="start")
+                        controller.command("start")
+                    except Exception as exc:
+                        try:
+                            telemetry.failure("tray.action_failed", exc, action="start")
+                        except OSError:
+                            pass  # Still offer repair controls if the log destination failed.
+                        controller.dialogs.show("action-error", str(exc), error=True)
                 threading.Thread(target=controller.worker, name="CAC-controls", daemon=True).start()
                 threading.Thread(target=controller.watch, name="CAC-status", daemon=True).start()
                 controller.refresh()
-                # Historical status is not a launch veto. The start command validates
-                # current settings and reports real failures without discarding work.
-                if start_monitor and not controller.running:
-                    controller.enqueue("start", "start")
             try:
                 controller.icon.run(setup=ready)
             finally:

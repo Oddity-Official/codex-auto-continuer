@@ -9,7 +9,6 @@ import shutil
 import stat
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -25,7 +24,7 @@ from . import __version__
 from .config import Config, control_dir
 from .errors import AutoContinuerError
 from .telemetry import emit, setup
-from .atomic import replace_file
+from .atomic import write_json
 
 TRUST = Path(__file__).with_name("updates.json")
 ROOT_ITEMS = {"CodexAutoContinuer.exe", "CodexAutoContinuer-CLI.exe", "_internal", "Licenses",
@@ -36,20 +35,6 @@ MAX_EXTRACTED = 1024 * 1024 * 1024
 
 class UpdateError(AutoContinuerError):
     pass
-
-
-def write_json(path: Path, value: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, name = tempfile.mkstemp(prefix=path.name + "-", suffix=".tmp", dir=path.parent)
-    temporary = Path(name)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as stream:
-            json.dump(value, stream, indent=2)
-            stream.flush()
-            os.fsync(stream.fileno())
-        replace_file(temporary, path)
-    finally:
-        temporary.unlink(missing_ok=True)
 
 
 def parse_json(payload: bytes) -> dict:

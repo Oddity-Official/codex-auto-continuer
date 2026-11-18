@@ -126,7 +126,9 @@ Small global control files remain under the per-user state directory: supervisor
 
 The supervisor takes its OS lock before loading state and initializing telemetry. A conflicting command cannot overwrite an active runtime snapshot. `start` checks the owner, launches a hidden process and waits up to 10 seconds for its lock. `stop` waits up to 60 seconds for the current cycle to finish. Sleep/reconnect waits check stop/scan requests every second.
 
-A description-owned native Startup shortcut targets the GUI EXE, or pythonw for a source install, with an absolute config path and no batch shell. Windows Shell creates it through bounded PowerShell. It refuses unmanaged or link/reparse targets. Tray readiness queues a fresh start unless monitoring is already running or --no-monitor is explicit. Old persisted failure status is diagnostic, not a launch veto. Invalid current settings still fail clearly. Moving a deployment requires reinstalling the shortcut.
+A description-owned native Startup shortcut targets the GUI EXE, or pythonw for a source install, with an absolute config path and no batch shell. Windows Shell creates it through bounded PowerShell. It refuses unmanaged or link/reparse targets. Unless `--no-monitor` is explicit, tray setup runs the idempotent start command before displaying saved status. A new supervisor replaces the status snapshot, then atomically publishes its PID and settings path. The launcher waits for that owner, not just a locked file. Old errors do not trigger a new login warning. Invalid settings or durable recovery state still require repair. Moving a deployment requires reinstalling the shortcut.
+
+CLI probes wait for the command process itself. Temporary output files allow a helper to inherit output handles without keeping a completed probe waiting for pipe closure. A timeout triggers bounded process cleanup. Once the command has exited, CAC reports a command failure to the existing retry or compatibility checks. If it cannot confirm the command exited, monitoring stops rather than launching an overlapping probe.
 
 ## Local telemetry
 

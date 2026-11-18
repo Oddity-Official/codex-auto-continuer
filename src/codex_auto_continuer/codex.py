@@ -5,11 +5,12 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import platform
 from dataclasses import dataclass
 from pathlib import Path
 
-from .errors import CodexCommandError, ProtocolError
+from .errors import AutoContinuerError, CodexCommandError, ProtocolError
 
 MIN_VERSION = (0, 160, 0)
 _VERSION_RE = re.compile(r"(?:(codex-cli|codex-app-server)\s+)?(\d+)\.(\d+)\.(\d+)((?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)")
@@ -58,37 +59,46 @@ def find_codex(executable: str | None = None) -> str:
 
 
 def _run(codex_bin: str, args: list[str], timeout: float, *, env: dict | None = None) -> subprocess.CompletedProcess[str]:
-    process = None
     try:
-        process = subprocess.Popen(
-            [codex_bin, *args],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            shell=False,
-            env=env,
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
-            start_new_session=os.name != "nt",
-        )
-        stdout, stderr = process.communicate(timeout=timeout)
-        return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
-    except subprocess.TimeoutExpired as exc:
-        if os.name == "nt":
-            subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
-                           capture_output=True, timeout=5, check=False,
-                           creationflags=subprocess.CREATE_NO_WINDOW)
-        else:
-            import signal
-            os.killpg(process.pid, signal.SIGKILL)
-        if process.poll() is None:
-            process.kill()
-        process.communicate(timeout=5)
-        raise CodexCommandError(
-            f"`codex {' '.join(args)}` exceeded {timeout}s; its process was stopped. Check Codex installation and daemon health."
-        ) from exc
+        # Wait for the command, not pipe EOF: a daemon/helper can outlive its
+        # launcher and keep both output handles open after the command succeeds.
+        with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+            process = subprocess.Popen(
+                [codex_bin, *args], stdin=subprocess.DEVNULL, stdout=out, stderr=err, env=env,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                start_new_session=os.name != "nt",
+            )
+            try:
+                process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired as exc:
+                cleanup = "Its process tree was stopped."
+                if os.name == "nt":
+                    try:
+                        subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5,
+                                       check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                    except (OSError, subprocess.SubprocessError):
+                        cleanup = "The command exited, but child process cleanup was not confirmed."
+                else:
+                    import signal
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                try:
+                    if process.poll() is None:
+                        process.kill()
+                    process.wait(timeout=5)
+                except (OSError, subprocess.TimeoutExpired) as stop_error:
+                    raise AutoContinuerError(
+                        f"Cannot confirm timed-out Codex command PID {process.pid} exited. "
+                        "Check the process before restarting monitoring."
+                    ) from stop_error
+                raise CodexCommandError(f"`codex {' '.join(args)}` exceeded {timeout}s. {cleanup}") from exc
+            out.seek(0)
+            err.seek(0)
+            return subprocess.CompletedProcess(process.args, process.returncode,
+                out.read().decode("utf-8", "replace"), err.read().decode("utf-8", "replace"))
     except OSError as exc:
         raise CodexCommandError(f"Failed to run `codex {' '.join(args)}`: {exc}") from exc
 

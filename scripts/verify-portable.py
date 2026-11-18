@@ -107,6 +107,24 @@ def main():
                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
             wait(lambda: current().get("phase") == "paused" and current().get("pid") != pid)
             pid = current()["pid"]
+            # Simulate an unclean stop only inside this disposable installation.
+            import psutil
+            monitor = psutil.Process(pid)
+            assert Path(monitor.exe()) == app / "CodexAutoContinuer.exe" and str(settings) in monitor.cmdline()
+            tray.terminate()
+            tray.wait(timeout=5)
+            monitor.kill()
+            monitor.wait(timeout=5)
+            damaged = b"\0" * 64
+            snapshot.write_bytes(damaged)
+            (Path(env["LOCALAPPDATA"]) / "CodexAutoContinuer/owner.json").write_bytes(damaged)
+            tray = subprocess.Popen([str(app / "CodexAutoContinuer.exe"), "--config", str(settings), "tray"], env=env,
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
+            wait(lambda: snapshot.read_bytes() != damaged and current().get("phase") == "paused" and current().get("pid") != pid)
+            pid = current()["pid"]
+            assert json.loads(command("status"))["supervisorRunning"]
+            tray_events = [json.loads(line) for line in (settings.parent / "tray.jsonl").read_text().splitlines()]
+            assert not any(e["pid"] == tray.pid and e["event"] in {"tray.status_failed", "tray.action_failed"} for e in tray_events)
             command("stop", timeout=65)
             from codex_auto_continuer.update_install import stop_tray
             previous = os.environ.get("LOCALAPPDATA")
@@ -140,7 +158,7 @@ def main():
                               "spacesAndPercentPath": True, "implicitDefaults": True, "samePidHotReload": True,
                               "invalidSettingsPauseAndRepair": True, "invalidPromptPauseAndRepair": True,
                               "correlatedScanFeedback": True, "exclusiveOnce": True, "gracefulStop": True,
-                              "staleFailureTrayAutostart": True, "encryptedHeldReview": True,
+                              "staleFailureTrayAutostart": True, "uncleanRestartWithDamagedStatus": True, "encryptedHeldReview": True,
                               "codexConnections": 0, "userChatsDispatched": 0}, indent=2))
         finally:
             if pid:
