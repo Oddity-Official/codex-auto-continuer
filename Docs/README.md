@@ -23,7 +23,7 @@
 
 These sanitized records are Git-tracked and suitable for public sharing, but excluded from binary releases.
 
-- [Audits](Audits/README.md): dated audit evidence and rotation
+- [Historical audits](Audits/README.md): findings from earlier versions
 - [Publication review](Audits/2026-10-12/AUDIT.md): documentation, full-history privacy review and public release checks
 - [Tray and telemetry investigation](Audits/History/2026-10-07/AUDIT.md): native UI acceptance, notification evidence and release checks
 - [Real client integration investigation](Audits/History/2026-10-05/AUDIT.md): connection proofs, actual CLI recovery repair, Desktop composer evidence and remaining holding limits

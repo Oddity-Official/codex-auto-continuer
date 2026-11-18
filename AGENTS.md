@@ -23,6 +23,5 @@
 - Work in native Windows with PowerShell 7 and Python 3.13. Don't use WSL; Linux checks don't establish Windows behaviour.
 - Read `README.md` and `Docs/README.md` before substantial work. Keep product and source contracts in their owner documents and current verification results in `Docs/VALIDATION.md`.
 - Keep open work concise. Move completed design, implementation and superseded verification records into `Docs/History/`, indexed once in `Docs/README.md`. Preserve historical observations rather than rewriting them to describe later code.
-- Keep an audit's report, probes, fixtures and results together in a dated folder under `Docs/Audits/`, as its README describes.
 - Protect unrelated changes and local runtime data. Bound processes from their first invocation, stop their children on timeout, and fail clearly rather than silently dropping source, evidence or errors. Use pytest for Python regressions and keep tests that cover real failure modes.
 - Check docs and code for contradictions, broken links and unsupported claims before finishing. Record failed or unavailable checks honestly.

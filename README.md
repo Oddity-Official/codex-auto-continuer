@@ -105,4 +105,4 @@ Our preference is about fit: native Windows, existing interactive chats, exact-t
 
 `src/` owns runtime code and the [SVG icon](src/codex_auto_continuer/assets/cac.svg); `tests/` owns product regressions; `scripts/` owns build and verification tools. [Docs](Docs/README.md) links the user guide, technical contracts and dated evidence. Audit history is a tracked development record, not a runtime requirement or downloadable-app content.
 
-Our code uses the [MIT license](LICENSE). See [dependency notices](Docs/THIRD-PARTY.md). Runtime data, deployed apps, virtual environments and build output remain local and are excluded from source transports.
+Our code uses the [MIT license](LICENSE). See [dependency notices](Docs/THIRD-PARTY.md). Runtime data, deployed apps, virtual environments, and local build output are not tracked in Git.

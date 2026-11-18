@@ -10,7 +10,10 @@ def main() -> int:
     root = Path(__file__).resolve().parents[1]
     failures = []
     checked = 0
-    for path in [*root.glob("*.md"), *root.joinpath("Docs").rglob("*.md")]:
+    # Current guides can link into history. Historical reports are not build inputs.
+    docs = root / "Docs"
+    guides = (path for path in docs.rglob("*.md") if path.relative_to(docs).parts[0] not in {"Audits", "History"})
+    for path in [*root.glob("*.md"), *guides]:
         text = path.read_text(encoding="utf-8")
         text = re.sub(r"```[^\n]*\n.*?```", "", text, flags=re.S)
         for target in re.findall(r"\[[^\]\n]*\]\(([^\n)]+)\)", text):
